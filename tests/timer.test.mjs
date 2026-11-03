@@ -595,3 +595,105 @@ test('native playing event starts the synchronized timer exactly once', () => {
   assert.equal(count, 1);
   media.destroy();
 });
+
+test('middle videos play even when iOS never emits loadeddata', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  videos[1].readyState = 0;
+  videos[2].readyState = 0;
+  const phases = [];
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+    onPhase: x => phases.push(x),
+  });
+  media.start();
+  await nextLoop();
+  videos[0].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 1, 'brew must advance without loadeddata');
+  assert.equal(videos[1].plays, 1);
+  assert.equal(videos[1].classList.contains('visible'), true);
+  assert.equal(videos[0].classList.contains('visible'), false);
+  videos[1].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 2, 'looping still must advance without loadeddata');
+  assert.equal(videos[2].plays, 1);
+  assert.equal(videos[2].classList.contains('visible'), true);
+  assert.equal(videos[1].classList.contains('visible'), false);
+  media.destroy();
+});
+
+test('reset keeps paused initial fill video visible at frame zero', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  assert.equal(videos[0].classList.contains('visible'), true, 'initial screen has first frame');
+  media.start();
+  await nextLoop();
+  videos[0].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  videos[1].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 2);
+  media.reset();
+  assert.equal(media.phase, -1);
+  assert.equal(videos[0].classList.contains('visible'), true);
+  assert.equal(videos[0].currentTime, 0);
+  assert.ok(videos[0].pauses >= 1);
+  for (let i = 1; i < 4; i++) {
+    assert.equal(videos[i].classList.contains('visible'), false);
+    assert.equal(videos[i].currentTime, 0);
+  }
+  media.start();
+  await nextLoop();
+  assert.equal(media.phase, 0);
+  assert.equal(videos[0].plays, 2, 'after reset Fill restarts from first frame');
+  media.destroy();
+});
+
+test('all four V2 clips are prefetched as independent blobs', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const fetched = [];
+  const revoked = [];
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  await media.preloadAll({
+    fetchImpl: async url => {
+      fetched.push(url);
+      return { ok: true, blob: async () => new Blob([new Uint8Array(2500)], {type:'video/mp4'}) };
+    },
+    createObjectURL: () => 'blob:test-' + fetched.length,
+    revokeObjectURL: url => revoked.push(url),
+  });
+  assert.deepEqual(fetched.map(x => x.split('/').at(-1)).sort(),
+    ['FIllSNB.mp4', 'brewSNB.mp4', 'stillSNB.mp4', 'MILKSNB.mp4'].sort());
+  assert.ok(videos.every(v => v.src.startsWith('blob:test-')));
+  media.destroy();
+  assert.equal(revoked.length, 4, 'destroy revokes all 4 Blob URLs');
+});
+
+test('reset during async middle-video play cannot activate stale transition', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  let allowBrew;
+  videos[1].play = () => new Promise(resolve => { allowBrew = resolve; });
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  media.start();
+  await nextLoop();
+  videos[0].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 0, 'old frame remains while brew is buffering');
+  media.reset();
+  allowBrew();
+  await nextLoop();
+  assert.equal(media.phase, -1);
+  assert.equal(videos[0].classList.contains('visible'), true);
+  assert.equal(videos[1].classList.contains('visible'), false);
+  media.destroy();
+});

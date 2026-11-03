@@ -108,3 +108,19 @@
   adapter reports a playback error. Only the explicit startSynced method
   switches to video-confirmed countdowns.
 - A failed initial MP4 download exposes a retry action in the test UI.
+
+## 2026-11-04: Missing brew / steep transitions and reset frame
+
+- User confirms first video works after explicit preload, but brew and
+  looping steep do not display; first video remains on last frame until milk.
+- Root in V3: show(1)/show(2) waited for Safari loadeddata before calling
+  play(), which may never be dispatched until playback is requested.
+- Explicitly fetch all four compact MP4s (sum < 1 MB) into Blob URLs before
+  Start is enabled, with cleanup and cancellation on unmount.
+- Brew and steep now call play() immediately without loadeddata gate; previous
+  video remains visible until next play Promise succeeds.
+- Reset/initial idle always display paused fill at currentTime=0.
+- Existing milk preauthorization/transition and synchronized countdown retained.
+- Added tests for no-loadeddata middle transitions, all four preloads, reset
+  idle frame, and stale transition cancellation.
+- Await real iPhone acceptance; no changes to V2, Supabase or MUI lab.

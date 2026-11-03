@@ -61,9 +61,9 @@ export default function TimerTest() {
     audio.current = sound;
     mediaRef.current = visuals;
     timer.current = controller;
-    // First video downloaded completely before Start becomes available.
+    // All four short MP4s (<1 MB combined) are downloaded before first Start.
     let mounted = true;
-    visuals.preloadFill()
+    visuals.preloadAll()
       .then(() => { if (mounted) setPreload('ready'); })
       .catch(error => {
         if (!mounted) return;
@@ -117,7 +117,7 @@ export default function TimerTest() {
     if (!visuals) return;
     setIssue('');
     setPreload('loading');
-    visuals.preloadFill()
+    visuals.preloadAll()
       .then(() => { if (mediaRef.current === visuals) setPreload('ready'); })
       .catch(error => {
         if (mediaRef.current === visuals) {
@@ -135,8 +135,8 @@ export default function TimerTest() {
   const startLabel = clock.preparing ? 'Start abbrechen' :
     clock.running ? 'Pause' : clock.finished ? 'Restart' :
     clock.remaining < clock.total ? 'Resume' :
-    preload === 'loading' ? 'Video wird geladen…' :
-    preload === 'error' ? 'Video nicht geladen' : 'Start timer';
+    preload === 'loading' ? 'Videos werden geladen…' :
+    preload === 'error' ? 'Videos nicht geladen' : 'Start timer';
   const startDisabled = !clock.running && !clock.preparing &&
     clock.remaining === clock.total && preload !== 'ready';
 
@@ -186,7 +186,7 @@ export default function TimerTest() {
           Clock: {time} · Milk: {milkRequested ? milkStatus.event : 'not requested'}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
-          First file: {preload === 'ready' ? 'downloaded' :
+          Four videos: {preload === 'ready' ? 'all downloaded' :
             preload === 'loading' ? 'downloading' : 'download failed'}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
@@ -251,8 +251,8 @@ export default function TimerTest() {
         {issue && <Typography role="alert" sx={{ mt: 1, fontSize: 12, color: 'error.main' }}>{issue}</Typography>}
       </Box>
       <Typography sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.9, mt: 2 }}>
-        The first video is downloaded before Start is enabled. The clock
-        starts only after video playback actually begins.
+        All four videos download before Start is enabled. The clock starts
+        when Fill actually plays. Reset holds the first frame until Start.
       </Typography>
       <Typography sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.9, mt: 2 }}>
         Check: fill → brew → still loop, sound at 30s, milk video at 5s,

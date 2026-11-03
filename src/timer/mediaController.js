@@ -50,8 +50,9 @@ export function createMediaController({
   let fillEverPlayed = false;
   let fillBlocked = false;
   let fillStartHandler = null;
-  let fillPreloadPromise = null;
-  let fillBlobCleanup = null;
+  const videoPreloadPromises = Array(4).fill(null);
+  const videoBlobCleanups = Array(4).fill(null);
+  const preloadAbort = new AbortController();
   let session = 0;
   let transitionId = 0;
   let destroyed = false;
@@ -138,6 +139,16 @@ export function createMediaController({
     video.load();
   });
 
+  // The preview should never go blank, including the initial load and Reset.
+  // Once the first video has a decodable frame, keep it visible and paused.
+  videos[0].classList.add('visible');
+  listen(videos[0], 'loadeddata', () => {
+    if (!active && phase === -1) {
+      videos[0].pause();
+      try { videos[0].currentTime = 0; } catch { /* not yet seekable */ }
+      videos[0].classList.add('visible');
+    }
+  });
   for (const event of ['playing', 'timeupdate', 'waiting', 'stalled', 'error', 'ended']) {
     listen(videos[0], event, () => fillEvent(event));
     listen(videos[3], event, () => milkEvent(event));
@@ -145,25 +156,36 @@ export function createMediaController({
   function ready(video) {
     return video.readyState >= 2;
   }
-  function preloadFill({ fetchImpl, createObjectURL, revokeObjectURL } = {}) {
+
+  // Every clip is < 0.5 MB in the pinned V2 snapshot. Explicitly fetch all
+  // four instead of relying on iPhone's advisory preload="auto" behavior.
+  // In particular, brew and steep must not wait forever for loadeddata.
+  function preloadVideo(index, { fetchImpl, createObjectURL, revokeObjectURL } = {}) {
     if (destroyed) return Promise.reject(new Error('Media controller disposed.'));
-    if (fillPreloadPromise) return fillPreloadPromise;
-    // Explicitly fetch full video bytes. iOS may only preload metadata.
-    fillPreloadPromise = prefetchVideoAsBlob({
-      video: videos[0], url: path('fill'), fetchImpl,
-      createObjectURL, revokeObjectURL,
+    if (videoPreloadPromises[index]) return videoPreloadPromises[index];
+    const promise = prefetchVideoAsBlob({
+      video: videos[index], url: path(sources[index]), fetchImpl,
+      createObjectURL, revokeObjectURL, signal: preloadAbort.signal,
     }).then(cleanup => {
-      if (destroyed) { cleanup(); throw new Error('Media controller disposed.'); }
-      fillBlobCleanup = cleanup;
-      fillEvent('file-prefetched');
+      if (destroyed || preloadAbort.signal.aborted) {
+        cleanup();
+        throw new Error('Media controller disposed.');
+      }
+      videoBlobCleanups[index] = cleanup;
+      if (index === 0) fillEvent('file-prefetched');
       return true;
     }).catch(error => {
-      fillPreloadPromise = null;
-      if (!destroyed) onError(new Error('Fill video preload: ' + error.message));
+      if (videoPreloadPromises[index] === promise) videoPreloadPromises[index] = null;
+      if (!destroyed) onError(new Error(sources[index] + ' video preload: ' + error.message));
       throw error;
     });
-    return fillPreloadPromise;
+    videoPreloadPromises[index] = promise;
+    return promise;
   }
+  const preloadFill = options => preloadVideo(0, options);
+  const preloadAll = options => Promise.all(
+    sources.map((_, index) => preloadVideo(index, options)),
+  );
   function waitReady(video) {
     if (ready(video)) return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -207,11 +229,12 @@ export function createMediaController({
     fillBlocked = false;
     fillStartHandler = null;
     stopSounds();
-    videos.forEach(video => {
+    videos.forEach((video, index) => {
       video.pause();
-      video.classList.remove('visible');
+      video.classList.toggle('visible', index === 0);
       try { video.currentTime = 0; } catch { /* metadata not ready */ }
     });
+    // Phase -1 means idle, but the first VIDEO FRAME remains visible.
     onPhase(-1);
     if (!destroyed) {
       milkEvent('reset');
@@ -302,15 +325,14 @@ export function createMediaController({
     const next = videos[i];
     const previous = phase >= 0 ? videos[phase] : null;
     try {
-      // On a cold iPhone launch, preload="auto" may not deliver loadeddata
-      // until playback has been requested. Never wait for loadeddata before
-      // requesting the FIRST fill video from the original Start tap.
-      // Its play() request begins buffering and retains the user gesture.
-      if (i !== 0 && !ready(next)) await waitReady(next);
+      // On iPhone, 'loadeddata' may never fire until play() is requested.
+      // The clips are fetched in advance as Blob URLs. Request playback of
+      // fill/brew/steep immediately; ONLY milk retains its older deferred path.
+      if (i === 3 && !ready(next)) await waitReady(next);
       if (!active || destroyed || id !== session || ownTransition !== transitionId) return;
       try { next.currentTime = 0; } catch (error) {
-        // Some iOS media elements are not seekable before metadata exists.
-        if (i !== 0) throw error;
+        // Do not block a muted MP4 play() merely because metadata is pending.
+        if (i === 3) throw error;
       }
       if (i === 2) { bubblePlayed = false; lastStillTime = 0; }
       if (i === 3) {
@@ -340,21 +362,35 @@ export function createMediaController({
         milkPriming = false;
         milkEvent('play-started');
         next.classList.add('visible');
-      } else {
+      } else if (i === 0) {
+        // First play() MUST be in the original user gesture.
         next.classList.add('visible');
-        if (i === 0) fillEvent('play-requested');
-        // This call must be synchronous from Start, even if readyState is 0.
+        fillEvent('play-requested');
         const p = next.play();
         p?.catch(error => {
           if (destroyed || id !== session || ownTransition !== transitionId) return;
-          if (i === 0) {
-            fillBlocked = true;
-            fillEvent('play-rejected');
-            fillFailed(error);
-          }
-          onError(new Error('Video ' + i + ' playback failed: ' +
+          fillBlocked = true;
+          fillEvent('play-rejected');
+          fillFailed(error);
+          onError(new Error('Video 0 playback failed: ' +
             (error?.message || String(error))));
         });
+      } else {
+        // Ended transitions are asynchronous. Start the next loaded Blob
+        // immediately; only remove the preceding final frame after actual
+        // playback was accepted. Prevents the first video from staying on screen.
+        const p = next.play();
+        try {
+          if (p?.then) await p;
+        } catch (error) {
+          if (!destroyed && id === session && ownTransition === transitionId) {
+            onError(new Error('Video ' + i + ' playback failed: ' +
+              (error?.message || String(error))));
+          }
+          return;
+        }
+        if (destroyed || id !== session || ownTransition !== transitionId) return;
+        next.classList.add('visible');
       }
       if (i === 0) {
         // Pour sound and video are independent. Waiting on an HTMLAudioElement
@@ -402,6 +438,7 @@ export function createMediaController({
     ready: () => videos.every(ready),
     prepare: () => Promise.all(videos.map(waitReady)),
     preloadFill,
+    preloadAll,
     unlock,
     reset,
     start: () => { active = true; void show(0); },
@@ -457,10 +494,8 @@ export function createMediaController({
       destroyed = true;
       reset();
       listeners.forEach(remove => remove());
-      if (fillBlobCleanup) {
-        fillBlobCleanup();
-        fillBlobCleanup = null;
-      }
+      preloadAbort.abort();
+      videoBlobCleanups.forEach(cleanup => cleanup?.());
     },
   };
 }
