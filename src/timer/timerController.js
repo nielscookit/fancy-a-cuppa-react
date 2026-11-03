@@ -98,22 +98,25 @@ export function createTimerController({
       finished = false;
       warnedThirty = false;
     }
-    // IMPORTANT: Execute these synchronously in the originating iPhone tap.
-    audio.unlock();
-    media.unlock();
-    const id = ++requestId;
-    const begin = () => {
-      if (destroyed || id !== requestId || running) return;
-      running = true;
-      deadline = now() + remaining * 1000;
+    // Audio and video unlock remain inside the originating iPhone tap.
+    // Neither media preload nor failed playback is allowed to block the clock.
+    try { audio.unlock(); } catch (error) { onError(error); }
+    try { media.unlock(); } catch (error) { onError(error); }
+    requestId++;
+    running = true;
+    deadline = now() + remaining * 1000;
+    // Start media synchronously in this gesture where possible. The media
+    // controller owns pending loadeddata events and invalidates them on reset.
+    try {
       if (remaining === total) media.start();
       else media.resume();
-      tick();
+    } catch (error) { onError(error); }
+    notify(); // Immediate visible feedback, even when media is still loading.
+    tick();
+    if (running) {
       ticker = scheduler.setInterval(tick, 100);
       void requestWakeLock();
-    };
-    if (media.ready()) begin();
-    else media.prepare().then(begin).catch(onError);
+    }
   }
   function pause() {
     if (!running) return;

@@ -15,3 +15,11 @@
 - Repeated real iPhone Safari playback test; critical acceptance gate.
 - React timer UI integration only after successful hardware confirmation.
 - Production V2 has not been changed and must not be changed.
+
+## iPhone finding / follow-up
+
+- Reported: video loop running without advancing clock or working start/reset.
+- Fault found in implementation: countdown start was gated behind prepare() resolving for all 4 videos.
+- Fix: countdown and reset independent from media loading; first video playback initiated inside the tap if ready.
+- Diagnostic last-action indicator added; automated tests for pending preload, playback errors and steep-loop abort at zero.
+- Must confirm actual iPhone Safari behavior before merging timer into main app.

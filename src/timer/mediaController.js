@@ -148,7 +148,9 @@ export function createMediaController({
     const next = videos[i];
     const previous = phase >= 0 ? videos[phase] : null;
     try {
-      await waitReady(next);
+      // No async boundary before .play() when the video is already ready:
+      // Safari must see the first playback request in the user tap.
+      if (!ready(next)) await waitReady(next);
       if (!active || destroyed || id !== session || ownTransition !== transitionId) return;
       next.currentTime = 0;
       if (i === 2) { bubblePlayed = false; lastStillTime = 0; }
@@ -212,8 +214,9 @@ export function createMediaController({
     pause,
     milk: () => { if (!milkStarted) { milkStarted = true; void show(3); } },
     finish: () => {
-      // The final milk video is intentionally allowed to finish after timer 0.
-      if (!milkStarted) pause();
+      // Only a *playing* milk video may continue after countdown zero.
+      // If the 5s transition never completed, stop the steep loop instead.
+      if (!milkStarted || phase !== 3) pause();
     },
     get milkStarted() { return milkStarted; },
     get phase() { return phase; },

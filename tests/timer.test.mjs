@@ -140,3 +140,78 @@ test('media bundle is pinned to confirmed V2 commit and uses expected filenames'
   assert.equal(Object.keys(MEDIA_ASSETS).length, 10);
   for (const {sha} of Object.values(MEDIA_ASSETS)) assert.match(sha, /^[a-f0-9]{40}$/);
 });
+
+test('countdown starts synchronously even if Safari preload never completes', () => {
+  const t = timerHarness(40);
+  let prepared = false;
+  t.timer.start();
+  assert.equal(t.timer.state().running, true);
+  assert.equal(t.timer.state().remaining, 40);
+  t.advance(11);
+  assert.equal(t.timer.state().remaining, 29);
+  assert.equal(t.events.filter(x => x === 'media:start').length, 1);
+  t.timer.reset();
+  assert.equal(t.timer.state().running, false);
+  assert.equal(t.timer.state().remaining, 40);
+  assert.equal(t.events.at(-2), 'media:reset');
+  t.advance(35);
+  assert.equal(t.timer.state().remaining, 40);
+  t.timer.destroy();
+});
+
+test('media unlock error must not prevent a functioning countdown', () => {
+  let milliseconds = 0;
+  const events = [];
+  const media = {
+    unlock: () => { throw new Error('Safari audio denied'); },
+    start: () => { throw new Error('Video unavailable'); },
+    pause: () => events.push('pause'),
+    reset: () => {}, finish: () => {}, destroy: () => {},
+  };
+  const audio = {
+    unlock: () => { throw new Error('Audio unavailable'); },
+    reset: () => {}, playAlmost: () => {}, playFinished: () => Promise.resolve(),
+    destroy: () => {},
+  };
+  const errors = [];
+  const timer = createTimerController({
+    media, audio, initialSeconds: 40, onError: e => errors.push(e.message),
+    now: () => milliseconds,
+    scheduler: { setInterval: () => 1, clearInterval: () => {} },
+    documentRef: { hidden: false, addEventListener: () => {}, removeEventListener: () => {} },
+    navigatorRef: {},
+  });
+  timer.start();
+  assert.equal(timer.state().running, true);
+  milliseconds = 2000;
+  timer.tick();
+  assert.equal(timer.state().remaining, 38);
+  assert.equal(errors.length, 3);
+  timer.reset();
+  assert.equal(timer.state().remaining, 40);
+  assert.equal(timer.state().running, false);
+  timer.destroy();
+});
+
+test('media at timer zero cannot leave stalled steep video running', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const media = createMediaController({
+    videos,
+    assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  media.start();
+  await nextLoop();
+  videos[0].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  videos[1].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 2);
+  // Simulate iPhone not loading / completing the milk video before zero.
+  videos[3].readyState = 0;
+  media.milk();
+  media.finish();
+  assert.ok(videos[2].pauses >= 1);
+  media.reset();
+  media.destroy();
+});

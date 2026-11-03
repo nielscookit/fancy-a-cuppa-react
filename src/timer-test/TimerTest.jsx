@@ -15,6 +15,7 @@ export default function TimerTest() {
   const [phase, setPhase] = useState(-1);
   const [issue, setIssue] = useState('');
   const [attempts, setAttempts] = useState(0);
+  const [lastAction, setLastAction] = useState('None');
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL + 'media/';
@@ -51,15 +52,18 @@ export default function TimerTest() {
 
   function selectDuration(seconds) {
     setIssue('');
+    setLastAction('Duration ' + seconds + 's');
     timer.current?.setSeconds(seconds);
   }
   function toggle() {
     setIssue('');
-    if (!clock.running) setAttempts(x => x + 1);
+    setLastAction(timer.current?.state().running ? 'Pause' : 'Start / resume');
+    if (!timer.current?.state().running) setAttempts(x => x + 1);
     timer.current?.toggle();
   }
   function reset() {
     setIssue('');
+    setLastAction('Reset');
     timer.current?.reset();
   }
   function soundCheck() {
@@ -139,7 +143,7 @@ export default function TimerTest() {
 
       <Box aria-live="polite" sx={{ mt: 2, minHeight: 40 }}>
         <Typography sx={{ fontSize: 12 }}>
-          Starts: {attempts} · Video phase: {phase < 0 ? 'Idle' : PHASES[phase]}
+          Starts: {attempts} · Last action: {lastAction} · Video phase: {phase < 0 ? 'Idle' : PHASES[phase]}
         </Typography>
         {issue && <Typography role="alert" sx={{ mt: 1, fontSize: 12, color: 'error.main' }}>{issue}</Typography>}
       </Box>
