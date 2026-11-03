@@ -1,19 +1,17 @@
 # Fancy a Cuppa V3 — migration status
 
-## Completed
+## Complete
+- V2 main reference 203782e33b4d52184091c171008bccdbb6437057; V2 unchanged.
+- React, Vite, MUI 7, Roboto Mono, pinned npm lockfile, independent GitHub Pages.
+- Existing Supabase reads verified (two teas); writes mocked in tests.
+- /lab/ standalone real MUI component lab, local preview-only settings.
+- React-independent timer, audio, media controllers based on V2 timing.
+- /timer-test/ diagnostic to verify real iPhone behavior before further app migration.
+- 10 V2 audio/video files copied at deployment from pinned SHA and blob-hash checked;
+  runtime assets served from independent V3 GitHub Pages path.
 
-1. V2 repository audited; production V2 untouched.
-2. React/Vite/MUI scaffold, pinned lockfile, global Roboto Mono.
-3. Independent GitHub Pages deployment.
-4. Supabase catalog REST/Edge Function adapter; live read verified, writes mocked.
-5. Component Lab as independent Vite entry:
-   - /fancy-a-cuppa-react/lab/
-   - Real MUI TextField, Select, Autocomplete, Button
-   - Interactive variant, height, radius, semantic color, state
-   - Lab-only React state/sx, no global theme edits or database calls
-   - Responsive iPhone layout, no new packages
-
-## Next
-
-Port media/timer logic into React-independent controller in src/timer.
-Test repeatable playback on iPhone before further migration.
+## Outstanding
+- GitHub Actions build and route/media integrity check.
+- Repeated real iPhone Safari playback test; critical acceptance gate.
+- React timer UI integration only after successful hardware confirmation.
+- Production V2 has not been changed and must not be changed.

@@ -1,27 +1,33 @@
 # Fancy a Cuppa V3 — React / Vite / MUI
 
-V3 is an isolated development repository. The V2 repository is unchanged.
+Independent V3 repository. The functioning V2 application, database schema and
+existing database records remain untouched.
 
-## Apps / URLs
+## Current direct GitHub Pages URLs
 
-- Technical V3 test page: https://nielscookit.github.io/fancy-a-cuppa-react/
-- Independent MUI component lab: https://nielscookit.github.io/fancy-a-cuppa-react/lab/
+- Main technical V3 app: https://nielscookit.github.io/fancy-a-cuppa-react/
+- MUI component lab: https://nielscookit.github.io/fancy-a-cuppa-react/lab/
+- Independent iPhone timer/media diagnostic: https://nielscookit.github.io/fancy-a-cuppa-react/timer-test/
 
-The lab has its own HTML entry (`lab/index.html`) and React root (`src/lab/main.jsx`).
-It uses the shared read-only theme definition (`src/theme.js`) with Roboto Mono.
-All preview overrides are local `sx` props; no theme object or global styles are mutated.
-No lab component imports the Supabase repository or timer.
+The component lab imports the existing ThemeProvider/Roboto Mono but has its own
+Vite HTML entry. It previews real MUI TextField/Select/Autocomplete/Button with
+local variant/height/radius/color/state controls. Lab state does not touch the
+global theme, App, timer or Supabase.
 
-The current lab previews real MUI TextField, Select, Autocomplete and Button:
-variant, height (px), radius (px), semantic theme color and available interaction
-states. Preview values remain only in React state; no persistence or API writes.
+## Isolated timer migration
 
-## Database
+The framework-independent controllers in `src/timer/` mirror the V2 deadline,
+30-second reminder, 5-second milk animation, finishing sound and established
+four-video sequence. The UI is intentionally only a diagnostic test page.
 
-The V3 main test page uses the existing Supabase catalog with publishable key
-and public RLS-protected REST reads. Explicit create/update actions use the
-existing Edge Function `community-tea`; the lab never does. Live CI runs
-read-only integration checks, with writes mocked.
+Video and audio assets are downloaded from a **pinned V2 commit**, checked by
+Git blob SHA-1 and included in the separate V3 build. The live V3 page
+does not load media from V2 URLs. No binary files are committed, and V2 is
+never modified.
+
+**Required acceptance gate:** repeat video/sound on a real iPhone Safari, test
+pause/resume, finishing cues, screen lock, going background/foreground. CI JS
+tests cannot prove mobile Safari media autoplay rules.
 
 ## Development
 
@@ -30,20 +36,15 @@ npm ci
 npm run check:safety
 npm test
 npm run verify:catalog
+npm run sync:media
+npm run build
+npm run verify:pages
 npm run dev
 ```
 
-Locally open /fancy-a-cuppa-react/lab/ (or /lab/ if using vite's dev fallback);
-the production build publishes the exact /fancy-a-cuppa-react/lab/ path.
+## Database
 
-## Deployment
-
-Push to main triggers a pinned-dependency `npm ci`, safety check,
-tests, live Supabase read, multi-page Vite build and GitHub Pages deployment.
-
-## V2 isolation
-
-- Repository: nielscookit/fancy-a-cuppa; inspected SHA 203782e33b4d52184091c171008bccdbb6437057.
-- Existing earlier freeze SHA ae86dd38d3ea0eaf37fc55dac3d2ccbe777e67c5.
-- Do not alter V2 sources during V3 migration.
-- Keep React-independent media controller in src/timer, with iPhone-repeatability tests before further migration.
+Main V3 test app connects to the existing Supabase project using a public
+publishable key and RLS-protected REST queries. Writes from future forms
+will go through the pre-existing community-tea Edge Function. No database
+connection or write functions are used in /lab/ or /timer-test/.

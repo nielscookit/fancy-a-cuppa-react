@@ -9,6 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "check:safety": "node scripts/safety-check.mjs",
     "verify:catalog": "node scripts/check-supabase.mjs",
+    "sync:media": "node scripts/sync-v2-media.mjs",
+    "verify:pages": "node scripts/verify-pages.mjs",
     "test": "node --test"
   },
   "dependencies": {

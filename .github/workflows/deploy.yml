@@ -36,8 +36,12 @@ jobs:
         run: npm test
       - name: Verify live Supabase read (no writes)
         run: npm run verify:catalog
+      - name: Copy and hash-verify V2 media into isolated V3
+        run: npm run sync:media
       - name: Build
         run: npm run build
+      - name: Verify independent Pages routes and media
+        run: npm run verify:pages
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - name: Upload artifact
