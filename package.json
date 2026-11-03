@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "check:safety": "node scripts/safety-check.mjs",
+    "verify:catalog": "node scripts/check-supabase.mjs",
     "test": "node --test"
   },
   "dependencies": {

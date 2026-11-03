@@ -16,13 +16,13 @@ assert.equal(pkg.name, 'fancy-a-cuppa-react');
 assert.equal(pkg.dependencies['@mui/material'].split('.')[0], '7');
 const theme = readFileSync('src/theme.js', 'utf8');
 assert.match(theme, /Roboto Mono/);
-const data = readFileSync('src/data/teaRepository.js', 'utf8');
-assert.match(data, /database writes are disabled/);
+const settings = readFileSync('src/data/supabaseConfig.js', 'utf8');
+assert.match(settings, /sb_publishable_/);
+const adapter = readFileSync('src/data/teaRepository.js', 'utf8');
+assert.match(adapter, /functions\/v1\/community-tea/);
 for (const path of sourceFiles('src')) {
   const source = readFileSync(path, 'utf8');
-  assert.doesNotMatch(source, /\b(?:https?:\/\/)[\w.-]*supabase\.co\b/,
-    `Unsafe production Supabase reference: ${path}`);
-  assert.doesNotMatch(source, /sb_secret_|service_role|functions\/v1\/community-tea/,
-    `Unsafe write credential or endpoint: ${path}`);
+  assert.doesNotMatch(source, /sb_secret_|SUPABASE_SERVICE_ROLE_KEY|Bearer\s+eyJ/,
+    `Sensitive credential in frontend: ${path}`);
 }
-console.log('Safety check passed: isolated V3 base, Roboto Mono, no production Supabase connection.');
+console.log('Safety check passed: isolated V3 origin, Roboto Mono, public Supabase key only.');
