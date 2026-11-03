@@ -58,3 +58,5 @@
 - Removed duplicate load() in waitReady(), which could interrupt pending play
   on iOS. Also inspect actual MILKSNB.mp4 duration in CI via ffprobe.
 - No claim of correct iPhone milk playback until device retest.
+
+- CI runner lacks ffprobe; use a dependency-free parser of MP4 moov/mvhd duration to verify each original clip.

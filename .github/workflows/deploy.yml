@@ -39,12 +39,7 @@ jobs:
       - name: Copy and hash-verify V2 media into isolated V3
         run: npm run sync:media
       - name: Inspect exact milk-video duration
-        run: |
-          if command -v ffprobe >/dev/null 2>&1; then
-            ffprobe -v error -show_entries format=duration:stream=index,codec_name,duration -of json public/media/MILKSNB.mp4
-          else
-            echo "ffprobe not available on runner"
-          fi
+        run: node scripts/inspect-media-duration.mjs
       - name: Build
         run: npm run build
       - name: Verify independent Pages routes and media
