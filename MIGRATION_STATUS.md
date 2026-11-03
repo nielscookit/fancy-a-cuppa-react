@@ -44,3 +44,17 @@
 - Running clock state is notified before synchronous audio/video setup; diagnostic page additionally displays tenths and "milk requested/loading".
 - Automated tests include milk loaded after zero, resetting during pending load, and immediate start notification.
 - Real iPhone playback still needs approval before migration to the production V3 UI.
+
+## 2026-11-03: iPhone test, visible time discrepancy and missing milk
+
+- Screenshots: 00:36 versus live 35.2s; 00:02 versus live 1.2s.
+- **Not two independent clock readings.** The old UI rounded up to a whole
+  second while the debug line displayed tenths. Both now use one shared
+  tenth-second formatter on the diagnostic page.
+- Previous "Milk: playing / last frame" was based on a phase variable, not on
+  an HTMLMediaElement playing event; it could falsely report playback.
+- Added actual native playback telemetry: requested, playing/timeupdate,
+  waiting, stalled, play-rejected, media time/duration/ready state and errors.
+- Removed duplicate load() in waitReady(), which could interrupt pending play
+  on iOS. Also inspect actual MILKSNB.mp4 duration in CI via ffprobe.
+- No claim of correct iPhone milk playback until device retest.

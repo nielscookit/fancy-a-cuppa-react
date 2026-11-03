@@ -11,6 +11,7 @@ export function createMediaController({
   onError = () => {},
   onPhase = () => {},
   onMilkRequested = () => {},
+  onMilkEvent = () => {},
   audioFactory = url => new Audio(url),
   schedule = setTimeout,
   clearSchedule = clearTimeout,
@@ -38,10 +39,36 @@ export function createMediaController({
   let lastStillTime = 0;
   let milkSoundTriggered = false;
   let milkSoundTimer = null;
+  let milkLastEvent = 'idle';
+  let milkEverPlayed = false;
   let session = 0;
   let transitionId = 0;
   let destroyed = false;
   const listeners = [];
+
+  function getMilkStatus() {
+    const video = videos[3];
+    const duration = Number(video.duration);
+    return {
+      requested: milkStarted,
+      phase,
+      event: milkLastEvent,
+      everPlayed: milkEverPlayed,
+      currentTime: Number(video.currentTime) || 0,
+      duration: Number.isFinite(duration) ? duration : null,
+      readyState: video.readyState,
+      paused: !!video.paused,
+      ended: !!video.ended,
+      errorCode: video.error?.code || null,
+    };
+  }
+  function milkEvent(event) {
+    milkLastEvent = event;
+    if (event === 'playing' || (event === 'timeupdate' && videos[3].currentTime > 0.05)) {
+      milkEverPlayed = true;
+    }
+    if (!destroyed) onMilkEvent(getMilkStatus());
+  }
 
   function listen(element, name, fn) {
     element.addEventListener(name, fn);
@@ -59,6 +86,9 @@ export function createMediaController({
     video.load();
   });
 
+  for (const event of ['playing', 'timeupdate', 'waiting', 'stalled', 'error', 'ended']) {
+    listen(videos[3], event, () => milkEvent(event));
+  }
   function ready(video) {
     return video.readyState >= 2;
   }
@@ -73,7 +103,8 @@ export function createMediaController({
       };
       video.addEventListener('loadeddata', done);
       video.addEventListener('error', fail);
-      video.load();
+      // Already called load() once during construction. Calling it again
+      // can abort an in-progress video play request in Safari.
     });
   }
   function stopSounds() {
@@ -94,6 +125,8 @@ export function createMediaController({
     bubblePlayed = false;
     lastStillTime = 0;
     milkSoundTriggered = false;
+    milkLastEvent = 'idle';
+    milkEverPlayed = false;
     stopSounds();
     videos.forEach(video => {
       video.pause();
@@ -101,6 +134,7 @@ export function createMediaController({
       try { video.currentTime = 0; } catch { /* metadata not ready */ }
     });
     onPhase(-1);
+    if (!destroyed) milkEvent('reset');
   }
 
   // Call in the same direct user-gesture handler as timer start; copied from V2.
@@ -162,11 +196,15 @@ export function createMediaController({
         sounds.milk.currentTime = 0;
       }
       next.classList.add('visible');
+      if (i === 3) milkEvent('play-requested');
       const p = next.play();
-      p?.catch(error => onError(new Error(
-        (i === 3 ? 'Milk video' : 'Video ' + i) +
-          ' playback failed: ' + (error?.message || String(error)),
-      )));
+      p?.catch(error => {
+        if (i === 3) milkEvent('play-rejected');
+        onError(new Error(
+          (i === 3 ? 'Milk video' : 'Video ' + i) +
+            ' playback failed: ' + (error?.message || String(error)),
+        ));
+      });
       if (i === 0) {
         try {
           sounds.pour.currentTime = 0;
@@ -220,6 +258,7 @@ export function createMediaController({
       if (destroyed || !active || milkStarted) return;
       milkStarted = true;
       onMilkRequested();
+      milkEvent('requested');
       // Loading is asynchronous in Safari; do NOT cancel this request at 0s.
       void show(3);
     },
@@ -240,6 +279,7 @@ export function createMediaController({
     },
     get milkStarted() { return milkStarted; },
     get phase() { return phase; },
+    getMilkStatus,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;

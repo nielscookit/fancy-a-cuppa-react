@@ -352,3 +352,28 @@ test('running state is published synchronously before media processing', () => {
   ]);
   timer.destroy();
 });
+
+test('milk playback telemetry is distinct from the requested phase', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const events = [];
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+    onMilkEvent: info => events.push(info),
+  });
+  media.start();
+  await nextLoop();
+  media.milk();
+  await nextLoop();
+  const requested = events.find(x => x.event === 'requested');
+  assert.equal(requested.requested, true);
+  assert.equal(requested.everPlayed, false, 'requested does not prove actual playback');
+  videos[3].currentTime = 1.5;
+  videos[3].dispatchEvent(new Event('timeupdate'));
+  assert.equal(media.getMilkStatus().currentTime, 1.5);
+  assert.equal(media.getMilkStatus().everPlayed, true);
+  media.reset();
+  assert.equal(media.getMilkStatus().requested, false);
+  assert.equal(media.getMilkStatus().everPlayed, false);
+  media.destroy();
+});

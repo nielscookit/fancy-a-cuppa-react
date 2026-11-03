@@ -3,6 +3,7 @@ import { Box, Button, Paper, Stack, Typography } from '@mui/material';
 import { createMediaController } from '../timer/mediaController.js';
 import { createAudioController } from '../timer/audioController.js';
 import { createTimerController } from '../timer/timerController.js';
+import { formatCountdown } from '../timer/formatCountdown.js';
 
 const PHASES = ['Fill', 'Brew', 'Steep (loop)', 'Milk'];
 const DURATIONS = [40, 60, 120, 240];
@@ -14,6 +15,10 @@ export default function TimerTest() {
   const [clock, setClock] = useState({ total: 40, remaining: 40, running: false, finished: false });
   const [phase, setPhase] = useState(-1);
   const [milkRequested, setMilkRequested] = useState(false);
+  const [milkStatus, setMilkStatus] = useState({
+    event: 'idle', currentTime: 0, duration: null,
+    everPlayed: false, paused: true, readyState: 0, errorCode: null,
+  });
   const [issue, setIssue] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [lastAction, setLastAction] = useState('None');
@@ -29,6 +34,7 @@ export default function TimerTest() {
       assetBase: base,
       onPhase: setPhase,
       onMilkRequested: () => setMilkRequested(true),
+      onMilkEvent: info => setMilkStatus(info),
       onError: e => {
         console.warn('Media playback:', e);
         setIssue('Video/audio: ' + (e?.message || String(e)));
@@ -38,7 +44,10 @@ export default function TimerTest() {
       media: visuals,
       audio: sound,
       initialSeconds: 40,
-      onUpdate: setClock,
+      onUpdate: snapshot => {
+        setClock(snapshot);
+        setMilkStatus(visuals.getMilkStatus());
+      },
       onError: e => setIssue('Timer/audio: ' + (e?.message || String(e))),
     });
     audio.current = sound;
@@ -78,9 +87,7 @@ export default function TimerTest() {
     audio.current?.unlock();
     audio.current?.playFinished().catch(e => setIssue('Finished sound: ' + e.message));
   }
-  const seconds = Math.max(0, Math.ceil(clock.remaining));
-  const time = String(Math.floor(seconds / 60)).padStart(2, '0')
-    + ':' + String(seconds % 60).padStart(2, '0');
+  const time = formatCountdown(clock.remaining);
   const startLabel = clock.running ? 'Pause' : clock.finished ? 'Restart' :
     clock.remaining < clock.total ? 'Resume' : 'Start timer';
 
@@ -116,7 +123,7 @@ export default function TimerTest() {
           ))}
         </Box>
         <Typography role="timer" aria-live="off" sx={{
-          fontSize: 'clamp(44px, 13vw, 64px)', fontWeight: 600,
+          fontSize: 'clamp(38px, 10vw, 58px)', fontWeight: 600,
           fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.05em',
         }}>
           {time}
@@ -126,9 +133,14 @@ export default function TimerTest() {
           {' · '}{phase < 0 ? 'No video' : PHASES[phase]}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.6 }}>
-          Live: {clock.remaining.toFixed(1)}s · Milk: {milkRequested
-            ? (phase === 3 ? 'playing / last frame' : 'requested – loading')
-            : 'not requested'}
+          Clock: {time} · Milk: {milkRequested ? milkStatus.event : 'not requested'}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
+          Milk video: {milkStatus.currentTime.toFixed(1)}s
+          /{milkStatus.duration == null ? 'duration unknown' : milkStatus.duration.toFixed(1) + 's'}
+          {' · '}loaded: {milkStatus.readyState}
+          {' · '}played: {milkStatus.everPlayed ? 'yes' : 'no'}
+          {milkStatus.errorCode != null ? ' · media error: ' + milkStatus.errorCode : ''}
         </Typography>
       </Paper>
 
