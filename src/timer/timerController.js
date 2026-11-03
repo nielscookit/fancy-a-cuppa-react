@@ -114,8 +114,7 @@ export function createTimerController({
       preparing = false;
       running = true;
       deadline = now() + remaining * 1000;
-      notify();
-      tick();
+      tick(); // Performs the one initial UI notification.
       if (running) {
         try { ticker = scheduler.setInterval(tick, 100); }
         catch (error) { onError(error); }
