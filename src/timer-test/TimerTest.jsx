@@ -112,6 +112,20 @@ export default function TimerTest() {
     setLastAction('Manual milk playback');
     mediaRef.current?.retryMilkPlayback();
   }
+  function retryDownload() {
+    const visuals = mediaRef.current;
+    if (!visuals) return;
+    setIssue('');
+    setPreload('loading');
+    visuals.preloadFill()
+      .then(() => { if (mediaRef.current === visuals) setPreload('ready'); })
+      .catch(error => {
+        if (mediaRef.current === visuals) {
+          setPreload('error');
+          setIssue('Fill video download: ' + (error?.message || String(error)));
+        }
+      });
+  }
   function soundCheck() {
     setIssue('');
     audio.current?.unlock();
@@ -192,6 +206,12 @@ export default function TimerTest() {
         </Typography>
       </Paper>
 
+      {preload === 'error' && (
+        <Button variant="outlined" fullWidth onClick={retryDownload}
+          sx={{ mt: 2, minHeight: 48, height: 48 }}>
+          Video erneut laden
+        </Button>
+      )}
       {milkStatus.blocked && milkRequested && (
         <Button
           variant="contained"

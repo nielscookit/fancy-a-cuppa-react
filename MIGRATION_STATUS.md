@@ -103,3 +103,8 @@
 - Added regression tests for video playback synchronization, cancellation,
   full prefetch and failed prefetch; iPhone verification remains pending.
 - V2, global theme, component lab, Supabase untouched.
+
+- Legacy clock-only controllers retain immediate starts even if their media
+  adapter reports a playback error. Only the explicit startSynced method
+  switches to video-confirmed countdowns.
+- A failed initial MP4 download exposes a retry action in the test UI.

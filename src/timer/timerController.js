@@ -129,18 +129,22 @@ export function createTimerController({
       notify();
       onError(error);
     }
-    notify();
-    // The following play() calls stay in the direct iPhone tap.
+    // Existing generic timers keep their established immediate clock start.
+    // Only the V3 media controller opts into playback-synchronized starts.
+    if (syncToFill) notify();
+    else beginClock();
+    // Play/unlock is synchronous from the originating user tap.
     try { audio.unlock(); } catch (error) { onError(error); }
     try { media.unlock(); } catch (error) { onError(error); }
-    try {
-      if (syncToFill) media.startSynced(beginClock, failedStart);
-      else {
+    if (syncToFill) {
+      try { media.startSynced(beginClock, failedStart); }
+      catch (error) { failedStart(error); }
+    } else {
+      try {
         if (remaining === total) media.start();
         else media.resume();
-        beginClock();
-      }
-    } catch (error) { failedStart(error); }
+      } catch (error) { onError(error); }
+    }
   }
   function pause() {
     if (preparing) { stop(); notify(); return; }
