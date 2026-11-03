@@ -465,3 +465,62 @@ test('reset invalidates pending milk prime so a late Promise cannot reset active
   assert.equal(media.getMilkStatus().priming, false);
   media.destroy();
 });
+
+test('cold iPhone first Start invokes fill.play immediately without waiting for loadeddata', async () => {
+  let gesture = true;
+  let resolvePlay;
+  class ColdVideo extends FakeVideo {
+    constructor() {
+      super();
+      this.readyState = 0; // iOS preload=auto ignored on fresh page.
+      this.restricted = true;
+    }
+    play() {
+      this.plays++;
+      if (!gesture) return Promise.reject(new Error('NotAllowedError: no gesture'));
+      return new Promise(resolve => { resolvePlay = resolve; });
+    }
+  }
+  const videos = [new ColdVideo(), new FakeVideo(), new FakeVideo(), new FakeVideo()];
+  const events = [];
+  const media = createMediaController({
+    videos,
+    assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+    onFillEvent: info => events.push(info.event),
+  });
+  // Unlike prior code, no loadeddata event is ever sent.
+  media.start();
+  gesture = false;
+  assert.equal(videos[0].plays, 1, 'fill.play() must happen in first tap, readyState=0');
+  assert.equal(media.phase, 0, 'fill phase must not wait for video to buffer');
+  assert.equal(media.getFillStatus().event, 'play-requested');
+  assert.equal(media.getFillStatus().blocked, false);
+  resolvePlay();
+  await nextLoop();
+  media.reset();
+  assert.equal(media.phase, -1);
+  media.destroy();
+});
+
+test('pending pour sound does not delay fill phase or prevent next video transition', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  let pendingPour = false;
+  const audioFactory = url => {
+    const audio = new FakeAudio(url);
+    if (url.endsWith('BrewNEW2.mp3')) {
+      audio.play = () => { pendingPour = true; return new Promise(() => {}); };
+    }
+    return audio;
+  };
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/', audioFactory,
+  });
+  media.start();
+  assert.equal(pendingPour, true);
+  assert.equal(media.phase, 0, 'phase must become fill even if audio play never settles');
+  videos[0].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 1, 'unresolved pour sound must not block brew');
+  media.destroy();
+});

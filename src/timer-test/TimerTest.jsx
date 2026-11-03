@@ -16,6 +16,10 @@ export default function TimerTest() {
   const [clock, setClock] = useState({ total: 40, remaining: 40, running: false, finished: false });
   const [phase, setPhase] = useState(-1);
   const [milkRequested, setMilkRequested] = useState(false);
+  const [fillStatus, setFillStatus] = useState({
+    event: 'idle', currentTime: 0, readyState: 0,
+    everPlayed: false, blocked: false, paused: true, errorCode: null,
+  });
   const [milkStatus, setMilkStatus] = useState({
     event: 'idle', currentTime: 0, duration: null,
     everPlayed: false, paused: true, readyState: 0, errorCode: null,
@@ -36,6 +40,7 @@ export default function TimerTest() {
       onPhase: setPhase,
       onMilkRequested: () => setMilkRequested(true),
       onMilkEvent: info => setMilkStatus(info),
+      onFillEvent: info => setFillStatus(info),
       onError: e => {
         console.warn('Media playback:', e);
         setIssue('Video/audio: ' + (e?.message || String(e)));
@@ -48,6 +53,7 @@ export default function TimerTest() {
       onUpdate: snapshot => {
         setClock(snapshot);
         setMilkStatus(visuals.getMilkStatus());
+        setFillStatus(visuals.getFillStatus());
       },
       onError: e => setIssue('Timer/audio: ' + (e?.message || String(e))),
     });
@@ -142,6 +148,13 @@ export default function TimerTest() {
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.6 }}>
           Clock: {time} · Milk: {milkRequested ? milkStatus.event : 'not requested'}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
+          Fill video: {fillStatus.currentTime.toFixed(1)}s
+          {' · '}loaded: {fillStatus.readyState}
+          {' · '}state: {fillStatus.event}
+          {' · '}played: {fillStatus.everPlayed ? 'yes' : 'no'}
+          {fillStatus.errorCode != null ? ' · media error: ' + fillStatus.errorCode : ''}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
           Milk video: {milkStatus.currentTime.toFixed(1)}s

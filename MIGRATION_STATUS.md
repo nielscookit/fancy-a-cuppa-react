@@ -75,3 +75,18 @@
 - Priming is excluded from the "played" telemetry, and reset prevents late
   priming callbacks from disrupting a new timer session.
 - Browser acceptance on iPhone is still unverified until the user retests.
+
+## Cold-start iPhone issue (after working milk fix)
+
+- User reports the very first Start tap counts down but video does not
+  begin until another tap or a Reset. Subsequent attempts work.
+- Identified risk: `show(0)` awaited `loadeddata` before calling `play()`,
+  but iOS can defer the first video's data until play() is requested.
+- Additionally `show(0)` awaited the pour-audio `play()` Promise, which could
+  block phase completion/transition in Safari.
+- Change: request fill.play() directly and synchronously in the initial
+  tap, regardless of readyState; separate pour-audio Promise from
+  phase transitions. Milk pre-authorization remains unchanged.
+- Added diagnostics for fill video readyState/time/playing/rejection and
+  tests for cold preload=0 plus a never-settling pour audio promise.
+- Real first-start iPhone behavior must be confirmed; V2/lab/DB unaffected.
