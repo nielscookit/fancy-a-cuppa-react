@@ -41,6 +41,9 @@ export function createMediaController({
   let milkSoundTimer = null;
   let milkLastEvent = 'idle';
   let milkEverPlayed = false;
+  let milkPriming = false;
+  let milkPrimed = false;
+  let milkBlocked = false;
   let session = 0;
   let transitionId = 0;
   let destroyed = false;
@@ -54,6 +57,9 @@ export function createMediaController({
       phase,
       event: milkLastEvent,
       everPlayed: milkEverPlayed,
+      priming: milkPriming,
+      primed: milkPrimed,
+      blocked: milkBlocked,
       currentTime: Number(video.currentTime) || 0,
       duration: Number.isFinite(duration) ? duration : null,
       readyState: video.readyState,
@@ -64,8 +70,13 @@ export function createMediaController({
   }
   function milkEvent(event) {
     milkLastEvent = event;
-    if (event === 'playing' || (event === 'timeupdate' && videos[3].currentTime > 0.05)) {
+    // Hidden priming playback is NOT evidence that the milk animation
+    // appeared at the end of the timer.
+    if (milkStarted && !milkPriming &&
+      (event === 'playing' || event === 'play-started' ||
+        (event === 'timeupdate' && videos[3].currentTime > 0.05))) {
       milkEverPlayed = true;
+      milkBlocked = false;
     }
     if (!destroyed) onMilkEvent(getMilkStatus());
   }
@@ -127,6 +138,9 @@ export function createMediaController({
     milkSoundTriggered = false;
     milkLastEvent = 'idle';
     milkEverPlayed = false;
+    milkPriming = false;
+    milkPrimed = false;
+    milkBlocked = false;
     stopSounds();
     videos.forEach(video => {
       video.pause();
@@ -137,9 +151,46 @@ export function createMediaController({
     if (!destroyed) milkEvent('reset');
   }
 
-  // Call in the same direct user-gesture handler as timer start; copied from V2.
+  // iOS WKWebView can reject a later .play() (NotAllowedError), even for
+  // an already-loaded muted video. Prime the ACTUAL milk <video> element
+  // synchronously in the initial Start tap, before any Promise/await.
+  // Preloading the media file alone does not grant playback permission.
+  function primeMilkVideo() {
+    if (destroyed || milkStarted || milkPriming || milkPrimed) return;
+    const id = session;
+    const video = videos[3];
+    milkPriming = true;
+    milkEvent('priming');
+    let playResult;
+    try {
+      playResult = video.play();
+    } catch {
+      milkPriming = false;
+      milkEvent('prime-rejected');
+      return;
+    }
+    Promise.resolve(playResult).then(() => {
+      if (destroyed || id !== session) return;
+      milkPrimed = true;
+      milkPriming = false;
+      if (!milkStarted) {
+        // Keep its element authorized, but rewind while invisible.
+        video.pause();
+        try { video.currentTime = 0; } catch { /* metadata not ready */ }
+        milkEvent('primed');
+      }
+    }).catch(() => {
+      if (destroyed || id !== session) return;
+      milkPriming = false;
+      // Actual playback may still work at -5s, or via the explicit tap.
+      milkEvent('prime-rejected');
+    });
+  }
+
+  // All playback requests are issued in the direct user gesture.
   function unlock() {
     if (destroyed) return;
+    primeMilkVideo();
     const audio = sounds.milk;
     audio.muted = true;
     let p;
@@ -195,16 +246,35 @@ export function createMediaController({
         sounds.milk.pause();
         sounds.milk.currentTime = 0;
       }
-      next.classList.add('visible');
-      if (i === 3) milkEvent('play-requested');
-      const p = next.play();
-      p?.catch(error => {
-        if (i === 3) milkEvent('play-rejected');
-        onError(new Error(
-          (i === 3 ? 'Milk video' : 'Video ' + i) +
-            ' playback failed: ' + (error?.message || String(error)),
-        ));
-      });
+      if (i === 3) {
+        milkEvent('play-requested');
+        try {
+          // Wait for *confirmed* playback before claiming a visible milk phase.
+          // An iOS NotAllowedError leaves the previous frame in place and
+          // exposes a genuine tap-to-play fallback instead.
+          const p = next.play();
+          if (p?.then) await p;
+        } catch (error) {
+          if (destroyed || id !== session || ownTransition !== transitionId) return;
+          milkBlocked = true;
+          milkEvent('play-rejected');
+          onError(new Error('Milk video playback blocked: ' +
+            (error?.message || String(error))));
+          return;
+        }
+        if (destroyed || id !== session || ownTransition !== transitionId) return;
+        milkBlocked = false;
+        milkPriming = false;
+        milkEvent('play-started');
+        next.classList.add('visible');
+      } else {
+        next.classList.add('visible');
+        const p = next.play();
+        p?.catch(error => onError(new Error(
+          'Video ' + i + ' playback failed: ' +
+          (error?.message || String(error)),
+        )));
+      }
       if (i === 0) {
         try {
           sounds.pour.currentTime = 0;
@@ -257,6 +327,7 @@ export function createMediaController({
     milk: () => {
       if (destroyed || !active || milkStarted) return;
       milkStarted = true;
+      milkPriming = false;
       onMilkRequested();
       milkEvent('requested');
       // Loading is asynchronous in Safari; do NOT cancel this request at 0s.
@@ -280,6 +351,13 @@ export function createMediaController({
     get milkStarted() { return milkStarted; },
     get phase() { return phase; },
     getMilkStatus,
+    retryMilkPlayback: () => {
+      if (!milkStarted || destroyed) return;
+      // Called synchronously from a user tap in the diagnostic UI.
+      milkBlocked = false;
+      milkEvent('manual-retry');
+      void show(3);
+    },
     destroy: () => {
       if (destroyed) return;
       destroyed = true;

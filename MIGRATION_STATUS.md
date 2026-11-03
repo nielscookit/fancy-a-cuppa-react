@@ -60,3 +60,18 @@
 - No claim of correct iPhone milk playback until device retest.
 
 - CI runner lacks ffprobe; use a dependency-free parser of MP4 moov/mvhd duration to verify each original clip.
+
+## 2026-11-03: iPhone NotAllowedError confirmed (MILKSNB.mp4)
+
+- Screenshot: milk loaded (readyState 4), time 0.0, never played, explicit
+  browser error: "The request is not allowed by the user agent or the platform
+  in the current context". This is an autoplay/user-activation restriction,
+  **not** a missing video or proof that the person denied a permission dialog.
+- First fix: prime the actual muted MILKSNB video with a synchronous play() in
+  the original Start tap, then rewind/pause the hidden video. Keep source loaded.
+- Milk phase only marked visible after successful play Promise resolution.
+- If iOS still rejects playback at -5s, show a "Milchvideo jetzt abspielen"
+  button, using a real user gesture to retry (including after timer zero).
+- Priming is excluded from the "played" telemetry, and reset prevents late
+  priming callbacks from disrupting a new timer session.
+- Browser acceptance on iPhone is still unverified until the user retests.

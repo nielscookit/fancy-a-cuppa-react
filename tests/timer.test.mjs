@@ -377,3 +377,91 @@ test('milk playback telemetry is distinct from the requested phase', async () =>
   assert.equal(media.getMilkStatus().everPlayed, false);
   media.destroy();
 });
+
+test('Start gesture primes the actual milk video; playback may later resume without gesture', async () => {
+  let userGesture = false;
+  class GestureVideo extends FakeVideo {
+    constructor() { super(); this.authorized = false; }
+    play() {
+      if (!userGesture && !this.authorized) {
+        return Promise.reject(new Error('NotAllowedError'));
+      }
+      this.authorized = true;
+      return super.play();
+    }
+  }
+  const videos = Array.from({ length: 3 }, () => new FakeVideo());
+  videos.push(new GestureVideo());
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  userGesture = true;
+  media.unlock();
+  media.start();
+  userGesture = false;
+  await nextLoop();
+  assert.equal(media.getMilkStatus().primed, true);
+  assert.equal(media.getMilkStatus().everPlayed, false,
+    'priming must not be reported as visibly played');
+  media.milk();
+  await nextLoop();
+  assert.equal(media.phase, 3);
+  assert.equal(media.getMilkStatus().blocked, false);
+  assert.equal(media.getMilkStatus().everPlayed, true);
+  media.destroy();
+});
+
+test('iOS NotAllowedError keeps previous frame and shows tap-to-play recovery', async () => {
+  let userGesture = false;
+  class GestureVideo extends FakeVideo {
+    play() {
+      if (!userGesture) return Promise.reject(new Error('NotAllowedError'));
+      return super.play();
+    }
+  }
+  const videos = Array.from({ length: 3 }, () => new FakeVideo());
+  videos.push(new GestureVideo());
+  const errors = [];
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+    onError: error => errors.push(error.message),
+  });
+  media.start();
+  await nextLoop();
+  assert.equal(media.phase, 0);
+  media.milk();
+  await nextLoop();
+  assert.equal(media.getMilkStatus().blocked, true);
+  assert.equal(media.phase, 0, 'rejected milk must not pretend to be playing');
+  assert.equal(videos[3].classList.contains('visible'), false);
+  assert.match(errors.at(-1), /Milk video playback blocked: NotAllowedError/);
+  media.finish(); // clock has reached 0
+  userGesture = true;
+  media.retryMilkPlayback();
+  userGesture = false;
+  await nextLoop();
+  assert.equal(media.phase, 3, 'explicit user tap can start milk after timer zero');
+  assert.equal(media.getMilkStatus().blocked, false);
+  assert.equal(videos[3].classList.contains('visible'), true);
+  media.destroy();
+});
+
+test('reset invalidates pending milk prime so a late Promise cannot reset active video', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  let resolvePrime;
+  videos[3].play = () => new Promise(resolve => { resolvePrime = resolve; });
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  media.unlock();
+  assert.equal(media.getMilkStatus().priming, true);
+  media.reset();
+  resolvePrime();
+  await nextLoop();
+  assert.equal(media.getMilkStatus().primed, false);
+  assert.equal(media.getMilkStatus().priming, false);
+  media.destroy();
+});

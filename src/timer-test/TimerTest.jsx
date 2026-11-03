@@ -12,6 +12,7 @@ export default function TimerTest() {
   const videos = useRef([]);
   const timer = useRef(null);
   const audio = useRef(null);
+  const mediaRef = useRef(null);
   const [clock, setClock] = useState({ total: 40, remaining: 40, running: false, finished: false });
   const [phase, setPhase] = useState(-1);
   const [milkRequested, setMilkRequested] = useState(false);
@@ -51,12 +52,14 @@ export default function TimerTest() {
       onError: e => setIssue('Timer/audio: ' + (e?.message || String(e))),
     });
     audio.current = sound;
+    mediaRef.current = visuals;
     timer.current = controller;
     // Preload all videos before the first user start, exactly as in V2.
     visuals.prepare().catch(e => setIssue('Preload: ' + (e?.message || String(e))));
     return () => {
       timer.current = null;
       audio.current = null;
+      mediaRef.current = null;
       controller.destroy();
     };
   }, []);
@@ -81,6 +84,11 @@ export default function TimerTest() {
     setIssue('');
     setLastAction('Reset');
     timer.current?.reset();
+  }
+  function retryMilk() {
+    setIssue('');
+    setLastAction('Manual milk playback');
+    mediaRef.current?.retryMilkPlayback();
   }
   function soundCheck() {
     setIssue('');
@@ -140,10 +148,22 @@ export default function TimerTest() {
           /{milkStatus.duration == null ? 'duration unknown' : milkStatus.duration.toFixed(1) + 's'}
           {' · '}loaded: {milkStatus.readyState}
           {' · '}played: {milkStatus.everPlayed ? 'yes' : 'no'}
+          {' · '}primed: {milkStatus.primed ? 'yes' : 'no'}
           {milkStatus.errorCode != null ? ' · media error: ' + milkStatus.errorCode : ''}
         </Typography>
       </Paper>
 
+      {milkStatus.blocked && milkRequested && (
+        <Button
+          variant="contained"
+          color="warning"
+          fullWidth
+          onClick={retryMilk}
+          sx={{ mt: 2, minHeight: 66, borderRadius: '6px', fontSize: 14 }}
+        >
+          Milchvideo jetzt abspielen
+        </Button>
+      )}
       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 2 }}>
         {DURATIONS.map(seconds => (
           <Button
