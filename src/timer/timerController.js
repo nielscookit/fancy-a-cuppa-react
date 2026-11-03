@@ -106,18 +106,19 @@ export function createTimerController({
     }
     // Audio and video unlock remain inside the originating iPhone tap.
     // Neither media preload nor failed playback is allowed to block the clock.
-    try { audio.unlock(); } catch (error) { onError(error); }
-    try { media.unlock(); } catch (error) { onError(error); }
     requestId++;
     running = true;
     deadline = now() + remaining * 1000;
+    notify(); // Publish the running state immediately after the user gesture.
+    // Unlocks still execute synchronously in that same iPhone tap.
+    try { audio.unlock(); } catch (error) { onError(error); }
+    try { media.unlock(); } catch (error) { onError(error); }
     // Start media synchronously in this gesture where possible. The media
     // controller owns pending loadeddata events and invalidates them on reset.
     try {
       if (remaining === total) media.start();
       else media.resume();
     } catch (error) { onError(error); }
-    notify(); // Immediate visible feedback, even when media is still loading.
     tick();
     if (running) {
       try {

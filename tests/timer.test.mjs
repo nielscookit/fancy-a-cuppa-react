@@ -270,3 +270,85 @@ test('browser-native timer methods use Window receiver and update automatically'
     globalThis.clearInterval = realClearInterval;
   }
 });
+
+test('milk video can start after zero when Safari loading is delayed', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  videos[3].readyState = 0; // iPhone has not decoded milk video yet.
+  const requests = [];
+  const media = createMediaController({
+    videos,
+    assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+    onMilkRequested: () => requests.push('milk'),
+  });
+  media.start();
+  await nextLoop();
+  videos[0].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  videos[1].dispatchEvent(new Event('ended'));
+  await nextLoop();
+  assert.equal(media.phase, 2);
+  media.milk();
+  assert.deepEqual(requests, ['milk']);
+  assert.equal(media.milkStarted, true);
+  media.finish(); // timer reaches zero BEFORE milk loadeddata
+  assert.ok(videos[2].pauses >= 1, 'steep loop must stop at zero');
+  assert.equal(media.phase, 2, 'milk is still loading, not falsely reported as visible');
+  videos[3].readyState = 3;
+  videos[3].dispatchEvent(new Event('loadeddata'));
+  await nextLoop();
+  assert.equal(media.phase, 3, 'pending milk must start after timer zero');
+  assert.ok(videos[3].plays >= 1);
+  videos[3].dispatchEvent(new Event('ended'));
+  assert.equal(videos[3].classList.contains('visible'), true,
+    'leave the finished milk frame visible instead of resetting it');
+  media.reset();
+  assert.equal(videos[3].classList.contains('visible'), false);
+  media.destroy();
+});
+
+test('reset cancels a milk load still pending from the previous timer session', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const media = createMediaController({
+    videos,
+    assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  media.start();
+  await nextLoop();
+  videos[3].readyState = 0;
+  media.milk();
+  media.reset();
+  videos[3].readyState = 3;
+  videos[3].dispatchEvent(new Event('loadeddata'));
+  await nextLoop();
+  assert.equal(media.phase, -1);
+  assert.equal(videos[3].plays, 0, 'stale milk must never play after reset');
+  media.destroy();
+});
+
+test('running state is published synchronously before media processing', () => {
+  let timer;
+  const events = [];
+  const audio = {
+    unlock: () => events.push('audio-unlock'),
+    reset() {}, playAlmost() {}, playFinished: () => Promise.resolve(), destroy() {},
+  };
+  const media = {
+    unlock: () => events.push('video-unlock'),
+    start: () => events.push('media-start'),
+    reset() {}, resume() {}, pause() {}, milk() {}, finish() {}, destroy() {},
+  };
+  timer = createTimerController({
+    media, audio, initialSeconds: 40,
+    onUpdate: state => { if (state.running) events.push('state-running'); },
+    documentRef: { hidden: false, addEventListener() {}, removeEventListener() {} },
+    navigatorRef: {},
+    scheduler: { setInterval: () => 1, clearInterval() {} },
+  });
+  timer.start();
+  assert.deepEqual(events.slice(0, 4), [
+    'state-running', 'audio-unlock', 'video-unlock', 'media-start',
+  ]);
+  timer.destroy();
+});

@@ -35,3 +35,12 @@
   callback if periodic scheduling ever fails.
 - Verify on actual iPhone before accepting migration; React, app, lab, V2 and
   Supabase otherwise unchanged.
+
+## Milk video / start latency correction
+
+- Reconfirmed V2 media matrix: fill + BrewNEW2, brew, looped still + BlubbKlein, 30s AlmostTime, at 5s MILKSNB + BlubbMILCH, at zero tea-finished.
+- Root risk: V3 finish() stopped the media controller while MILKSNB was still waiting for Safari's loadeddata after 0s.
+- Updated: milk request survives the timer reaching zero; old steep video stops and pending milk may still play; last milk frame remains visible.
+- Running clock state is notified before synchronous audio/video setup; diagnostic page additionally displays tenths and "milk requested/loading".
+- Automated tests include milk loaded after zero, resetting during pending load, and immediate start notification.
+- Real iPhone playback still needs approval before migration to the production V3 UI.

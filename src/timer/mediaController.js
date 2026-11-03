@@ -10,6 +10,7 @@ export function createMediaController({
   assetBase,
   onError = () => {},
   onPhase = () => {},
+  onMilkRequested = () => {},
   audioFactory = url => new Audio(url),
   schedule = setTimeout,
   clearSchedule = clearTimeout,
@@ -162,7 +163,10 @@ export function createMediaController({
       }
       next.classList.add('visible');
       const p = next.play();
-      p?.catch(error => onError(error));
+      p?.catch(error => onError(new Error(
+        (i === 3 ? 'Milk video' : 'Video ' + i) +
+          ' playback failed: ' + (error?.message || String(error)),
+      )));
       if (i === 0) {
         try {
           sounds.pour.currentTime = 0;
@@ -212,11 +216,27 @@ export function createMediaController({
       else void show(0);
     },
     pause,
-    milk: () => { if (!milkStarted) { milkStarted = true; void show(3); } },
+    milk: () => {
+      if (destroyed || !active || milkStarted) return;
+      milkStarted = true;
+      onMilkRequested();
+      // Loading is asynchronous in Safari; do NOT cancel this request at 0s.
+      void show(3);
+    },
     finish: () => {
-      // Only a *playing* milk video may continue after countdown zero.
-      // If the 5s transition never completed, stop the steep loop instead.
-      if (!milkStarted || phase !== 3) pause();
+      if (!milkStarted) {
+        pause();
+        return;
+      }
+      // The countdown ends before the milk clip necessarily finishes.
+      // Keep the milk video playing, or keep its pending loadeddata handler
+      // alive so it can start even when loading crosses timer zero.
+      // Stop previous video loops immediately to prevent endless steeping.
+      for (const video of videos.slice(0, 3)) video.pause();
+      sounds.pour.pause();
+      sounds.bubble.pause();
+      // Do not call stopSounds()/pause(): that would cancel milk playback.
+      // The milk video's ended event leaves its final frame visible.
     },
     get milkStarted() { return milkStarted; },
     get phase() { return phase; },

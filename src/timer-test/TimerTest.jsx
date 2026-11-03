@@ -13,6 +13,7 @@ export default function TimerTest() {
   const audio = useRef(null);
   const [clock, setClock] = useState({ total: 40, remaining: 40, running: false, finished: false });
   const [phase, setPhase] = useState(-1);
+  const [milkRequested, setMilkRequested] = useState(false);
   const [issue, setIssue] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [lastAction, setLastAction] = useState('None');
@@ -27,6 +28,7 @@ export default function TimerTest() {
       videos: videos.current,
       assetBase: base,
       onPhase: setPhase,
+      onMilkRequested: () => setMilkRequested(true),
       onError: e => {
         console.warn('Media playback:', e);
         setIssue('Video/audio: ' + (e?.message || String(e)));
@@ -51,17 +53,22 @@ export default function TimerTest() {
   }, []);
 
   function selectDuration(seconds) {
+    setMilkRequested(false);
     setIssue('');
     setLastAction('Duration ' + seconds + 's');
     timer.current?.setSeconds(seconds);
   }
   function toggle() {
+    if (!timer.current?.state().running && timer.current?.state().finished) {
+      setMilkRequested(false);
+    }
     setIssue('');
     setLastAction(timer.current?.state().running ? 'Pause' : 'Start / resume');
     if (!timer.current?.state().running) setAttempts(x => x + 1);
     timer.current?.toggle();
   }
   function reset() {
+    setMilkRequested(false);
     setIssue('');
     setLastAction('Reset');
     timer.current?.reset();
@@ -117,6 +124,11 @@ export default function TimerTest() {
         <Typography sx={{ color: 'text.secondary', fontSize: 12, mt: 0.5 }}>
           {clock.finished ? 'Finished' : clock.running ? 'Running' : 'Ready / paused'}
           {' · '}{phase < 0 ? 'No video' : PHASES[phase]}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.6 }}>
+          Live: {clock.remaining.toFixed(1)}s · Milk: {milkRequested
+            ? (phase === 3 ? 'playing / last frame' : 'requested – loading')
+            : 'not requested'}
         </Typography>
       </Paper>
 
