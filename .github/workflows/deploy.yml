@@ -29,13 +29,7 @@ jobs:
           node-version: '22'
           package-manager-cache: false
       - name: Install dependencies
-        # A lockfile will be committed after first successful registry-backed install.
-        run: npm install --no-audit --no-fund
-      - name: Export lockfile for dependency pinning
-        run: |
-          echo '__V3_LOCKFILE_BEGIN__'
-          base64 -w 2048 package-lock.json
-          echo '__V3_LOCKFILE_END__'
+        run: npm ci --no-audit --no-fund
       - name: Safety check
         run: npm run check:safety
       - name: Run built-in tests

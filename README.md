@@ -30,7 +30,7 @@ npm run build
 npm run preview
 ```
 
-Registry access is unavailable in the assistant's local environment, so initial npm install / Vite build must be verified by GitHub Actions. Once generated, commit package-lock.json and replace npm install with npm ci.
+Registry-backed npm install, automated tests and Vite production build passed in GitHub Actions. The generated package-lock.json is committed for reproducible installs, and deployment uses npm ci.
 
 ## GitHub Pages
 

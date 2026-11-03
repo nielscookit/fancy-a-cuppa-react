@@ -18,7 +18,9 @@
 - V3-only localStorage prefix fac-v3:
 - GitHub Actions Pages workflow included
 - Local Node syntax and built-in tests passed before publication
-- npm install / Vite build / live deployment verification pending
+- npm install / automated tests / production build succeeded on GitHub Actions
+- package-lock.json generated in CI and committed; deployments now use npm ci
+- Live Pages activation/deployment pending a repository Pages setting
 
 ## Next
 
