@@ -5,7 +5,6 @@ import {
   Button,
   FormControl,
   FormHelperText,
-  InputLabel,
   MenuItem,
   Paper,
   Select,
@@ -139,40 +138,74 @@ function Preview({ component, settings, onInteraction }) {
       minWidth: 0,
     },
   };
+  const flatFieldSx = {
+    width: '100%',
+    '& .MuiInputBase-root': {
+      height: height + 'px',
+      borderRadius: radius + 'px',
+      backgroundColor: '#efede8',
+      boxShadow: 'none',
+      '&:hover': { backgroundColor: '#efede8' },
+      '&.Mui-focused': { backgroundColor: '#efede8' },
+      '&::before, &::after': { display: 'none' },
+      '& .MuiOutlinedInput-notchedOutline': { border: 0 },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 0 },
+      '&:has(.MuiInputBase-input:focus-visible, .MuiSelect-select:focus-visible)': {
+        outline: '3px solid #792b40',
+        outlineOffset: 0,
+      },
+      '&.Mui-disabled': { opacity: 0.4, backgroundColor: '#efede8' },
+    },
+    '& .MuiInputBase-input': { boxSizing: 'border-box', minWidth: 0, fontSize: 16, fontWeight: 500 },
+    '& .MuiSelect-select': { display: 'flex', alignItems: 'center' },
+    '& .MuiInputBase-root.Mui-disabled .MuiInputBase-input': {
+      WebkitTextFillColor: 'currentColor',
+    },
+  };
   const commonFieldProps = { variant, color, error, disabled, required, fullWidth: true };
   const helper = error ? 'Example validation error' : 'Preview only – no data is saved.';
 
   return (
     <Box ref={rootRef} sx={{ width: '100%', minWidth: 0 }}>
       {component === 'TextField' && (
-        <TextField
-          {...commonFieldProps}
-          label="Tea name"
-          value={text}
-          onChange={event => setText(event.target.value)}
-          slotProps={{ input: { readOnly } }}
-          helperText={helper}
-          sx={fieldSx}
-        />
+        <Box sx={{ width: '100%' }}>
+          <Typography component="label" htmlFor="lab-tea-name" sx={{ display: 'block', mb: 1, fontSize: 16, fontWeight: 500 }}>
+            Tea name
+          </Typography>
+          <TextField
+            {...commonFieldProps}
+            id="lab-tea-name"
+            variant="filled"
+            value={text}
+            onChange={event => setText(event.target.value)}
+            slotProps={{ input: { readOnly, disableUnderline: true } }}
+            helperText={helper}
+            sx={flatFieldSx}
+          />
+        </Box>
       )}
       {component === 'Select' && (
-        <FormControl {...commonFieldProps} sx={fieldSx}>
-          <InputLabel id="lab-select-label">Tea category</InputLabel>
-          <Select
-            labelId="lab-select-label"
-            id="lab-select"
-            label="Tea category"
-            value={category}
-            onChange={event => setCategory(event.target.value)}
-            inputProps={{ readOnly }}
-            MenuProps={{
-              PaperProps: { sx: { borderRadius: radius + 'px', maxHeight: 'min(320px, 60dvh)' } },
-            }}
-          >
-            {CATEGORIES.map(option => <MenuItem key={option} value={option}>{option}</MenuItem>)}
-          </Select>
-          <FormHelperText>{helper}</FormHelperText>
-        </FormControl>
+        <Box sx={{ width: '100%' }}>
+          <Typography component="label" htmlFor="lab-select" sx={{ display: 'block', mb: 1, fontSize: 16, fontWeight: 500 }}>
+            Tea category
+          </Typography>
+          <FormControl {...commonFieldProps} variant="filled" sx={flatFieldSx}>
+            <Select
+              id="lab-select"
+              variant="filled"
+              disableUnderline
+              value={category}
+              onChange={event => setCategory(event.target.value)}
+              inputProps={{ readOnly, 'aria-label': 'Tea category' }}
+              MenuProps={{
+                PaperProps: { sx: { borderRadius: radius + 'px', maxHeight: 'min(320px, 60dvh)' } },
+              }}
+            >
+              {CATEGORIES.map(option => <MenuItem key={option} value={option}>{option}</MenuItem>)}
+            </Select>
+            <FormHelperText>{helper}</FormHelperText>
+          </FormControl>
+        </Box>
       )}
       {component === 'Autocomplete' && (
         <Autocomplete
@@ -329,12 +362,19 @@ export default function ComponentLab() {
               </Button>
             </Stack>
             <Stack spacing={3}>
-              <GroupControl
-                label="Variant"
-                options={definition.variants}
-                value={settings.variant}
-                onChange={next => setOption('variant', next)}
-              />
+              {(component !== 'TextField' && component !== 'Select') && (
+                <GroupControl
+                  label="Variant"
+                  options={definition.variants}
+                  value={settings.variant}
+                  onChange={next => setOption('variant', next)}
+                />
+              )}
+              {(component === 'TextField' || component === 'Select') && (
+                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                  V2 flat fill · no border, underline or floating label · keyboard-only red focus outline
+                </Typography>
+              )}
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5 }}>
                 <ValueSlider
