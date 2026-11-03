@@ -215,3 +215,58 @@ test('media at timer zero cannot leave stalled steep video running', async () =>
   media.reset();
   media.destroy();
 });
+
+test('browser-native timer methods use Window receiver and update automatically', () => {
+  // Browsers reject window.setInterval/clearInterval when called as methods of
+  // an unrelated object ("Illegal invocation"). Node normally tolerates it.
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  let scheduledTick = null;
+  let clearedId = null;
+  let time = 1000;
+  const snapshots = [];
+  globalThis.setInterval = function (callback, ms) {
+    assert.equal(this, globalThis, 'setInterval must use the global receiver');
+    assert.equal(ms, 100);
+    scheduledTick = callback;
+    return 37;
+  };
+  globalThis.clearInterval = function (id) {
+    assert.equal(this, globalThis, 'clearInterval must use the global receiver');
+    clearedId = id;
+  };
+  let controller;
+  try {
+    const media = {
+      unlock() {}, start() {}, resume() {}, pause() {}, reset() {},
+      milk() {}, finish() {}, destroy() {},
+    };
+    const audio = {
+      unlock() {}, reset() {}, playAlmost() {},
+      playFinished: () => Promise.resolve(), destroy() {},
+    };
+    const documentRef = {
+      hidden: false, addEventListener() {}, removeEventListener() {},
+    };
+    controller = createTimerController({
+      media, audio, initialSeconds: 40,
+      now: () => time, onUpdate: snapshot => snapshots.push(snapshot),
+      documentRef, navigatorRef: {},
+      // Deliberately use the default scheduler to catch regression.
+    });
+    controller.start();
+    assert.equal(typeof scheduledTick, 'function', 'automatic ticks must be scheduled');
+    time += 5000;
+    scheduledTick();
+    assert.equal(controller.state().remaining, 35);
+    assert.equal(snapshots.at(-1).remaining, 35);
+    controller.pause();
+    assert.equal(clearedId, 37, 'automatic interval must be cleared on pause');
+    controller.reset();
+    assert.equal(controller.state().remaining, 40);
+  } finally {
+    controller?.destroy();
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+  }
+});

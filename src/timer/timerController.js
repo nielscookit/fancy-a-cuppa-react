@@ -10,7 +10,13 @@ export function createTimerController({
   onError = () => {},
   initialSeconds = 120,
   now = () => Date.now(),
-  scheduler = { setInterval, clearInterval },
+  // Bind calls to globalThis: passing native Window timer methods as
+  // object properties and invoking them as methods throws "Illegal invocation".
+  // This happened in iPhone Safari after the first immediate tick.
+  scheduler = {
+    setInterval: (callback, ms) => globalThis.setInterval(callback, ms),
+    clearInterval: id => globalThis.clearInterval(id),
+  },
   documentRef = globalThis.document,
   navigatorRef = globalThis.navigator,
 }) {
@@ -114,7 +120,12 @@ export function createTimerController({
     notify(); // Immediate visible feedback, even when media is still loading.
     tick();
     if (running) {
-      ticker = scheduler.setInterval(tick, 100);
+      try {
+        ticker = scheduler.setInterval(tick, 100);
+      } catch (error) {
+        // Do not silently leave a countdown running without a visual update.
+        onError(error);
+      }
       void requestWakeLock();
     }
   }

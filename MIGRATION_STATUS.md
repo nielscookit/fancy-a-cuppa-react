@@ -23,3 +23,15 @@
 - Fix: countdown and reset independent from media loading; first video playback initiated inside the tap if ready.
 - Diagnostic last-action indicator added; automated tests for pending preload, playback errors and steep-loop abort at zero.
 - Must confirm actual iPhone Safari behavior before merging timer into main app.
+
+## 2026-11-03: confirmed iPhone timer root cause
+
+- User reported video playing, no periodic clock updates, clock jumped on Pause.
+- Reproduced `TypeError: Illegal invocation` in a real Chromium browser by
+  calling a detached native setInterval through an unrelated scheduler object.
+- The existing timer default scheduler used precisely this erroneous pattern.
+- Fixed by wrapping globalThis.setInterval/clearInterval with receiver-safe arrows.
+- Added regression test emulating a strict browser receiver plus a visible error
+  callback if periodic scheduling ever fails.
+- Verify on actual iPhone before accepting migration; React, app, lab, V2 and
+  Supabase otherwise unchanged.
