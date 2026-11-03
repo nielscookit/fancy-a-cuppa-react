@@ -524,3 +524,74 @@ test('pending pour sound does not delay fill phase or prevent next video transit
   assert.equal(media.phase, 1, 'unresolved pour sound must not block brew');
   media.destroy();
 });
+
+test('first timer start waits for actual video playing before countdown starts', () => {
+  let time = 1000;
+  let onPlaying;
+  let scheduled;
+  const media = {
+    startSynced: callback => { onPlaying = callback; },
+    unlock() {}, pause() {}, reset() {}, finish() {}, milk() {}, destroy() {},
+  };
+  const audio = {
+    unlock() {}, reset() {}, playAlmost() {},
+    playFinished: () => Promise.resolve(), destroy() {},
+  };
+  const controller = createTimerController({
+    media, audio, initialSeconds: 40, now: () => time,
+    scheduler: { setInterval: callback => { scheduled = callback; return 1; }, clearInterval() {} },
+    documentRef: { hidden: false, addEventListener() {}, removeEventListener() {} },
+    navigatorRef: {},
+  });
+  controller.start();
+  assert.equal(controller.state().preparing, true);
+  assert.equal(controller.state().running, false);
+  time += 3500;
+  assert.equal(controller.state().remaining, 40);
+  onPlaying();
+  assert.equal(controller.state().running, true);
+  time += 5000;
+  scheduled();
+  assert.equal(controller.state().remaining, 35);
+  controller.destroy();
+});
+
+test('reset during buffering invalidates a late playing event', () => {
+  let onPlaying;
+  const media = {
+    startSynced: callback => { onPlaying = callback; },
+    unlock() {}, pause() {}, reset() {}, finish() {}, milk() {}, destroy() {},
+  };
+  const audio = {
+    unlock() {}, reset() {}, playAlmost() {},
+    playFinished: () => Promise.resolve(), destroy() {},
+  };
+  const controller = createTimerController({
+    media, audio, initialSeconds: 40,
+    scheduler: { setInterval: () => 1, clearInterval() {} },
+    documentRef: { hidden: false, addEventListener() {}, removeEventListener() {} },
+    navigatorRef: {},
+  });
+  controller.start();
+  controller.reset();
+  onPlaying();
+  assert.equal(controller.state().running, false);
+  assert.equal(controller.state().preparing, false);
+  assert.equal(controller.state().remaining, 40);
+  controller.destroy();
+});
+
+test('native playing event starts the synchronized timer exactly once', () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  let count = 0;
+  const media = createMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  media.startSynced(() => { count++; });
+  assert.equal(count, 0);
+  videos[0].dispatchEvent(new Event('playing'));
+  videos[0].dispatchEvent(new Event('playing'));
+  assert.equal(count, 1);
+  media.destroy();
+});

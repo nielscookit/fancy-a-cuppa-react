@@ -1,4 +1,5 @@
 import { MEDIA_ASSETS } from './mediaManifest.js';
+import { prefetchVideoAsBlob } from './videoPreloader.js';
 
 /**
  * React-independent HTMLVideoElement / HTMLAudioElement controller.
@@ -48,6 +49,9 @@ export function createMediaController({
   let fillLastEvent = 'idle';
   let fillEverPlayed = false;
   let fillBlocked = false;
+  let fillStartHandler = null;
+  let fillPreloadPromise = null;
+  let fillBlobCleanup = null;
   let session = 0;
   let transitionId = 0;
   let destroyed = false;
@@ -92,6 +96,17 @@ export function createMediaController({
       fillBlocked = false;
     }
     if (!destroyed) onFillEvent(getFillStatus());
+    if (event === 'playing' && active && fillStartHandler) {
+      const handler = fillStartHandler;
+      fillStartHandler = null;
+      handler.onPlaying();
+    }
+  }
+  function fillFailed(error) {
+    if (!fillStartHandler) return;
+    const handler = fillStartHandler;
+    fillStartHandler = null;
+    handler.onFailure(error);
   }
 
   function milkEvent(event) {
@@ -129,6 +144,25 @@ export function createMediaController({
   }
   function ready(video) {
     return video.readyState >= 2;
+  }
+  function preloadFill({ fetchImpl, createObjectURL, revokeObjectURL } = {}) {
+    if (destroyed) return Promise.reject(new Error('Media controller disposed.'));
+    if (fillPreloadPromise) return fillPreloadPromise;
+    // Explicitly fetch full video bytes. iOS may only preload metadata.
+    fillPreloadPromise = prefetchVideoAsBlob({
+      video: videos[0], url: path('fill'), fetchImpl,
+      createObjectURL, revokeObjectURL,
+    }).then(cleanup => {
+      if (destroyed) { cleanup(); throw new Error('Media controller disposed.'); }
+      fillBlobCleanup = cleanup;
+      fillEvent('file-prefetched');
+      return true;
+    }).catch(error => {
+      fillPreloadPromise = null;
+      if (!destroyed) onError(new Error('Fill video preload: ' + error.message));
+      throw error;
+    });
+    return fillPreloadPromise;
   }
   function waitReady(video) {
     if (ready(video)) return Promise.resolve();
@@ -171,6 +205,7 @@ export function createMediaController({
     fillLastEvent = 'idle';
     fillEverPlayed = false;
     fillBlocked = false;
+    fillStartHandler = null;
     stopSounds();
     videos.forEach(video => {
       video.pause();
@@ -315,6 +350,7 @@ export function createMediaController({
           if (i === 0) {
             fillBlocked = true;
             fillEvent('play-rejected');
+            fillFailed(error);
           }
           onError(new Error('Video ' + i + ' playback failed: ' +
             (error?.message || String(error))));
@@ -357,6 +393,7 @@ export function createMediaController({
 
   function pause() {
     active = false;
+    fillStartHandler = null;
     videos.forEach(v => v.pause());
     stopSounds();
   }
@@ -364,9 +401,16 @@ export function createMediaController({
   return {
     ready: () => videos.every(ready),
     prepare: () => Promise.all(videos.map(waitReady)),
+    preloadFill,
     unlock,
     reset,
     start: () => { active = true; void show(0); },
+    startSynced: (onPlaying, onFailure = onError) => {
+      if (destroyed) return;
+      fillStartHandler = { onPlaying, onFailure };
+      active = true;
+      void show(0); // Calls play() synchronously in the initiating iPhone tap.
+    },
     resume: () => {
       active = true;
       if (phase >= 0) videos[phase].play().catch(error => onError(error));
@@ -413,6 +457,10 @@ export function createMediaController({
       destroyed = true;
       reset();
       listeners.forEach(remove => remove());
+      if (fillBlobCleanup) {
+        fillBlobCleanup();
+        fillBlobCleanup = null;
+      }
     },
   };
 }

@@ -90,3 +90,16 @@
 - Added diagnostics for fill video readyState/time/playing/rejection and
   tests for cold preload=0 plus a never-settling pour audio promise.
 - Real first-start iPhone behavior must be confirmed; V2/lab/DB unaffected.
+
+## 2026-11-04: explicit preload and synchronized first start
+
+- iPhone test confirmed first Start has a video gap while countdown already runs.
+- Apple WebKit does not guarantee a full data download for preload="auto".
+- Dedicated fetch downloads the full initial MP4 into a same-origin Blob URL
+  before enabling the first Start button in the separate timer diagnostic.
+- Timer controller now waits for native video "playing" before setting deadline.
+- If buffering occurs, visible "Video startet…" status remains and timer
+  does not count down invisibly; Reset cancels an in-flight start.
+- Added regression tests for video playback synchronization, cancellation,
+  full prefetch and failed prefetch; iPhone verification remains pending.
+- V2, global theme, component lab, Supabase untouched.

@@ -25,6 +25,7 @@ export function createTimerController({
   let remaining = initialSeconds;
   let deadline = 0;
   let running = false;
+  let preparing = false;
   let finished = false;
   let warnedThirty = false;
   let ticker = null;
@@ -33,7 +34,7 @@ export function createTimerController({
   let destroyed = false;
 
   function state() {
-    return { total, remaining, running, finished, warnedThirty };
+    return { total, remaining, running, preparing, finished, warnedThirty };
   }
   function notify() { if (!destroyed) onUpdate(state()); }
   function clearTicker() {
@@ -61,6 +62,7 @@ export function createTimerController({
     requestId++;
     clearTicker();
     running = false;
+    preparing = false;
     releaseWakeLock();
     media.pause();
   }
@@ -96,7 +98,7 @@ export function createTimerController({
     notify();
   }
   function start() {
-    if (destroyed || running) return;
+    if (destroyed || running || preparing) return;
     if (finished) {
       media.reset();
       audio.reset();
@@ -104,40 +106,51 @@ export function createTimerController({
       finished = false;
       warnedThirty = false;
     }
-    // Audio and video unlock remain inside the originating iPhone tap.
-    // Neither media preload nor failed playback is allowed to block the clock.
-    requestId++;
-    running = true;
-    deadline = now() + remaining * 1000;
-    notify(); // Publish the running state immediately after the user gesture.
-    // Unlocks still execute synchronously in that same iPhone tap.
+    const id = ++requestId;
+    const syncToFill = remaining === total && typeof media.startSynced === 'function';
+    preparing = syncToFill;
+    function beginClock() {
+      if (destroyed || id !== requestId || running) return;
+      preparing = false;
+      running = true;
+      deadline = now() + remaining * 1000;
+      notify();
+      tick();
+      if (running) {
+        try { ticker = scheduler.setInterval(tick, 100); }
+        catch (error) { onError(error); }
+        void requestWakeLock();
+      }
+    }
+    function failedStart(error) {
+      if (destroyed || id !== requestId) return;
+      preparing = false;
+      media.pause();
+      notify();
+      onError(error);
+    }
+    notify();
+    // The following play() calls stay in the direct iPhone tap.
     try { audio.unlock(); } catch (error) { onError(error); }
     try { media.unlock(); } catch (error) { onError(error); }
-    // Start media synchronously in this gesture where possible. The media
-    // controller owns pending loadeddata events and invalidates them on reset.
     try {
-      if (remaining === total) media.start();
-      else media.resume();
-    } catch (error) { onError(error); }
-    tick();
-    if (running) {
-      try {
-        ticker = scheduler.setInterval(tick, 100);
-      } catch (error) {
-        // Do not silently leave a countdown running without a visual update.
-        onError(error);
+      if (syncToFill) media.startSynced(beginClock, failedStart);
+      else {
+        if (remaining === total) media.start();
+        else media.resume();
+        beginClock();
       }
-      void requestWakeLock();
-    }
+    } catch (error) { failedStart(error); }
   }
   function pause() {
+    if (preparing) { stop(); notify(); return; }
     if (!running) return;
-    tick(); // Preserve exact remaining seconds at pause.
+    tick();
     if (!running) return;
     stop();
     notify();
   }
-  function toggle() { if (running) pause(); else start(); }
+  function toggle() { if (running || preparing) pause(); else start(); }
   function visibilityChange() {
     if (!documentRef?.hidden && running) {
       tick();

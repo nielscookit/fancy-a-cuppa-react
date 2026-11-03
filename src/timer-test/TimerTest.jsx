@@ -24,6 +24,7 @@ export default function TimerTest() {
     event: 'idle', currentTime: 0, duration: null,
     everPlayed: false, paused: true, readyState: 0, errorCode: null,
   });
+  const [preload, setPreload] = useState('loading');
   const [issue, setIssue] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [lastAction, setLastAction] = useState('None');
@@ -60,9 +61,17 @@ export default function TimerTest() {
     audio.current = sound;
     mediaRef.current = visuals;
     timer.current = controller;
-    // Preload all videos before the first user start, exactly as in V2.
-    visuals.prepare().catch(e => setIssue('Preload: ' + (e?.message || String(e))));
+    // First video downloaded completely before Start becomes available.
+    let mounted = true;
+    visuals.preloadFill()
+      .then(() => { if (mounted) setPreload('ready'); })
+      .catch(error => {
+        if (!mounted) return;
+        setPreload('error');
+        setIssue('Fill video download: ' + (error?.message || String(error)));
+      });
     return () => {
+      mounted = false;
       timer.current = null;
       audio.current = null;
       mediaRef.current = null;
@@ -77,12 +86,19 @@ export default function TimerTest() {
     timer.current?.setSeconds(seconds);
   }
   function toggle() {
-    if (!timer.current?.state().running && timer.current?.state().finished) {
+    const state = timer.current?.state();
+    if (!state) return;
+    if (!state.running && !state.preparing && state.remaining === state.total &&
+      preload !== 'ready') return;
+    if (!state.running && !state.preparing && state.finished) {
       setMilkRequested(false);
     }
     setIssue('');
-    setLastAction(timer.current?.state().running ? 'Pause' : 'Start / resume');
-    if (!timer.current?.state().running) setAttempts(x => x + 1);
+    setLastAction(timer.current?.state().preparing ? 'Cancel startup' :
+      timer.current?.state().running ? 'Pause' : 'Start / resume');
+    if (!timer.current?.state().running && !timer.current?.state().preparing) {
+      setAttempts(x => x + 1);
+    }
     timer.current?.toggle();
   }
   function reset() {
@@ -102,8 +118,13 @@ export default function TimerTest() {
     audio.current?.playFinished().catch(e => setIssue('Finished sound: ' + e.message));
   }
   const time = formatCountdown(clock.remaining);
-  const startLabel = clock.running ? 'Pause' : clock.finished ? 'Restart' :
-    clock.remaining < clock.total ? 'Resume' : 'Start timer';
+  const startLabel = clock.preparing ? 'Start abbrechen' :
+    clock.running ? 'Pause' : clock.finished ? 'Restart' :
+    clock.remaining < clock.total ? 'Resume' :
+    preload === 'loading' ? 'Video wird geladen…' :
+    preload === 'error' ? 'Video nicht geladen' : 'Start timer';
+  const startDisabled = !clock.running && !clock.preparing &&
+    clock.remaining === clock.total && preload !== 'ready';
 
   return (
     <Box component="main" sx={{
@@ -143,11 +164,16 @@ export default function TimerTest() {
           {time}
         </Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: 12, mt: 0.5 }}>
-          {clock.finished ? 'Finished' : clock.running ? 'Running' : 'Ready / paused'}
+          {clock.finished ? 'Finished' : clock.running ? 'Running' :
+            clock.preparing ? 'Video startet…' : 'Ready / paused'}
           {' · '}{phase < 0 ? 'No video' : PHASES[phase]}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.6 }}>
           Clock: {time} · Milk: {milkRequested ? milkStatus.event : 'not requested'}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
+          First file: {preload === 'ready' ? 'downloaded' :
+            preload === 'loading' ? 'downloading' : 'download failed'}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
           Fill video: {fillStatus.currentTime.toFixed(1)}s
@@ -190,7 +216,7 @@ export default function TimerTest() {
         ))}
       </Stack>
       <Stack direction="row" gap={1} sx={{ mt: 2 }}>
-        <Button variant="contained" fullWidth onClick={toggle}>{startLabel}</Button>
+        <Button variant="contained" fullWidth disabled={startDisabled} onClick={toggle}>{startLabel}</Button>
         <Button variant="outlined" onClick={reset} sx={{ minWidth: 105 }}>Reset</Button>
       </Stack>
       <Button variant="text" fullWidth onClick={soundCheck}
@@ -204,6 +230,10 @@ export default function TimerTest() {
         </Typography>
         {issue && <Typography role="alert" sx={{ mt: 1, fontSize: 12, color: 'error.main' }}>{issue}</Typography>}
       </Box>
+      <Typography sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.9, mt: 2 }}>
+        The first video is downloaded before Start is enabled. The clock
+        starts only after video playback actually begins.
+      </Typography>
       <Typography sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.9, mt: 2 }}>
         Check: fill → brew → still loop, sound at 30s, milk video at 5s,
         finish sound at 0. Repeat restart at least five times; test pause/resume
