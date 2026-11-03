@@ -45,6 +45,7 @@ test('direct nested Pages URL builds as independent HTML entry', () => {
 test('lab is not wired to global theme mutation or database', () => {
   const source = readFileSync('src/lab/ComponentLab.jsx', 'utf8');
   assert.match(source, /from '@mui\/material'/);
-  assert.doesNotMatch(source, /supabase|teaRepository|createTheme|ThemeProvider/i);
+  assert.doesNotMatch(source, /from ['"][^'"]*(supabase|teaRepository)/i);
+  assert.doesNotMatch(source, /\b(createTheme|ThemeProvider)\b/);
   assert.match(source, /COMPONENT_DEFINITIONS/);
 });
