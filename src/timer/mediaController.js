@@ -231,7 +231,8 @@ export function createMediaController({
     stopSounds();
     videos.forEach((video, index) => {
       video.pause();
-      video.classList.toggle('visible', index === 0);
+      if (index === 0) video.classList.add('visible');
+      else video.classList.remove('visible');
       try { video.currentTime = 0; } catch { /* metadata not ready */ }
     });
     // Phase -1 means idle, but the first VIDEO FRAME remains visible.
