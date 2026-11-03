@@ -1,16 +1,27 @@
 # Fancy a Cuppa V3 — React / Vite / MUI
 
-Phase 2: React scaffold plus connection to the existing Supabase test catalog. The V2 repository and database schema remain untouched. No timer/media port and no UX redesign yet.
+V3 is an isolated development repository. The V2 repository is unchanged.
 
-## Catalog API
+## Apps / URLs
 
-- V3 uses the existing Supabase project's **publishable** key for anonymous public RLS-protected REST reads.
-- Reads public published teas and nested tea_preparations; barcode lookups read tea_codes.
-- createTea/updateTea use existing community-tea Edge Function; no direct table writes or service role credentials.
-- Deletion is unsupported in the V2 API and remains unsupported in V3.
-- Live CI integration test uses reads only; write requests are tested with mocked fetch.
-- A temporary debug page shows catalog status and tea names, not the approved product UI.
-- No new npm dependencies were added for the database.
+- Technical V3 test page: https://nielscookit.github.io/fancy-a-cuppa-react/
+- Independent MUI component lab: https://nielscookit.github.io/fancy-a-cuppa-react/lab/
+
+The lab has its own HTML entry (`lab/index.html`) and React root (`src/lab/main.jsx`).
+It uses the shared read-only theme definition (`src/theme.js`) with Roboto Mono.
+All preview overrides are local `sx` props; no theme object or global styles are mutated.
+No lab component imports the Supabase repository or timer.
+
+The current lab previews real MUI TextField, Select, Autocomplete and Button:
+variant, height (px), radius (px), semantic theme color and available interaction
+states. Preview values remain only in React state; no persistence or API writes.
+
+## Database
+
+The V3 main test page uses the existing Supabase catalog with publishable key
+and public RLS-protected REST reads. Explicit create/update actions use the
+existing Edge Function `community-tea`; the lab never does. Live CI runs
+read-only integration checks, with writes mocked.
 
 ## Development
 
@@ -22,22 +33,17 @@ npm run verify:catalog
 npm run dev
 ```
 
-## Deploy
+Locally open /fancy-a-cuppa-react/lab/ (or /lab/ if using vite's dev fallback);
+the production build publishes the exact /fancy-a-cuppa-react/lab/ path.
 
-GitHub Actions tests and builds on each push to main.
+## Deployment
 
-- Source: GitHub Actions
-- URL: https://nielscookit.github.io/fancy-a-cuppa-react/
-- Vite base: /fancy-a-cuppa-react/
-- Browser localStorage keys have prefix fac-v3:
+Push to main triggers a pinned-dependency `npm ci`, safety check,
+tests, live Supabase read, multi-page Vite build and GitHub Pages deployment.
 
 ## V2 isolation
 
-- Existing V2: nielscookit/fancy-a-cuppa, SHA 203782e33b4d52184091c171008bccdbb6437057 as reviewed.
+- Repository: nielscookit/fancy-a-cuppa; inspected SHA 203782e33b4d52184091c171008bccdbb6437057.
 - Existing earlier freeze SHA ae86dd38d3ea0eaf37fc55dac3d2ccbe777e67c5.
-- Same Supabase project, but no table/schema/Edge Function modifications.
-- UI elements will be migrated only after an independently functioning media controller is tested on iPhone.
-
-## Next
-
-Port the timer and media controller as a React-independent module while preserving V2 iPhone behavior.
+- Do not alter V2 sources during V3 migration.
+- Keep React-independent media controller in src/timer, with iPhone-repeatability tests before further migration.

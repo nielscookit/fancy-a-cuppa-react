@@ -1,31 +1,19 @@
 # Fancy a Cuppa V3 — migration status
 
-## Milestone 1: V2 audited (read-only)
+## Completed
 
-- Repository: nielscookit/fancy-a-cuppa
-- Production V2 source commit (reviewed): 203782e33b4d52184091c171008bccdbb6437057
-- Earlier freeze commit: ae86dd38d3ea0eaf37fc55dac3d2ccbe777e67c5
-- Neither repository nor database schema changed during preparation.
-
-## Milestone 2–5: isolated React V3 foundation
-
-- Repository: nielscookit/fancy-a-cuppa-react
-- React / Vite / MUI; global Roboto Mono
-- Page path: /fancy-a-cuppa-react/
-- package-lock.json pinned; npm ci used
-- GitHub Pages deployment previously succeeded
-- V3 browser storage namespaced fac-v3:
-
-## Milestone 6: Supabase adapter
-
-- Existing DB explicitly authorized for V3 development: user says current rows are test data.
-- No schema migration, Edge Function deployment, RLS edits, or existing data changes.
-- Public publishable key; server-side RLS for public reads.
-- Existing Edge Function community-tea for explicit create/update only.
-- Barcode lookups preserved; normalized records compatible with V2.
-- Tests mock writes; live CI integration check reads without modifying records.
-- No UI redesign: technical catalog status only.
+1. V2 repository audited; production V2 untouched.
+2. React/Vite/MUI scaffold, pinned lockfile, global Roboto Mono.
+3. Independent GitHub Pages deployment.
+4. Supabase catalog REST/Edge Function adapter; live read verified, writes mocked.
+5. Component Lab as independent Vite entry:
+   - /fancy-a-cuppa-react/lab/
+   - Real MUI TextField, Select, Autocomplete, Button
+   - Interactive variant, height, radius, semantic color, state
+   - Lab-only React state/sx, no global theme edits or database calls
+   - Responsive iPhone layout, no new packages
 
 ## Next
 
-Migrate framework-independent timer and media controller from V2 and run repeated iPhone tests before adding other UI.
+Port media/timer logic into React-independent controller in src/timer.
+Test repeatable playback on iPhone before further migration.
