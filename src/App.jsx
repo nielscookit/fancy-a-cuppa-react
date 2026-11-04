@@ -279,7 +279,7 @@ export default function App() {
           assistantButtonRef={assistantButtonRef}
         />
         <Box ref={assistantSectionRef} component="main"
-        sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))',position:'relative',zIndex:1,bgcolor:'background.default'}}> 
+        sx={{maxWidth:500,mx:'auto',px:2.5,pt:'14px',pb:'max(45px, env(safe-area-inset-bottom))',position:'relative',zIndex:1,bgcolor:'background.default'}}> 
       <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
         Fancy a Cuppa
       </Typography>
