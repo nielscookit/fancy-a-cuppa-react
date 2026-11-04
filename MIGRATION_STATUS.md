@@ -138,3 +138,18 @@
 - The bridge is tested for preload-before-start, direct tap actions, reset,
   cleanup, and stale async completion after unmount.
 - Next: connect the adapter to a user-approved V3 interface; rerun on-device tests.
+
+## 2026-11-04: white screen when closing selected tea with X
+
+- Reproduced by code inspection: TeaTimer renders callback refs into a mutable
+  `videoRefs.current` array and passed that same array to createMediaController.
+  React sets callback refs to null on unmount. media.destroy() invokes reset()
+  and dereferences each video in the now-null array, triggering TypeError and
+  potentially crashing the React root (blank white screen on iPhone).
+- Fix is strictly inside the new integration adapter:
+  `const mountedVideos = videos.slice()` before constructing the media
+  controller. Detached DOM nodes remain addressable for synchronous cleanup.
+- Regression test simulates React clearing all 4 refs before effect teardown;
+  asserts cleanup of every video succeeds without exceptions.
+- Existing iPhone-approved media, timer, audio controllers and /timer-test/
+  remain untouched. X continues to clear selection and return to search.

@@ -14,6 +14,12 @@ export function createTeaTimerSession({
   onChange = () => {},
   factories = {},
 }) {
+  // React callback refs are set to null during unmount (close tea / switch
+  // tea). The media controller must retain the original four DOM nodes for
+  // its teardown. Do not pass React's MUTABLE videoRefs.current array itself.
+  // Otherwise media.destroy() -> reset() may dereference null and crash the
+  // entire app when the selected tea card is closed.
+  const mountedVideos = Array.isArray(videos) ? videos.slice() : videos;
   const makeAudio = factories.audio || createAudioController;
   const makeMedia = factories.media || createMediaController;
   const makeTimer = factories.timer || createTimerController;
@@ -39,7 +45,7 @@ export function createTeaTimerSession({
   let timer;
   try {
     media = makeMedia({
-      videos, assetBase,
+      videos: mountedVideos, assetBase,
       onError: reportError,
       onPhase: nextPhase => { phase = nextPhase; notify(); },
     });

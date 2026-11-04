@@ -118,3 +118,41 @@ test('timer adapter remains isolated from V3 app, shared theme and database', as
   assert.doesNotMatch(adapter + bridge, /\\blocalStorage\\s*[.\\[]/);
   assert.doesNotMatch(mainApp, /useTeaTimer|teaTimerSession|timerController/);
 });
+
+test('closing selected tea cannot crash when React clears video callback refs before cleanup', () => {
+  const originalRefs = Array.from({ length: 4 }, (_, index) => ({ index }));
+  const initialNodes = originalRefs.slice();
+  const events = [];
+  const session = createTeaTimerSession({
+    videos: originalRefs,
+    assetBase: '/fancy-a-cuppa-react/media/',
+    factories: {
+      audio: () => ({ destroy() { events.push('audio-cleaned'); } }),
+      media: ({ videos }) => ({
+        destroy() {
+          // Matches the validated media controller's reset() cleanup:
+          // it must be able to address every original video DOM element.
+          for (const video of videos) {
+            assert.ok(video && Number.isInteger(video.index),
+              'A video DOM reference must not be replaced by React null');
+            events.push('video-' + video.index + '-cleaned');
+          }
+          assert.notEqual(videos, originalRefs,
+            'Controller must receive a snapshot, not React mutable refs');
+        },
+      }),
+      timer: ({ media, audio }) => ({
+        destroy() { media.destroy(); audio.destroy(); },
+      }),
+    },
+  });
+  // React 19 callback refs are invoked with null as the UI is unmounted.
+  originalRefs.fill(null);
+  assert.doesNotThrow(() => session.destroy());
+  assert.deepEqual(events, [
+    'video-0-cleaned', 'video-1-cleaned', 'video-2-cleaned',
+    'video-3-cleaned', 'audio-cleaned',
+  ]);
+  assert.deepEqual(initialNodes.map(video => video.index), [0, 1, 2, 3]);
+  assert.ok(originalRefs.every(node => node === null));
+});
