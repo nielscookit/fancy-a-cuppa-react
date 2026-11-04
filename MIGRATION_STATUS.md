@@ -324,3 +324,16 @@
   /timer-test/, V2, Supabase, and MUI Lab are unchanged.
 - New iPhone acceptance still required: button tap scroll then free scrolling,
   both directions; absence of timer controls under long page; quick video.
+
+## 2026-11-04: Figma Home/assistant micro-adjustments
+
+- User accepted the normal-flow manual scrolling and QuickTimer behavior.
+- Landing target adjusted from 12px to 8px: the red Home action ends at
+  exactly y=0 instead of showing a 4px strip above the assistant button.
+- When scrolling manually back to scrollY <= 2 after leaving Home, the
+  assistant selection returns to default and the entire search/detail
+  section unmounts. Also applies on animated return or immediate double-tap.
+- The assistant section is mounted only while opened, without changing
+  the continuous Home/assistant document semantics during navigation.
+- Existing approved cubic ease-out and media/timer/audio controllers
+  unchanged. On-device confirmation pending.

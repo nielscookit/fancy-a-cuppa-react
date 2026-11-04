@@ -68,6 +68,9 @@ export default function App() {
   const assistantSectionRef = useRef(null);
   const assistantButtonRef = useRef(null);
   const [assistantActive, setAssistantActive] = useState(false);
+  const [assistantVisible, setAssistantVisible] = useState(false);
+  const assistantHasLeftHomeRef = useRef(false);
+  const assistantReturningHomeRef = useRef(false);
   const scrollingRef = useRef(null);
   const pendingScrollFrameRef = useRef(null);
 
@@ -80,19 +83,38 @@ export default function App() {
   }, []);
 
 
-  // The assistant button is in normal document flow. Selected state changes
-  // on press only; scrolling itself never pins or selects it.
+  // The assistant button is in normal document flow. Clicking it selects
+  // immediately. Reaching the very top by hand (or by return animation)
+  // restores the default state and hides the search/detail section.
   useEffect(() => {
     saveQuickMinutes(quickMinutes);
   }, [quickMinutes]);
 
+  useEffect(() => {
+    if (!assistantVisible) return undefined;
+    function onPageScroll() {
+      const y = Math.max(0, window.scrollY);
+      if (y >= 24) assistantHasLeftHomeRef.current = true;
+      if (y > 2 ||
+          !(assistantHasLeftHomeRef.current || assistantReturningHomeRef.current)) return;
+
+      assistantHasLeftHomeRef.current = false;
+      assistantReturningHomeRef.current = false;
+      setAssistantActive(false);
+      setAssistantVisible(false);
+      setMode('closed');
+    }
+    window.addEventListener('scroll', onPageScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onPageScroll);
+  }, [assistantVisible]);
+
   const showTeaAssistant = () => {
     const nextActive = !assistantActive;
 
-    // Button state updates on press, BEFORE the first animated scroll frame.
+    // Button state changes immediately on press, before any scrolling.
     setAssistantActive(nextActive);
 
-    // Pressing again while an animation is running reverses immediately.
+    // A second press may reverse the motion while the first is in progress.
     if (pendingScrollFrameRef.current !== null) {
       window.cancelAnimationFrame(pendingScrollFrameRef.current);
       pendingScrollFrameRef.current = null;
@@ -101,18 +123,31 @@ export default function App() {
     scrollingRef.current = null;
 
     if (nextActive) {
+      assistantReturningHomeRef.current = false;
+      assistantHasLeftHomeRef.current = false;
+      setAssistantVisible(true);
       setMode('search');
       setQuery('');
+    } else {
+      assistantReturningHomeRef.current = true;
+      if (window.scrollY <= 2) {
+        // Clicking twice before leaving Home should not leave a hidden
+        // search section mounted behind the Home screen.
+        assistantHasLeftHomeRef.current = false;
+        assistantReturningHomeRef.current = false;
+        setAssistantVisible(false);
+        setMode('closed');
+        return;
+      }
     }
 
-    // Allow React to paint the new selected state and assistant content first.
+    // Keep the approved cubic ease-out. The red Home button ends at y=0
+    // when the assistant button is positioned at 8px instead of 12px.
     pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
       pendingScrollFrameRef.current = null;
-      // Target the actual button, 12 px from the top. Unlike a sticky
-      // button it then keeps travelling with the document on manual scroll.
       const button = assistantButtonRef.current;
       const targetY = nextActive && button
-        ? Math.max(0, window.scrollY + button.getBoundingClientRect().top - 12)
+        ? Math.max(0, window.scrollY + button.getBoundingClientRect().top - 8)
         : 0;
       scrollingRef.current = animateScrollTo(targetY);
     });
@@ -278,6 +313,7 @@ export default function App() {
           assistantActive={assistantActive}
           assistantButtonRef={assistantButtonRef}
         />
+        {assistantVisible && (
         <Box ref={assistantSectionRef} component="main"
         sx={{maxWidth:500,mx:'auto',px:2.5,pt:'14px',pb:'max(45px, env(safe-area-inset-bottom))',position:'relative',zIndex:1,bgcolor:'background.default'}}> 
       <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
@@ -430,6 +466,7 @@ export default function App() {
         </>
       )}
         </Box>
+        )}
       </Box>
       {/* The media session stays mounted and preloaded. The opaque page layer
           completely masks its inactive UI; the active overlay rises above it

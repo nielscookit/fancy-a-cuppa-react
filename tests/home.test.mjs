@@ -75,7 +75,7 @@ test('home keeps tea assistant and validated timer integration isolated', () => 
   assert.doesNotMatch(readFileSync('src/components/HomeScreen.jsx','utf8'), /createMediaController|createTimerController|createAudioController/);
 });
 
-test('assistant button scrolls normally with document; click targets 12px top offset', () => {
+test('assistant button scrolls normally with document; click targets 8px top offset', () => {
   const app=readFileSync('src/App.jsx','utf8');
   const home=readFileSync('src/components/HomeScreen.jsx','utf8');
   const css=readFileSync('src/components/home.css','utf8');
@@ -95,7 +95,7 @@ test('assistant button scrolls normally with document; click targets 12px top of
   assert.match(app,/setAssistantActive\(nextActive\)/);
   assert.match(app,/scrollingRef\.current = animateScrollTo\(targetY\)/);
   assert.match(app,/assistantButtonRef\.current/);
-  assert.match(app,/getBoundingClientRect\(\)\.top - 12/);
+  assert.match(app,/getBoundingClientRect\(\)\.top - 8/);
   assert.match(app,/assistantActive=\{assistantActive\}/);
   assert.match(app,/assistantButtonRef=\{assistantButtonRef\}/);
   assert.doesNotMatch(app,/setAssistantPinned|assistantPinned|syncAssistantPosition|addEventListener\('scroll'/);
@@ -111,4 +111,31 @@ test('the button starts at the original Figma position and scrolls offscreen', (
   const positions=[0,726,840,1000].map(scrollY => buttonTop-scrollY);
   assert.deepEqual(positions,[738,12,-102,-262]);
   assert.ok(positions[2] < 0, 'Button must disappear naturally when user scrolls further');
+});
+
+test('the red Home button is fully above the viewport at the 8px assistant landing', () => {
+  const figmaHomeHeight=812;
+  const redButtonBottom=figmaHomeHeight-82;
+  const assistantButtonTop=figmaHomeHeight-74;
+  const scrollY=assistantButtonTop-8;
+  assert.equal(redButtonBottom-scrollY,0,
+    'The 4px red sliver visible at 12px disappears at the 8px landing');
+});
+
+test('returning all the way to top hides assistant and restores default select state', () => {
+  const app=readFileSync('src/App.jsx','utf8');
+  assert.match(app,/const \[assistantVisible, setAssistantVisible\] = useState\(false\)/);
+  assert.match(app,/const \[assistantActive, setAssistantActive\] = useState\(false\)/);
+  assert.match(app,/assistantHasLeftHomeRef\.current = true/);
+  assert.match(app,/assistantReturningHomeRef\.current = true/);
+  assert.match(app,/if \(y >= 24\) assistantHasLeftHomeRef\.current = true/);
+  assert.match(app,/if \(y > 2 \|\|/);
+  const reachedHome=app.split('function onPageScroll() {')[1].split("window.addEventListener('scroll'")[0];
+  assert.match(reachedHome,/setAssistantActive\(false\)/);
+  assert.match(reachedHome,/setAssistantVisible\(false\)/);
+  assert.match(reachedHome,/setMode\('closed'\)/);
+  assert.match(app,/\{assistantVisible && \(/);
+  assert.match(app,/setAssistantVisible\(true\)/);
+  assert.match(app,/setAssistantActive\(nextActive\)/);
+  assert.match(app,/scrollingRef\.current = animateScrollTo\(targetY\)/);
 });

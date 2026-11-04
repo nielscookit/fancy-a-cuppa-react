@@ -96,7 +96,7 @@
 /* The button is at original Home y=738px (812px viewport).
    It stays in the normal scroll flow: no sticky/fixed position, so manual
    scrolls move Home, button, and Tea Detail as ONE long document.
-   Button-press animation targets its natural document position - 12px. */
+   Button-press animation targets its natural document position - 8px. */
 .fac-home__assistant-slot {
   position: relative;
   z-index: 1;
