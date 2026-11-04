@@ -8,9 +8,10 @@ const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
  * Approved Figma 01 · Home (node 19:47, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false, assistantPinned = false }) {
+export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false }) {
   return (
-    <Box component="section" className="fac-home" aria-label="Home">
+    <>
+      <Box component="section" className="fac-home" aria-label="Home">
       <Box className="fac-home__canvas">
         <Box className="fac-home__time-control" aria-label="Brewing time">
           <IconButton
@@ -44,19 +45,24 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, as
         >
           Fancy a Cuppa?
         </Button>
+      </Box>
+      </Box>
+      {/* Natural-flow position at Home bottom. CSS sticky, rather than
+          switching absolute to fixed, keeps this SAME button moving with
+          the content all the way to its 12px top stop. */}
+      <Box className="fac-home__assistant-slot">
         <Button
           variant="contained"
           disableElevation
           disableRipple
           className={'fac-home__action fac-home__action--secondary' +
-            (assistantActive ? ' is-active' : '') +
-            (assistantPinned ? ' is-pinned' : '')}
+            (assistantActive ? ' is-active' : '')}
           aria-pressed={assistantActive}
           onClick={onTeaAssistant}
         >
           How do you take it?
         </Button>
       </Box>
-    </Box>
+    </>
   );
 }

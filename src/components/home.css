@@ -91,19 +91,29 @@
   outline-offset: 2px;
 }
 
-/* Approved Home interaction: dark selected state, pinned 12px from viewport top.
-   A single accessible button transitions between the Home and assistant states. */
+/* The button lives in normal document flow at the original Home y=738px
+   (when viewport is 812px high), then sticks continuously at 12px.
+   Negative top margin and compensating bottom margin keep the assistant
+   content's y coordinate unchanged. No fixed/absolute mode switching. */
+.fac-home__assistant-slot {
+  position: sticky;
+  top: 12px;
+  z-index: 1100;
+  width: 100%;
+  max-width: 375px;
+  box-sizing: border-box;
+  height: 66px;
+  margin: -74px auto 8px;
+  padding: 0 8px;
+}
+.fac-home__assistant-slot .fac-home__action--secondary.MuiButton-root {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  width: 100%;
+}
 .fac-home__action--secondary.is-active.MuiButton-root,
 .fac-home__action--secondary.is-active.MuiButton-root:hover {
   color: #ffffff;
   background-color: #323234;
-}
-.fac-home__action--secondary.is-pinned.MuiButton-root {
-  position: fixed;
-  top: 12px;
-  bottom: auto;
-  left: 50%;
-  width: min(359px, calc(100vw - 16px));
-  transform: translateX(-50%);
-  z-index: 1100;
 }

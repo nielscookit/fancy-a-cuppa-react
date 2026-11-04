@@ -229,3 +229,20 @@
 - iOS Reduce Motion preference bypasses animation.
 - No changes to V2, Supabase, /timer-test/, or validated
   timer/audio/media controllers. Tea Detail Figma remains separate phase.
+
+## 2026-11-04: correction after iPhone screen recording
+
+- Source: user-provided 6.5-second screen recording. Visible content moves
+  continuously, but the assistant button visibly snaps at the moment
+  JS toggles absolute placement to fixed placement near the top.
+  The reverse journey shows the same mismatch.
+- Replaced JS observer / `assistantPinned` state and fixed positioning with
+  one native CSS sticky wrapper in normal document flow (top 12px).
+- Initial location retains original Figma bottom-8px placement via
+  `margin-top:-74px; height:66px; margin-bottom:8px`; the 8px
+  compensation keeps the lower content anchor exactly where it was.
+- Selected state still changes on press only, independently of scroll
+  position. Existing 300–560ms ease-out scroll controller unchanged.
+- No changes to iPhone validated video/audio/timer controller, media files,
+  /timer-test/, V2, Supabase, or existing Tea Detail features.
+- New mobile video check required to confirm elimination of visual snap.

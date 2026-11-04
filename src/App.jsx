@@ -62,7 +62,6 @@ export default function App() {
   const [quickNotice, setQuickNotice] = useState(false);
   const assistantSectionRef = useRef(null);
   const [assistantActive, setAssistantActive] = useState(false);
-  const [assistantPinned, setAssistantPinned] = useState(false);
   const scrollingRef = useRef(null);
   const pendingScrollFrameRef = useRef(null);
 
@@ -75,24 +74,8 @@ export default function App() {
   }, []);
 
 
-  // Sticky placement is determined by scroll position only.
-  // Selected state changes exclusively on button press, never while scrolling.
-  useEffect(() => {
-    function syncAssistantPosition() {
-      const sectionTop = assistantSectionRef.current?.getBoundingClientRect().top;
-      if (sectionTop == null) return;
-      const pinned = sectionTop <= 86; // 66px button + 8px bottom + 12px sticky top
-      setAssistantPinned(current => current === pinned ? current : pinned);
-    }
-    window.addEventListener('scroll', syncAssistantPosition, { passive: true });
-    window.addEventListener('resize', syncAssistantPosition);
-    syncAssistantPosition();
-    return () => {
-      window.removeEventListener('scroll', syncAssistantPosition);
-      window.removeEventListener('resize', syncAssistantPosition);
-    };
-  }, []);
-
+  // CSS sticky owns the physical button position continuously; JavaScript
+  // only changes the selected state in response to button presses.
   useEffect(() => {
     saveQuickMinutes(quickMinutes);
   }, [quickMinutes]);
@@ -249,7 +232,6 @@ export default function App() {
         onBrew={() => setQuickNotice(true)}
         onTeaAssistant={showTeaAssistant}
         assistantActive={assistantActive}
-        assistantPinned={assistantPinned}
       />
       <Box ref={assistantSectionRef} component="main"
         sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))'}}> 

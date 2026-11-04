@@ -67,30 +67,42 @@ test('home keeps tea assistant and validated timer integration isolated', () => 
   assert.doesNotMatch(readFileSync('src/components/HomeScreen.jsx','utf8'), /createMediaController|createTimerController|createAudioController/);
 });
 
-test('assistant button has reversible selected state and sticks at 12px', () => {
+test('one sticky button tracks the scrolling page without a fixed-position jump', () => {
   const app=readFileSync('src/App.jsx','utf8');
   const home=readFileSync('src/components/HomeScreen.jsx','utf8');
   const css=readFileSync('src/components/home.css','utf8');
   assert.match(home,/assistantActive\s*=\s*false/);
-  assert.match(home,/assistantPinned\s*=\s*false/);
   assert.match(home,/aria-pressed=\{assistantActive\}/);
+  assert.match(home,/fac-home__assistant-slot/);
   assert.match(home,/is-active/);
-  assert.match(home,/is-pinned/);
-  assert.match(css,/\.fac-home__action--secondary\.is-active\.MuiButton-root/);
-  assert.match(css,/background-color:\s*#323234/);
-  assert.match(css,/\.fac-home__action--secondary\.is-pinned\.MuiButton-root\s*\{/);
-  assert.match(css,/position:\s*fixed/);
+  assert.doesNotMatch(home,/is-pinned|assistantPinned/);
+  assert.match(css,/\.fac-home__assistant-slot\s*\{\s*position:\s*sticky/);
   assert.match(css,/top:\s*12px/);
-  assert.match(css,/z-index:\s*1100/);
+  assert.match(css,/margin:\s*-74px auto 8px/);
+  assert.match(css,/height:\s*66px/);
+  assert.match(css,/\.fac-home__assistant-slot \.fac-home__action--secondary\.MuiButton-root/);
+  assert.match(css,/background-color:\s*#323234/);
+  assert.doesNotMatch(css,/position:\s*fixed/);
   assert.match(app,/const nextActive = !assistantActive/);
   assert.match(app,/setAssistantActive\(nextActive\)/);
   assert.match(app,/scrollingRef\.current = animateScrollTo\(targetY\)/);
   assert.match(app,/const targetY = nextActive && section/);
-  // No scroll event may toggle the selected state.
-  const scrollObserver = app.split('function syncAssistantPosition() {')[1].split('window.addEventListener')[0];
-  assert.doesNotMatch(scrollObserver,/setAssistantActive/);
-  assert.match(app,/sectionTop\s*<=\s*86/);
+  // Only a real button click changes selection. Scroll does not change state.
+  assert.doesNotMatch(app,/setAssistantPinned|assistantPinned|syncAssistantPosition|addEventListener\('scroll'/);
   assert.match(app,/assistantActive=\{assistantActive\}/);
-  assert.match(app,/assistantPinned=\{assistantPinned\}/);
-  assert.match(app,/window\.addEventListener\('scroll',\s*syncAssistantPosition,\s*\{ passive: true \}\)/);
+});
+test('sticky button occupies the same Home-space coordinates as the reference', () => {
+  // Initial top = viewport height - 74px (Figma 812 -> 738px).
+  const viewport = 812;
+  const initialTop = viewport - 74;
+  const buttonHeight = 66;
+  const compensatingMargin = 8;
+  assert.equal(initialTop, 738);
+  assert.equal(initialTop + buttonHeight + compensatingMargin, viewport);
+  // It tracks content smoothly until it reaches the 12px top limit.
+  const positions = [0, 10, 100, 500, 715, 730, 800]
+    .map(scrollY => Math.max(12, initialTop - scrollY));
+  assert.deepEqual(positions, [738, 728, 638, 238, 23, 12, 12]);
+  assert.ok(positions.every((position, index) =>
+    index === 0 || position <= positions[index - 1]));
 });
