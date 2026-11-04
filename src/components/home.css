@@ -93,14 +93,13 @@
   outline-offset: 2px;
 }
 
-/* The button lives in normal document flow at the original Home y=738px
-   (when viewport is 812px high), then sticks continuously at 12px.
-   Negative top margin and compensating bottom margin keep the assistant
-   content's y coordinate unchanged. No fixed/absolute mode switching. */
+/* The button is at original Home y=738px (812px viewport).
+   It stays in the normal scroll flow: no sticky/fixed position, so manual
+   scrolls move Home, button, and Tea Detail as ONE long document.
+   Button-press animation targets its natural document position - 12px. */
 .fac-home__assistant-slot {
-  position: sticky;
-  top: 12px;
-  z-index: 1100;
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 375px;
   box-sizing: border-box;

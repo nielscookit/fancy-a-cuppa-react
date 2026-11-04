@@ -75,42 +75,40 @@ test('home keeps tea assistant and validated timer integration isolated', () => 
   assert.doesNotMatch(readFileSync('src/components/HomeScreen.jsx','utf8'), /createMediaController|createTimerController|createAudioController/);
 });
 
-test('one sticky button tracks the scrolling page without a fixed-position jump', () => {
+test('assistant button scrolls normally with document; click targets 12px top offset', () => {
   const app=readFileSync('src/App.jsx','utf8');
   const home=readFileSync('src/components/HomeScreen.jsx','utf8');
   const css=readFileSync('src/components/home.css','utf8');
   assert.match(home,/assistantActive\s*=\s*false/);
   assert.match(home,/aria-pressed=\{assistantActive\}/);
+  assert.match(home,/ref=\{assistantButtonRef\}/);
   assert.match(home,/fac-home__assistant-slot/);
   assert.match(home,/is-active/);
   assert.doesNotMatch(home,/is-pinned|assistantPinned/);
-  assert.match(css,/\.fac-home__assistant-slot\s*\{\s*position:\s*sticky/);
-  assert.match(css,/top:\s*12px/);
-  assert.match(css,/margin:\s*-74px auto 8px/);
-  assert.match(css,/height:\s*66px/);
-  assert.match(css,/\.fac-home__assistant-slot \.fac-home__action--secondary\.MuiButton-root/);
+  const rule=css.split('.fac-home__assistant-slot {')[1].split('}')[0];
+  assert.match(rule,/position:\s*relative/);
+  assert.match(rule,/margin:\s*-74px auto 8px/);
+  assert.match(rule,/height:\s*66px/);
+  assert.doesNotMatch(rule,/position:\s*(?:sticky|fixed)|top:\s*12px/);
   assert.match(css,/background-color:\s*#323234/);
-  assert.doesNotMatch(css,/position:\s*fixed/);
   assert.match(app,/const nextActive = !assistantActive/);
   assert.match(app,/setAssistantActive\(nextActive\)/);
   assert.match(app,/scrollingRef\.current = animateScrollTo\(targetY\)/);
-  assert.match(app,/const targetY = nextActive && section/);
-  // Only a real button click changes selection. Scroll does not change state.
-  assert.doesNotMatch(app,/setAssistantPinned|assistantPinned|syncAssistantPosition|addEventListener\('scroll'/);
+  assert.match(app,/assistantButtonRef\.current/);
+  assert.match(app,/getBoundingClientRect\(\)\.top - 12/);
   assert.match(app,/assistantActive=\{assistantActive\}/);
+  assert.match(app,/assistantButtonRef=\{assistantButtonRef\}/);
+  assert.doesNotMatch(app,/setAssistantPinned|assistantPinned|syncAssistantPosition|addEventListener\('scroll'/);
 });
-test('sticky button occupies the same Home-space coordinates as the reference', () => {
-  // Initial top = viewport height - 74px (Figma 812 -> 738px).
-  const viewport = 812;
-  const initialTop = viewport - 74;
-  const buttonHeight = 66;
-  const compensatingMargin = 8;
-  assert.equal(initialTop, 738);
-  assert.equal(initialTop + buttonHeight + compensatingMargin, viewport);
-  // It tracks content smoothly until it reaches the 12px top limit.
-  const positions = [0, 10, 100, 500, 715, 730, 800]
-    .map(scrollY => Math.max(12, initialTop - scrollY));
-  assert.deepEqual(positions, [738, 728, 638, 238, 23, 12, 12]);
-  assert.ok(positions.every((position, index) =>
-    index === 0 || position <= positions[index - 1]));
+test('the button starts at the original Figma position and scrolls offscreen', () => {
+  const homeHeight=812;
+  const buttonTop=homeHeight-74;
+  const buttonHeight=66;
+  const bottomSpace=8;
+  assert.equal(buttonTop,738);
+  assert.equal(buttonTop + buttonHeight + bottomSpace, homeHeight);
+  // User gestures continue to move the button after the click destination.
+  const positions=[0,726,840,1000].map(scrollY => buttonTop-scrollY);
+  assert.deepEqual(positions,[738,12,-102,-262]);
+  assert.ok(positions[2] < 0, 'Button must disappear naturally when user scrolls further');
 });

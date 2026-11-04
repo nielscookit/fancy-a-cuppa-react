@@ -34,7 +34,15 @@ test('QuickTimer overlay remains optically rendered behind Home until activation
   assert.match(css,/\.fac-quick-timer--active\s*\{\s*z-index:\s*1400/);
   assert.doesNotMatch(css,/opacity:\s*0/);
   assert.match(home,/\.fac-home\s*\{\s*position:\s*relative;\s*z-index:\s*1/);
-  assert.match(app,/bgcolor:'background\.default'/);
+  // The overlay is composited but never exposed behind the long page.
+  assert.match(app,/className="fac-app-page"/);
+  assert.match(app,/minHeight:\s*'100svh'/);
+  assert.match(app,/bgcolor:\s*'background\.default'/);
+  const start=app.indexOf('<Box className="fac-app-page"');
+  const content=app.indexOf('<Box ref={assistantSectionRef}');
+  const pageEnd=app.indexOf('<QuickTimerView',content);
+  assert.ok(start >= 0 && content > start && pageEnd > content,
+    'Home and Assistant must share one opaque page layer; timer sits outside');
   assert.match(app,/flushSync\(\(\) => setQuickTimerOpen\(true\)\)/);
 });
 

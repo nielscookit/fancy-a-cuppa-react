@@ -304,3 +304,23 @@
 - No changes to timer/audio/media controllers, separate /timer-test/,
   existing Supabase adapter, V2 or MUI Lab.
 - Confirm UX on iPhone as well as pending full video/milk acceptance.
+
+## 2026-11-04: scroll interaction + inactive timer bleed correction
+
+- User iPhone recording at 23:13 reviewed: after successful button-triggered
+  smooth scroll, manual gestures leave HOW DO YOU TAKE IT? pinned above the
+  catalog. At the end of the scrolling page, inactive timer PAUSE/RESET
+  appears through uncovered regions behind the catalog.
+- Fix 1: remove native CSS position:sticky. Assistant button remains a normal
+  document-flow element at its exact Home placement (y=viewportHeight-74).
+  Programmatic click scroll now targets that real button's top at 12px,
+  with the unchanged approved ease-out motion. Further swipes move the
+  button with the whole document; it naturally leaves the viewport.
+- Fix 2: Home + assistant content are nested in one full-width, opaque,
+  min-height:100svh page layer (z-index:1), entirely covering the existing
+  inactive pre-mounted QuickTimerView below (z-index:0). The timer still
+  promotes to z-index:1400 synchronously before .play() on the same tap.
+- The quick timer view, its video/audio/timer controllers, preload state,
+  /timer-test/, V2, Supabase, and MUI Lab are unchanged.
+- New iPhone acceptance still required: button tap scroll then free scrolling,
+  both directions; absence of timer controls under long page; quick video.

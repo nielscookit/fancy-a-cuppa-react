@@ -8,7 +8,7 @@ const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
  * Approved Figma 01 · Home (node 19:47, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false, brewDisabled = false }) {
+export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false, brewDisabled = false, assistantButtonRef }) {
   return (
     <>
       <Box component="section" className="fac-home" aria-label="Home">
@@ -49,10 +49,9 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, as
         </Button>
       </Box>
       </Box>
-      {/* Natural-flow position at Home bottom. CSS sticky, rather than
-          switching absolute to fixed, keeps this SAME button moving with
-          the content all the way to its 12px top stop. */}
-      <Box className="fac-home__assistant-slot">
+      {/* Ordinary long-page content: only button presses animate scrolling.
+          The button scrolls out of view naturally when the user swipes. */}
+      <Box ref={assistantButtonRef} className="fac-home__assistant-slot">
         <Button
           variant="contained"
           disableElevation

@@ -66,6 +66,7 @@ export default function App() {
   const [quickVideoStatus, setQuickVideoStatus] = useState('loading');
   const quickTimerRef = useRef(null);
   const assistantSectionRef = useRef(null);
+  const assistantButtonRef = useRef(null);
   const [assistantActive, setAssistantActive] = useState(false);
   const scrollingRef = useRef(null);
   const pendingScrollFrameRef = useRef(null);
@@ -79,8 +80,8 @@ export default function App() {
   }, []);
 
 
-  // CSS sticky owns the physical button position continuously; JavaScript
-  // only changes the selected state in response to button presses.
+  // The assistant button is in normal document flow. Selected state changes
+  // on press only; scrolling itself never pins or selects it.
   useEffect(() => {
     saveQuickMinutes(quickMinutes);
   }, [quickMinutes]);
@@ -107,9 +108,11 @@ export default function App() {
     // Allow React to paint the new selected state and assistant content first.
     pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
       pendingScrollFrameRef.current = null;
-      const section = assistantSectionRef.current;
-      const targetY = nextActive && section
-        ? window.scrollY + section.getBoundingClientRect().top
+      // Target the actual button, 12 px from the top. Unlike a sticky
+      // button it then keeps travelling with the document on manual scroll.
+      const button = assistantButtonRef.current;
+      const targetY = nextActive && button
+        ? Math.max(0, window.scrollY + button.getBoundingClientRect().top - 12)
         : 0;
       scrollingRef.current = animateScrollTo(targetY);
     });
@@ -257,25 +260,25 @@ export default function App() {
 
   return (
     <>
-      {/* Phase 1A: approved 375 × 812 Home. Existing tea assistant continues
-          below until the Tea Detail Figma implementation in Phase 2. */}
-      <HomeScreen
-        minutes={quickMinutes}
-        onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous, delta))}
-        onBrew={startQuickTimer}
-        brewDisabled={quickVideoStatus === 'loading'}
-        onTeaAssistant={showTeaAssistant}
-        assistantActive={assistantActive}
-      />
-      {/* Persistent media elements are prepared on Home, before the first
-          user gesture. The quick timer uses the same validated controller. */}
-      <QuickTimerView
-        ref={quickTimerRef}
-        active={quickTimerOpen}
-        onClose={closeQuickTimer}
-        onPreloadChange={setQuickVideoStatus}
-      />
-      <Box ref={assistantSectionRef} component="main"
+      {/* One opaque, scrolling document. It covers the pre-mounted timer
+          underneath even at the bottom of the tea list and during scrolling. */}
+      <Box className="fac-app-page" sx={{
+        position: 'relative',
+        zIndex: 1,
+        minHeight: '100svh',
+        bgcolor: 'background.default',
+      }}>
+        {/* Phase 1A Home and the assistant are one continuous long page. */}
+        <HomeScreen
+          minutes={quickMinutes}
+          onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous, delta))}
+          onBrew={startQuickTimer}
+          brewDisabled={quickVideoStatus === 'loading'}
+          onTeaAssistant={showTeaAssistant}
+          assistantActive={assistantActive}
+          assistantButtonRef={assistantButtonRef}
+        />
+        <Box ref={assistantSectionRef} component="main"
         sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))',position:'relative',zIndex:1,bgcolor:'background.default'}}> 
       <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
         Fancy a Cuppa
@@ -426,7 +429,17 @@ export default function App() {
           )}
         </>
       )}
+        </Box>
       </Box>
+      {/* The media session stays mounted and preloaded. The opaque page layer
+          completely masks its inactive UI; the active overlay rises above it
+          synchronously in the original Home tap. */}
+      <QuickTimerView
+        ref={quickTimerRef}
+        active={quickTimerOpen}
+        onClose={closeQuickTimer}
+        onPreloadChange={setQuickVideoStatus}
+      />
       <Snackbar
         open={Boolean(quickNotice)}
         autoHideDuration={4200}
