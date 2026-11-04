@@ -98,7 +98,8 @@ test('assistant button scrolls normally with document; click targets 8px top off
   assert.match(app,/getBoundingClientRect\(\)\.top - 8/);
   assert.match(app,/assistantActive=\{assistantActive\}/);
   assert.match(app,/assistantButtonRef=\{assistantButtonRef\}/);
-  assert.doesNotMatch(app,/setAssistantPinned|assistantPinned|syncAssistantPosition|addEventListener\('scroll'/);
+  // Scroll events only collapse the assistant at Home; they never pin the button.
+  assert.doesNotMatch(app,/setAssistantPinned|assistantPinned|syncAssistantPosition/);
 });
 test('the button starts at the original Figma position and scrolls offscreen', () => {
   const homeHeight=812;
