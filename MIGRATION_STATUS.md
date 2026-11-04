@@ -290,3 +290,17 @@
 - Core timer/audio/media controllers, useTeaTimer adapter and /timer-test/
   unchanged. Need real iPhone validation; simulator/CI cannot confirm Safari
   media compositor behaviour.
+
+## 2026-11-04: User-corrected Quick Timer UX – RESET = Home
+
+- Single exit control: RESET stops media/audio and resets the full timer via
+  the already validated `actions.reset()`, then invokes `onClose()`.
+- Removed separate BACK TO HOME control, in-screen restart action and
+  milk-retry action. Timer page now has exactly two buttons:
+  PAUSE/RESUME and RESET. Status warnings remain text only.
+- While finished, the PAUSE/RESUME control reads FINISHED and is disabled;
+  RESET returns Home, where the user can immediately choose a duration or
+  restart. The original Home duration remains stored.
+- No changes to timer/audio/media controllers, separate /timer-test/,
+  existing Supabase adapter, V2 or MUI Lab.
+- Confirm UX on iPhone as well as pending full video/milk acceptance.

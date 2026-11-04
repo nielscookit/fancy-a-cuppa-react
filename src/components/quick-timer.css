@@ -113,14 +113,7 @@
   clip-path: inset(50%);
 }
 
-/* BACK is always the first reachable control, safely above iOS bottom chrome. */
-.fac-quick-timer__back.MuiButton-root {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  flex-shrink: 0;
-  margin-bottom: 8px;
-}
+/* Timer page has precisely two actions: PAUSE/RESUME and RESET. */
 .fac-quick-timer__media .fac-quick-timer__error.MuiTypography-root {
   text-align: center;
   max-width: 335px;

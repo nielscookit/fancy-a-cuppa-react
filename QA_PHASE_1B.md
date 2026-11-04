@@ -5,9 +5,9 @@
 3. A separate timer view appears immediately. Countdown must begin when the first Fill video actually plays.
 4. Video order remains Fill → Brew → Still Loop → Milk, with all original V2 sounds.
 5. Tap PAUSE, then RESUME. Clock and video continue in sync.
-6. Tap RESET. Clock returns to 3 minutes and first Fill frame remains visible.
-7. Tap BACK TO HOME during playback. All playback stops; Home returns with the chosen 3 MIN.
-8. Tap FANCY A CUPPA? again without reloading. Video and timer start reliably from frame one.
+6. Tap RESET during playback. All video/audio and countdown stop, and Home returns with the chosen 3 MIN.
+7. Change the Home duration and tap FANCY A CUPPA? again without reloading. The new countdown starts from the first Fill frame.
+8. Repeat with the previous duration to verify consecutive timer starts are reliable.
 9. Select a different minute duration on Home, start again. Verify the new time is used.
 10. Navigate HOW DO YOU TAKE IT? and check the pre-existing tea catalog/TeaTimer remains functional.
 11. Repeat from iPhone Safari (or ChatGPT in-app browser); check no autoplay-blocked or blank videos.
@@ -27,6 +27,14 @@ Timer visuals are interim; only the pill button styling matches Home design at t
   an explicit-tap RESTART VIDEO & TIMER recovery.
 - If milk does not appear by the last 2s or at finish, PLAY MILK VIDEO is
   available via the existing validated retryMilk action.
-- BACK TO HOME moved to top to avoid iPhone bottom-browser controls.
-  RESET does not close the overlay.
+- Superseded by UX approval: remove BACK TO HOME. RESET is the only way
+  back to Home and resets the session in the same tap.
 - Verify on the user's real iPhone before marking any of these fixes accepted.
+
+## Final navigation rule (user approved, 2026-11-04)
+
+- Quick timer page shows precisely two controls: PAUSE (changes to RESUME when paused) and RESET.
+- RESET stops all media/audio, resets the timer, and returns to Home in the same tap.
+- Home duration can then be adjusted or the timer can be started again; no separate BACK button.
+- After the countdown finishes, PAUSE is disabled as FINISHED; RESET returns Home.
+- Video stall/missing milk warnings may appear as text only, no additional timer-page action buttons.

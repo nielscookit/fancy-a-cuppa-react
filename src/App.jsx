@@ -138,7 +138,8 @@ export default function App() {
   };
 
   const closeQuickTimer = () => {
-    // Playback is stopped in QuickTimerView.onBack only. RESET never calls this.
+    // Called exclusively by QuickTimerView.RESET after media and countdown
+    // have been stopped/reset. Home keeps the last selected minute value.
     setQuickTimerOpen(false);
   };
   const photoRef = useRef(null);

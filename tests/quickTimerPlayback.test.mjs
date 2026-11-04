@@ -38,21 +38,21 @@ test('QuickTimer overlay remains optically rendered behind Home until activation
   assert.match(app,/flushSync\(\(\) => setQuickTimerOpen\(true\)\)/);
 });
 
-test('RESET only resets; BACK TO HOME is the sole exit action', () => {
+test('RESET ends the quick session and returns Home; PAUSE/RESUME is the only other control', () => {
   const src=readFileSync('src/components/QuickTimerView.jsx','utf8');
   const app=readFileSync('src/App.jsx','utf8');
-  const reset=src.split('const onReset = () => {')[1].split('const onBack = () => {')[0];
-  const back=src.split('const onBack = () => {')[1].split('const onRestartStalled = () => {')[0];
-  assert.match(reset,/actions\.reset\(\)/);
-  assert.doesNotMatch(reset,/onClose/);
-  assert.match(back,/actions\.reset\(\)/);
-  assert.match(back,/onClose\?\.\(\)/);
+  const reset=src.split('const onReset = () => {')[1].split('const milkMissing')[0];
+  assert.match(reset,/actions\.reset\(\);\s*onClose\?\.\(\)/);
   assert.match(src,/onClick=\{onReset\}/);
-  assert.match(src,/onClick=\{onBack\}/);
-  assert.match(src,/RESTART VIDEO & TIMER/);
-  assert.match(src,/onClick=\{actions\.retryMilk\}/);
+  assert.match(src,/onClick=\{onPrimary\}/);
+  assert.match(src,/const playbackLabel = countdown\.finished \? 'FINISHED'/);
+  assert.match(src,/countdown\.running \|\| countdown\.preparing \? 'PAUSE' : 'RESUME'/);
   assert.match(src,/Brewing · /);
+  assert.doesNotMatch(src,/onBack|BACK TO HOME|RESTART VIDEO & TIMER|PLAY MILK VIDEO|onRestartStalled/);
+  assert.equal((src.match(/<Button\b/g) || []).length, 2,
+    'Exactly two buttons on the quick timer page');
   assert.doesNotMatch(app.split('const closeQuickTimer = () => {')[1].split('const photoRef')[0],/\.reset\(/);
+  assert.match(app,/setQuickTimerOpen\(false\)/);
 });
 
 test('stage diagnostic is independent of the validated media controller', () => {
