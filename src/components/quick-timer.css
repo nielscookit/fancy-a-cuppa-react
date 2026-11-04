@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   /* Keep the video compositor alive below the opaque Home content.
-     opacity:0 on an ancestor causes WebKit to throttle/offload the video
+     a fully transparent ancestor may let WebKit defer video decoding
      pipeline; raising the stacked view does not change its opacity. */
   z-index: 0;
   background: #faf9f6;
