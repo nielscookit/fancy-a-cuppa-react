@@ -1,0 +1,20 @@
+/* The exact 4-layer media presentation of the iPhone-validated timer test. */
+.fac-timer-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: transparent;
+}
+.fac-timer-video.visible { opacity: 1; visibility: visible; }
+.fac-timer-video:nth-child(4).visible { z-index: 4; }
+.fac-timer-visual {
+  background: #faf9f6;
+  isolation: isolate;
+  -webkit-mask-image: radial-gradient(circle closest-side at center, #000 68%, rgba(0,0,0,.92) 77%, rgba(0,0,0,.5) 88%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side at center, #000 68%, rgba(0,0,0,.92) 77%, rgba(0,0,0,.5) 88%, transparent 100%);
+}
