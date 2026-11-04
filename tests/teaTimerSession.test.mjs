@@ -112,6 +112,9 @@ test('timer adapter remains isolated from V3 app, shared theme and database', as
   assert.match(adapter, /from 'react'/);
   assert.match(adapter, /createTeaTimerSession/);
   assert.doesNotMatch(bridge, /from ['"]react['"]/);
-  assert.doesNotMatch(adapter + bridge, /supabase|createTheme|ThemeProvider|localStorage/i);
+  // Restrict this to executable imports/API calls; comments can document
+  // that the adapter deliberately does NOT use Supabase or a global theme.
+  assert.doesNotMatch(adapter + bridge, /^\\s*import .*?(supabase|createTheme|ThemeProvider)/im);
+  assert.doesNotMatch(adapter + bridge, /\\blocalStorage\\s*[.\\[]/);
   assert.doesNotMatch(mainApp, /useTeaTimer|teaTimerSession|timerController/);
 });
