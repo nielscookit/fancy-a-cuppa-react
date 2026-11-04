@@ -124,3 +124,17 @@
 - Added tests for no-loadeddata middle transitions, all four preloads, reset
   idle frame, and stale transition cancellation.
 - Await real iPhone acceptance; no changes to V2, Supabase or MUI lab.
+
+
+## 2026-11-04: real-device acceptance confirmed
+
+- User confirmed everything works on the iPhone in the isolated timer test:
+  video sequence, countdown, milk ending and first-frame Reset.
+- Preserve commit d6bfbdba376dc9449400f33b910856871476976c as the
+  device-accepted implementation reference for the existing controllers and
+  diagnostic page.
+- Introduced a new opt-in React hook/bridge (without modifying the accepted
+  media controller, standalone test screen, application layout, MUI lab or DB).
+- The bridge is tested for preload-before-start, direct tap actions, reset,
+  cleanup, and stale async completion after unmount.
+- Next: connect the adapter to a user-approved V3 interface; rerun on-device tests.

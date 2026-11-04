@@ -1,21 +1,41 @@
-# Framework-independent V3 timer and media controllers
+# Confirmed media controller + React integration boundary
 
-Sources are pinned to the validated V2 main SHA 203782e33b4d52184091c171008bccdbb6437057
-and the preserved video integration test. V2 remains unchanged.
+The user's real iPhone Safari test on **2026-11-04** confirmed that the
+isolated `/timer-test/` plays correctly, including:
 
-- `mediaController.js`: video fill → brew → looping still → milk;
-  matching V2 sounds, 1.03s bubble cue, milk sound +60ms, session-token cleanup.
-- `audioController.js`: V2-style WebAudio preload/click/30-second cue
-  and HTMLAudioElement timer-finished sound.
-- `timerController.js`: timestamp-based countdown, pause/resume/reset,
-  30/5-second thresholds, wake lock and background visibility handling.
-- `mediaManifest.js`: known Git content hashes; checked at download time.
-- `scripts/sync-v2-media.mjs`: copies verified media from the immutable V2
-  source commit into V3 public/media; no changes or requests to V2 write APIs.
+- All four clips: `FIllSNB.mp4` → `brewSNB.mp4` → looping `stillSNB.mp4` → `MILKSNB.mp4`.
+- Audio cues, timer synchronization and the milk video near completion.
+- Reset: paused **first frame** of the first video remains visible; Start replays it.
 
-The controllers do not import React. A dedicated /timer-test/ page will
-mount and exercise these modules before any timer migration into the main app.
+**Do not modify the working `/timer-test/` or the three underlying controllers
+without a regression test and an explicit need.** V2 is still untouched.
 
-iPhone Safari remains the acceptance gate: repeated start/restart, media
-sequencing, no lost audio, visibility and screen lock. Automated JS tests
-cannot substitute for real device confirmation.
+## Migration preparation
+
+- `teaTimerSession.js`: framework-neutral wiring that creates all three
+  controllers, preloads 4 videos and exposes Start/Pause/Reset/SetSeconds.
+- `useTeaTimer.js`: small React hook adapter returning a state snapshot and
+  imperative user-gesture callbacks. It does not render or style anything.
+- No changes to `src/App.jsx`, `src/theme.js`, MUI lab or Supabase.
+- Source code of validated media controllers and iPhone diagnostic stays
+  unchanged; a safe integration point is ready for the approved V3 UI.
+
+## Usage for a future approved UI
+
+```jsx
+const videoRefs = useRef([]);
+const { snapshot, actions } = useTeaTimer({
+  videoRefs,
+  assetBase: import.meta.env.BASE_URL + 'media/',
+  initialSeconds: 240,
+});
+```
+
+Render four persistent video elements and populate `videoRefs.current[index]`
+before mounting. Keep the media presentation CSS consistent with the validated
+`/timer-test/`. Use `snapshot.preload === 'ready'` to enable Start; invoke
+`actions.start()` **directly in the button's onClick** to maintain the
+iPhone user-gesture permission. There must be no awaiting before the call.
+
+Wait for UX approval before changing the app layout or replacing the existing
+technical catalog test screen. Confirm iPhone behavior again after UI integration.
