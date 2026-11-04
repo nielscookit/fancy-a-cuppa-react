@@ -1,0 +1,92 @@
+/* Figma 01 · Home, node 19:47, reference canvas 375 × 812 px. */
+.fac-home {
+  background-color: #ffffff;
+  width: 100%;
+  height: 100svh;
+  min-height: 560px;
+}
+.fac-home__canvas {
+  position: relative;
+  width: 100%;
+  max-width: 375px;
+  height: 100%;
+  margin: 0 auto;
+}
+.fac-home__time-control {
+  position: absolute;
+  top: calc(50% - 43px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 66px;
+}
+.fac-home__time-button.MuiIconButton-root {
+  flex: 0 0 66px;
+  width: 66px;
+  height: 66px;
+  min-width: 66px;
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+}
+.fac-home__time-button img {
+  display: block;
+  width: 66px;
+  height: 66px;
+  max-width: none;
+}
+.fac-home__time-value.MuiTypography-root {
+  display: block;
+  min-width: 85px;
+  color: #202024;
+  font-family: "Roboto Mono", monospace;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: normal;
+  white-space: nowrap;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.fac-home__action.MuiButton-root {
+  position: absolute;
+  left: 8px;
+  width: calc(100% - 16px);
+  height: 66px;
+  min-height: 66px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 100px;
+  box-shadow: none;
+  font-family: "Roboto Mono", monospace;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: normal;
+  text-transform: uppercase;
+  letter-spacing: normal;
+}
+.fac-home__action--primary.MuiButton-root {
+  bottom: 82px;
+  color: #ffffff;
+  background-color: #782b40;
+}
+.fac-home__action--primary.MuiButton-root:hover {
+  background-color: #782b40;
+  box-shadow: none;
+}
+.fac-home__action--secondary.MuiButton-root {
+  bottom: 8px;
+  color: #323234;
+  background-color: #eeeeec;
+}
+.fac-home__action--secondary.MuiButton-root:hover {
+  background-color: #eeeeec;
+  box-shadow: none;
+}
+.fac-home__time-button.MuiIconButton-root:focus-visible,
+.fac-home__action.MuiButton-root:focus-visible {
+  outline: 3px solid #782b40;
+  outline-offset: 2px;
+}

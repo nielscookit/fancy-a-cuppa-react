@@ -178,3 +178,22 @@
 
 - User confirmed checklist point 3: switching 250/500/1000/1500 ml and custom 900 ml updates dosage as expected in integrated V3.
 - QA-04 and QA-05 accepted on actual iPhone. Next: QA-11 to QA-13 form and photo barcode checks, without production database writes.
+
+## 2026-11-04: Figma Phase 1A Home only
+
+- Figma 01 · Home (node 19:47), source screenshot 375 × 812.
+- User approved primary label "Fancy a Cuppa" (visually uppercase per Figma).
+- Implemented Figma-aligned white home canvas, 66px exact Figma SVG
+  plus/minus controls, 28px Bold time label, exact 66px pill buttons at
+  82px and 8px from the bottom and 375px horizontal reference.
+- Quick minute selection defaults to 2 and persists under isolated V3 key.
+- Existing tea assistant below Home stays functional; secondary button
+  opens it by smooth scrolling without introducing a separate route.
+- The primary action is EXPLICITLY a temporary English notice: auto-start
+  of the separate quick timer belongs to Phase 1B and is not claimed working.
+- No timer/audio/media controllers, standalone /timer-test/, Supabase data
+  adapters, V2 or MUI lab changes. Pre-implementation fallback branch:
+  freeze/v3-before-figma-phase1a at `9568483a62fae87c4a33e0eae6174d7711f6db04`.
+- Next: Phase 1B direct BREW tap to standalone timer view must retain the
+  original iPhone media user-gesture semantics and preload all four clips
+  before enabling Start. Then obtain real iPhone acceptance.

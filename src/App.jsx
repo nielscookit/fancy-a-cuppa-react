@@ -9,6 +9,10 @@ import {
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaTimer from './components/TeaTimer.jsx';
+import HomeScreen from './components/HomeScreen.jsx';
+import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
+import { v3StorageKey } from './storage.js';
+import Snackbar from '@mui/material/Snackbar';
 
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
 const searchSx = {
@@ -53,6 +57,24 @@ export default function App() {
   const [scanError, setScanError] = useState('');
   const [scannedCode, setScannedCode] = useState(null);
   const [message, setMessage] = useState('');
+  const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
+  const [quickNotice, setQuickNotice] = useState(false);
+  const assistantSectionRef = useRef(null);
+
+  useEffect(() => {
+    saveQuickMinutes(quickMinutes);
+  }, [quickMinutes]);
+
+  const showTeaAssistant = () => {
+    setMode('search');
+    setQuery('');
+    requestAnimationFrame(() => {
+      assistantSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
   const photoRef = useRef(null);
   const searchRef = useRef(null);
 
@@ -167,7 +189,17 @@ export default function App() {
   );
 
   return (
-    <Box component="main" sx={{maxWidth:500,mx:'auto',px:2.5,pt:3,pb:'max(45px, env(safe-area-inset-bottom))'}}>
+    <>
+      {/* Phase 1A: approved 375 × 812 Home. Existing tea assistant continues
+          below until the Tea Detail Figma implementation in Phase 2. */}
+      <HomeScreen
+        minutes={quickMinutes}
+        onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous, delta))}
+        onBrew={() => setQuickNotice(true)}
+        onTeaAssistant={showTeaAssistant}
+      />
+      <Box ref={assistantSectionRef} component="main"
+        sx={{maxWidth:500,mx:'auto',px:2.5,pt:3,pb:'max(45px, env(safe-area-inset-bottom))'}}> 
       <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
         Fancy a Cuppa
       </Typography>
@@ -317,6 +349,14 @@ export default function App() {
           )}
         </>
       )}
-    </Box>
+      </Box>
+      <Snackbar
+        open={quickNotice}
+        autoHideDuration={4200}
+        onClose={() => setQuickNotice(false)}
+        message="Quick timer will be connected in Phase 1B."
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      />
+    </>
   );
 }
