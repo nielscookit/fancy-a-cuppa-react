@@ -60,7 +60,7 @@ test('home keeps tea assistant and validated timer integration isolated', () => 
   const app=readFileSync('src/App.jsx','utf8');
   assert.match(app, /<HomeScreen/);
   assert.match(app, /onTeaAssistant=\{showTeaAssistant\}/);
-  assert.match(app, /scrollIntoView\(/);
+  assert.match(app, /animateScrollTo\(/);
   assert.match(app, /Quick timer will be connected in Phase 1B/);
   assert.match(app, /<TeaTimer/);
   assert.match(app, /<TeaEditor/);
@@ -82,8 +82,13 @@ test('assistant button has reversible selected state and sticks at 12px', () => 
   assert.match(css,/position:\s*fixed/);
   assert.match(css,/top:\s*12px/);
   assert.match(css,/z-index:\s*1100/);
-  assert.match(app,/window\.scrollTo\(\{\s*top:\s*0,\s*behavior:\s*'smooth'\s*\}\)/);
-  assert.match(app,/scrollIntoView\(/);
+  assert.match(app,/const nextActive = !assistantActive/);
+  assert.match(app,/setAssistantActive\(nextActive\)/);
+  assert.match(app,/scrollingRef\.current = animateScrollTo\(targetY\)/);
+  assert.match(app,/const targetY = nextActive && section/);
+  // No scroll event may toggle the selected state.
+  const scrollObserver = app.split('function syncAssistantPosition() {')[1].split('window.addEventListener')[0];
+  assert.doesNotMatch(scrollObserver,/setAssistantActive/);
   assert.match(app,/sectionTop\s*<=\s*86/);
   assert.match(app,/assistantActive=\{assistantActive\}/);
   assert.match(app,/assistantPinned=\{assistantPinned\}/);

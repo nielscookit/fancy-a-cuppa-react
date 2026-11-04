@@ -13,6 +13,7 @@ import HomeScreen from './components/HomeScreen.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
 import { v3StorageKey } from './storage.js';
 import Snackbar from '@mui/material/Snackbar';
+import { animateScrollTo } from './features/scrollMotion.js';
 
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
 const searchSx = {
@@ -62,17 +63,26 @@ export default function App() {
   const assistantSectionRef = useRef(null);
   const [assistantActive, setAssistantActive] = useState(false);
   const [assistantPinned, setAssistantPinned] = useState(false);
+  const scrollingRef = useRef(null);
+  const pendingScrollFrameRef = useRef(null);
 
-  // The same Home button becomes the pinned, dark selected control once it
-  // reaches 12px from the viewport top. Scrolling back restores Home state.
+  // Cancel scheduled/programmatic scrolling if this screen is unmounted.
+  useEffect(() => () => {
+    if (pendingScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingScrollFrameRef.current);
+    }
+    scrollingRef.current?.();
+  }, []);
+
+
+  // Sticky placement is determined by scroll position only.
+  // Selected state changes exclusively on button press, never while scrolling.
   useEffect(() => {
     function syncAssistantPosition() {
       const sectionTop = assistantSectionRef.current?.getBoundingClientRect().top;
       if (sectionTop == null) return;
       const pinned = sectionTop <= 86; // 66px button + 8px bottom + 12px sticky top
       setAssistantPinned(current => current === pinned ? current : pinned);
-      if (pinned) setAssistantActive(true);
-      else if (window.scrollY <= 2) setAssistantActive(false);
     }
     window.addEventListener('scroll', syncAssistantPosition, { passive: true });
     window.addEventListener('resize', syncAssistantPosition);
@@ -88,20 +98,32 @@ export default function App() {
   }, [quickMinutes]);
 
   const showTeaAssistant = () => {
-    if (assistantActive) {
-      // Keep the selected button pinned until smooth scrolling crosses back
-      // into the Home frame. The scroll observer restores its original state.
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+    const nextActive = !assistantActive;
+
+    // Button state updates on press, BEFORE the first animated scroll frame.
+    setAssistantActive(nextActive);
+
+    // Pressing again while an animation is running reverses immediately.
+    if (pendingScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingScrollFrameRef.current);
+      pendingScrollFrameRef.current = null;
     }
-    setAssistantActive(true);
-    setMode('search');
-    setQuery('');
-    requestAnimationFrame(() => {
-      assistantSectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
+    scrollingRef.current?.();
+    scrollingRef.current = null;
+
+    if (nextActive) {
+      setMode('search');
+      setQuery('');
+    }
+
+    // Allow React to paint the new selected state and assistant content first.
+    pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
+      pendingScrollFrameRef.current = null;
+      const section = assistantSectionRef.current;
+      const targetY = nextActive && section
+        ? window.scrollY + section.getBoundingClientRect().top
+        : 0;
+      scrollingRef.current = animateScrollTo(targetY);
     });
   };
   const photoRef = useRef(null);

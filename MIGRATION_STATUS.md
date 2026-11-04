@@ -213,3 +213,19 @@
   button does not obscure content. Tea Detail Figma implementation is
   still Phase 2; existing V3 search/card/dosing is retained unchanged.
 - No changes to V2, validated timer/audio/media controllers or Supabase.
+
+## 2026-11-04: Home assistant button press semantics and eased scrolling
+
+- Selection is now toggled immediately on the "HOW DO YOU TAKE IT?"
+  button press; passive scroll/resize events ONLY update its 12px pinned
+  position and NEVER change selected colour.
+- Pressing selected button immediately deselects (light grey) and
+  programmatically returns to Home. The dark/grey state updates before
+  starting the motion in the next animation frame.
+- Smooth scroll now uses decelerating ease-out cubic with distance-aware
+  duration 300–560ms rather than browser-defined native smooth behaviour.
+- Touch/pointer, wheel and keyboard can interrupt scripted motion.
+  Repeated pressing reverses the movement without a queued animation.
+- iOS Reduce Motion preference bypasses animation.
+- No changes to V2, Supabase, /timer-test/, or validated
+  timer/audio/media controllers. Tea Detail Figma remains separate phase.
