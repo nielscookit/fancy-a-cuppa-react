@@ -42,7 +42,7 @@ test('Figma Tea Detail BREW preserves the validated first-tap video start',()=>{
   const app=readFileSync('src/App.jsx','utf8');
   const detail=readFileSync('src/components/TeaDetail.jsx','utf8');
   const quick=readFileSync('src/components/QuickTimerView.jsx','utf8');
-  assert.match(detail,/onBrew=\{onBrew\}/);
+  assert.match(detail,/onClick=\{onBrew\}/);
   assert.match(app,/onBrew=\{startDetailTimer\}/);
   assert.match(app,/const startDetailTimer = \(\) => openTimerWithSeconds\(detailMinutes \* 60\)/);
   assert.match(app,/setDetailMinutes\(initialDetailMinutes\(tea\)\)/);
