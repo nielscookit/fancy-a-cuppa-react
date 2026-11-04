@@ -1,7 +1,8 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { useTeaTimer } from '../timer/useTeaTimer.js';
 import { formatCountdown } from '../timer/formatCountdown.js';
+import { nextVideoProgress } from '../features/quickVideoProgress.js';
 import './tea-timer.css';
 import './quick-timer.css';
 
@@ -20,6 +21,8 @@ const QuickTimerView = forwardRef(function QuickTimerView({
   onPreloadChange,
 }, ref) {
   const videoRefs = useRef([]);
+  const [playbackStalled, setPlaybackStalled] = useState(false);
+  const progressRef = useRef({ phase: -1, time: 0, unchangedMs: 0 });
   // Fixed initialSeconds ensures +/- changes on Home do not recreate the
   // controller and trigger a fresh four-video download.
   const { snapshot, actions } = useTeaTimer({
@@ -41,11 +44,30 @@ const QuickTimerView = forwardRef(function QuickTimerView({
     return () => { document.body.style.overflow = previous; };
   }, [active]);
 
+  // The supplied iPhone recording shows the clock progressing while the
+  // visual stage stops. Detect that independently of timer-controller state.
+  // A visible warning prevents treating a frozen video as a valid sequence.
+  useEffect(() => {
+    progressRef.current = { phase, time: 0, unchangedMs: 0 };
+    if (!active || !countdown.running || phase < 0) return undefined;
+    const id = window.setInterval(() => {
+      const video = videoRefs.current[phase];
+      if (!video) return;
+      const sample = nextVideoProgress(progressRef.current, {
+        phase, time: video.currentTime, elapsedMs: 1000,
+      });
+      progressRef.current = sample;
+      setPlaybackStalled(sample.stalled);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [active, countdown.running, phase]);
+
   useImperativeHandle(ref, () => ({
     begin(seconds) {
       // Both calls run synchronously inside the originating click, preserving
       // Safari's direct gesture for milk priming, audio and Fill video.play().
       if (preload !== 'ready') return false;
+      setPlaybackStalled(false);
       actions.setSeconds(seconds);
       return actions.start();
     },
@@ -61,12 +83,26 @@ const QuickTimerView = forwardRef(function QuickTimerView({
     if (preload === 'ready') actions.toggle();
     else if (preload === 'error') void actions.retryPreload();
   };
+  const onReset = () => {
+    // RESET changes countdown/media only; it must never navigate to Home.
+    setPlaybackStalled(false);
+    actions.reset();
+  };
   const onBack = () => {
-    // Reset immediately in the BACK tap, so no detached media plays while
-    // Home is visible and the next quick start begins from frame one.
+    // BACK is the only action allowed to close the timer overlay.
+    setPlaybackStalled(false);
     actions.reset();
     onClose?.();
   };
+  const onRestartStalled = () => {
+    // A new explicit tap retries media playback with Safari user activation.
+    // Reset and Start are synchronous and use the validated media controller.
+    setPlaybackStalled(false);
+    actions.reset();
+    actions.start();
+  };
+  const milkMissing = (countdown.finished || countdown.remaining <= 2) &&
+    phase !== 3 && phase >= 0;
 
   return (
     <Box
@@ -79,6 +115,11 @@ const QuickTimerView = forwardRef(function QuickTimerView({
       className={'fac-quick-timer' + (active ? ' fac-quick-timer--active' : '')}
     >
       <Box className="fac-quick-timer__layout">
+        <Button type="button" variant="contained" disableElevation disableRipple
+          className="fac-quick-timer__button fac-quick-timer__button--secondary fac-quick-timer__back"
+          onClick={onBack}>
+          BACK TO HOME
+        </Button>
         <Typography component="h2" className="fac-quick-timer__heading">
           FANCY A CUPPA?
         </Typography>
@@ -104,29 +145,48 @@ const QuickTimerView = forwardRef(function QuickTimerView({
           <Typography role="status" className="fac-quick-timer__state">
             {countdown.finished ? 'Your tea is ready' :
               countdown.preparing ? 'Starting video…' :
-              countdown.running ? 'Brewing' :
+              countdown.running ? 'Brewing · ' + (PHASES[phase] || 'Preparing') :
               countdown.remaining < countdown.total ? 'Paused' :
               preload === 'ready' ? 'Ready' :
               preload === 'error' ? 'Video loading failed' : 'Preparing videos…'}
           </Typography>
+          {playbackStalled && (
+            <Typography role="alert" className="fac-quick-timer__error">
+              Video playback has stopped. Restart the timer to try again.
+            </Typography>
+          )}
+          {milkMissing && !playbackStalled && (
+            <Typography role="alert" className="fac-quick-timer__error">
+              The milk video has not appeared.
+            </Typography>
+          )}
         </Box>
         <Box className="fac-quick-timer__controls">
-          <Button variant="contained" disableElevation disableRipple
+          <Button type="button" variant="contained" disableElevation disableRipple
             className="fac-quick-timer__button fac-quick-timer__button--primary"
             disabled={preload === 'loading'}
             onClick={onPrimary}>
             {preload === 'error' ? 'RETRY VIDEOS' : playbackLabel}
           </Button>
-          <Button variant="contained" disableElevation disableRipple
+          <Button type="button" variant="contained" disableElevation disableRipple
             className="fac-quick-timer__button fac-quick-timer__button--secondary"
-            onClick={actions.reset}>
+            onClick={onReset}>
             RESET
           </Button>
-          <Button variant="contained" disableElevation disableRipple
-            className="fac-quick-timer__button fac-quick-timer__button--secondary"
-            onClick={onBack}>
-            BACK TO HOME
-          </Button>
+          {playbackStalled && (
+            <Button type="button" variant="contained" disableElevation disableRipple
+              className="fac-quick-timer__button fac-quick-timer__button--secondary"
+              onClick={onRestartStalled}>
+              RESTART VIDEO & TIMER
+            </Button>
+          )}
+          {milkMissing && !playbackStalled && (
+            <Button type="button" variant="contained" disableElevation disableRipple
+              className="fac-quick-timer__button fac-quick-timer__button--secondary"
+              onClick={actions.retryMilk}>
+              PLAY MILK VIDEO
+            </Button>
+          )}
         </Box>
         {error && <Typography role="alert" className="fac-quick-timer__error">{error}</Typography>}
         <Typography aria-hidden="true" className="fac-quick-timer__phase">

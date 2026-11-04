@@ -138,7 +138,7 @@ export default function App() {
   };
 
   const closeQuickTimer = () => {
-    quickTimerRef.current?.reset();
+    // Playback is stopped in QuickTimerView.onBack only. RESET never calls this.
     setQuickTimerOpen(false);
   };
   const photoRef = useRef(null);
@@ -275,7 +275,7 @@ export default function App() {
         onPreloadChange={setQuickVideoStatus}
       />
       <Box ref={assistantSectionRef} component="main"
-        sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))'}}> 
+        sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))',position:'relative',zIndex:1,bgcolor:'background.default'}}> 
       <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
         Fancy a Cuppa
       </Typography>

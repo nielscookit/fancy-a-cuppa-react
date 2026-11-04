@@ -3,16 +3,18 @@
 .fac-quick-timer {
   position: fixed;
   inset: 0;
-  z-index: 1400;
+  /* Keep the video compositor alive below the opaque Home content.
+     opacity:0 on an ancestor causes WebKit to throttle/offload the video
+     pipeline; raising the stacked view does not change its opacity. */
+  z-index: 0;
   background: #faf9f6;
-  opacity: 0;
   pointer-events: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 .fac-quick-timer--active {
-  opacity: 1;
+  z-index: 1400;
   pointer-events: auto;
 }
 .fac-quick-timer__layout {
@@ -109,4 +111,19 @@
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+/* BACK is always the first reachable control, safely above iOS bottom chrome. */
+.fac-quick-timer__back.MuiButton-root {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+.fac-quick-timer__media .fac-quick-timer__error.MuiTypography-root {
+  text-align: center;
+  max-width: 335px;
+  padding: 8px 12px;
+  margin-top: 12px;
 }

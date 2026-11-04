@@ -1,5 +1,7 @@
 /* Figma 01 · Home, node 19:47, reference canvas 375 × 812 px. */
 .fac-home {
+  position: relative;
+  z-index: 1;
   background-color: #ffffff;
   width: 100%;
   height: 100svh;

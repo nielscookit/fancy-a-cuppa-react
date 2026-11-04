@@ -14,3 +14,19 @@
 
 Do not modify V2, the separate /timer-test/ page, the tested controllers or the production Supabase data.
 Timer visuals are interim; only the pill button styling matches Home design at this phase.
+
+## 2026-11-04: retest after user screen recording
+
+- User video shows countdown progressing 60→0 while cup imagery remains almost
+  static after the first seconds. The Brew/Steep/Milk progression was not visible.
+- Keep Home video session mounted but render it *under* the opaque Home page
+  at normal opacity instead of as an opacity:0 video overlay; show on tap
+  through z-index promotion without a compositor opacity switch.
+- Visual stage label indicates Fill/Brew/Steep/Milk in the provisional UI.
+- A 4.5s video-currentTime watchdog warns of a stalled phase and offers
+  an explicit-tap RESTART VIDEO & TIMER recovery.
+- If milk does not appear by the last 2s or at finish, PLAY MILK VIDEO is
+  available via the existing validated retryMilk action.
+- BACK TO HOME moved to top to avoid iPhone bottom-browser controls.
+  RESET does not close the overlay.
+- Verify on the user's real iPhone before marking any of these fixes accepted.

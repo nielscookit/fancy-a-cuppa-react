@@ -268,3 +268,25 @@
   Supabase, MUI Lab remain unchanged.
 
 - iPhone playback guard: `flushSync(() => setQuickTimerOpen(true))` makes the previously pre-mounted video container visible synchronously within the original tap BEFORE invoking media.play/unlock; avoids starting under an inert/opacity-zero ancestor and preserves user activation.
+
+## 2026-11-04: first iPhone QuickTimer video failure / recovery
+
+- User-provided 73s iPhone recording inspected (25 sampled frames).
+  Countdown continues with the initial cup image nearly static after the
+  Fill sequence; no visible Brew/Steep/Milk progression during the minute.
+- Suspected integration-specific cause: QuickTimerView preloads all four
+  videos under an opacity-zero ancestor, unlike the approved visible
+  inline TeaTimer and /timer-test/. WebKit may defer decoded frames or
+  suspend playback for video elements composited as fully transparent.
+- Adapter presentation fix: persistent QuickTimerView now remains an opaque,
+  normal-compositing layer BEHIND the opaque Home/assistant page while idle.
+  Only z-index/pointer events change when active; this keeps the existing
+  user-tap media start and preloaded video DOM elements.
+- Added video-currentTime watchdog (4.5s unchanged with running countdown),
+  explicit-tap RESTART VIDEO & TIMER, missed milk PLAY MILK VIDEO retry
+  via existing session.retryMilk(), plus visible stage label for diagnosis.
+- BACK TO HOME is now top control; RESET is wired separately and never calls
+  onClose. Removed duplicate reset in parent close action.
+- Core timer/audio/media controllers, useTeaTimer adapter and /timer-test/
+  unchanged. Need real iPhone validation; simulator/CI cannot confirm Safari
+  media compositor behaviour.
