@@ -246,3 +246,25 @@
 - No changes to iPhone validated video/audio/timer controller, media files,
   /timer-test/, V2, Supabase, or existing Tea Detail features.
 - New mobile video check required to confirm elimination of visual snap.
+
+## 2026-11-04: Phase 1B Quick Timer (Home -> dedicated view)
+
+- QuickTimerView is mounted behind Home at all times and calls the
+  existing useTeaTimer adapter / createTeaTimerSession. Four short MP4s
+  preload as blobs on first render, BEFORE enabling Home start.
+- The Home "FANCY A CUPPA?" button calls quickTimerRef.begin(seconds)
+  synchronously inside the tap. begin() invokes setSeconds() and start()
+  with no Promise/await or delayed effect between them; required for iOS.
+- On success Home is covered by a full-viewport timer view. Pause/Resume,
+  Reset, Back to Home use existing session actions. Back resets immediately;
+  timer remains mounted/preloaded so repeated starts do not stall.
+- Timer-view button styling matches Home: primary #782B40,
+  secondary #EEEEEC, height 66px, radius 100px, Roboto Mono 16/600.
+- Rest of timer layout is provisional pending approved Figma design.
+- Preloader error enables a retry action; no pretend auto-start after an
+  asynchronous preload (Safari user activation would be lost).
+- Regression tests added; QA_PHASE_1B.md documents real iPhone acceptance.
+- Validated timer/audio/media controllers, standalone /timer-test/, V2,
+  Supabase, MUI Lab remain unchanged.
+
+- iPhone playback guard: `flushSync(() => setQuickTimerOpen(true))` makes the previously pre-mounted video container visible synchronously within the original tap BEFORE invoking media.play/unlock; avoids starting under an inert/opacity-zero ancestor and preserves user activation.

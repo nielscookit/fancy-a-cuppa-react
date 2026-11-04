@@ -117,3 +117,11 @@
   color: #ffffff;
   background-color: #323234;
 }
+
+/* During first-load media prefetch, keep the Figma pill proportions and
+   label legible; prevent an iOS tap before every clip is cached. */
+.fac-home__action--primary.MuiButton-root.Mui-disabled {
+  color: #ffffff;
+  background-color: #782b40;
+  opacity: 0.65;
+}

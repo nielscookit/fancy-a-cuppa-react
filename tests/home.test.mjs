@@ -61,7 +61,15 @@ test('home keeps tea assistant and validated timer integration isolated', () => 
   assert.match(app, /<HomeScreen/);
   assert.match(app, /onTeaAssistant=\{showTeaAssistant\}/);
   assert.match(app, /animateScrollTo\(/);
-  assert.match(app, /Quick timer will be connected in Phase 1B/);
+  assert.match(app, /<QuickTimerView/);
+  assert.match(app, /quickTimerRef\.current\?\.begin\(quickMinutes \* 60\)/);
+  const visible = app.indexOf('flushSync(() => setQuickTimerOpen(true))');
+  const start = app.indexOf('quickTimerRef.current?.begin(quickMinutes * 60)');
+  assert.ok(visible >= 0 && start > visible,
+    'Timer view must be visible synchronously before the iPhone video start');
+  const gesture = app.slice(visible, start);
+  assert.doesNotMatch(gesture, /await|\.then\(|setTimeout\(|requestAnimationFrame\(/);
+
   assert.match(app, /<TeaTimer/);
   assert.match(app, /<TeaEditor/);
   assert.doesNotMatch(readFileSync('src/components/HomeScreen.jsx','utf8'), /createMediaController|createTimerController|createAudioController/);

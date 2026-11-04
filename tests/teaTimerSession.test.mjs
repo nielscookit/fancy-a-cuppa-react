@@ -156,3 +156,24 @@ test('closing selected tea cannot crash when React clears video callback refs be
   assert.deepEqual(initialNodes.map(video => video.index), [0, 1, 2, 3]);
   assert.ok(originalRefs.every(node => node === null));
 });
+
+test('Phase 1B quick start sets chosen seconds and starts synchronously inside one tap', async () => {
+  const h = testSession();
+  const prefetch = h.session.prefetch();
+  assert.equal(h.session.start(), false, 'Start is blocked while clips are loading');
+  h.finishPreload();
+  await prefetch;
+  h.session.setSeconds(180);
+  assert.equal(h.session.start(), true);
+  const setIndex = h.events.indexOf('seconds:180');
+  const startIndex = h.events.indexOf('start-sync');
+  assert.ok(setIndex >= 0 && startIndex === setIndex + 1,
+    'No Promise or effect is allowed between time assignment and Start');
+  assert.equal(h.getPublished().countdown.total, 180);
+  assert.equal(h.getPublished().countdown.running, true);
+  h.session.reset();
+  assert.equal(h.getPublished().countdown.remaining, 180);
+  h.session.setSeconds(120);
+  assert.equal(h.session.start(), true, 'Repeated quick Start works without re-prefetch');
+  h.session.destroy();
+});

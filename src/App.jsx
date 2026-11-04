@@ -10,9 +10,11 @@ import { scanBarcodePhoto } from './features/scanBarcode.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaTimer from './components/TeaTimer.jsx';
 import HomeScreen from './components/HomeScreen.jsx';
+import QuickTimerView from './components/QuickTimerView.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
 import { v3StorageKey } from './storage.js';
 import Snackbar from '@mui/material/Snackbar';
+import { flushSync } from 'react-dom';
 import { animateScrollTo } from './features/scrollMotion.js';
 
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
@@ -59,7 +61,10 @@ export default function App() {
   const [scannedCode, setScannedCode] = useState(null);
   const [message, setMessage] = useState('');
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
-  const [quickNotice, setQuickNotice] = useState(false);
+  const [quickNotice, setQuickNotice] = useState('');
+  const [quickTimerOpen, setQuickTimerOpen] = useState(false);
+  const [quickVideoStatus, setQuickVideoStatus] = useState('loading');
+  const quickTimerRef = useRef(null);
   const assistantSectionRef = useRef(null);
   const [assistantActive, setAssistantActive] = useState(false);
   const scrollingRef = useRef(null);
@@ -108,6 +113,33 @@ export default function App() {
         : 0;
       scrollingRef.current = animateScrollTo(targetY);
     });
+  };
+  const startQuickTimer = () => {
+    if (quickVideoStatus === 'error') {
+      setQuickNotice('Video preparation failed. Retrying…');
+      quickTimerRef.current?.retryPreload();
+      return;
+    }
+    if (quickVideoStatus !== 'ready') {
+      setQuickNotice('Preparing the videos. Please try again shortly.');
+      return;
+    }
+
+    // The actual video element must be visible BEFORE .play(): a hidden
+    // ancestor can cause video stalls on iPhone. React's flushSync changes
+    // the overlay immediately but still inside the SAME user tap.
+    // No Promise, await or delayed effect may intervene before begin().
+    flushSync(() => setQuickTimerOpen(true));
+    const started = quickTimerRef.current?.begin(quickMinutes * 60);
+    if (!started) {
+      setQuickTimerOpen(false);
+      setQuickNotice('Timer not ready. Please try again.');
+    }
+  };
+
+  const closeQuickTimer = () => {
+    quickTimerRef.current?.reset();
+    setQuickTimerOpen(false);
   };
   const photoRef = useRef(null);
   const searchRef = useRef(null);
@@ -229,9 +261,18 @@ export default function App() {
       <HomeScreen
         minutes={quickMinutes}
         onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous, delta))}
-        onBrew={() => setQuickNotice(true)}
+        onBrew={startQuickTimer}
+        brewDisabled={quickVideoStatus === 'loading'}
         onTeaAssistant={showTeaAssistant}
         assistantActive={assistantActive}
+      />
+      {/* Persistent media elements are prepared on Home, before the first
+          user gesture. The quick timer uses the same validated controller. */}
+      <QuickTimerView
+        ref={quickTimerRef}
+        active={quickTimerOpen}
+        onClose={closeQuickTimer}
+        onPreloadChange={setQuickVideoStatus}
       />
       <Box ref={assistantSectionRef} component="main"
         sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))'}}> 
@@ -386,10 +427,10 @@ export default function App() {
       )}
       </Box>
       <Snackbar
-        open={quickNotice}
+        open={Boolean(quickNotice)}
         autoHideDuration={4200}
-        onClose={() => setQuickNotice(false)}
-        message="Quick timer will be connected in Phase 1B."
+        onClose={() => setQuickNotice('')}
+        message={quickNotice}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       />
     </>

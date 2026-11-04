@@ -8,7 +8,7 @@ const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
  * Approved Figma 01 · Home (node 19:47, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false }) {
+export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false, brewDisabled = false }) {
   return (
     <>
       <Box component="section" className="fac-home" aria-label="Home">
@@ -42,6 +42,8 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, as
           disableRipple
           className="fac-home__action fac-home__action--primary"
           onClick={onBrew}
+          disabled={brewDisabled}
+          aria-label={brewDisabled ? 'Preparing tea timer videos' : 'Fancy a Cuppa?'}
         >
           Fancy a Cuppa?
         </Button>
