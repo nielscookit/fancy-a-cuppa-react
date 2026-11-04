@@ -1,0 +1,217 @@
+/* Figma 03 · Tea Detail, node 67:6557 — 375px reference width.
+   Home/assistant scrolling and the iPhone video layer are intentionally not
+   altered by these component-scoped rules. */
+.fac-tea-assistant {
+  width: 100%;
+  max-width: 375px;
+  margin: 0 auto;
+  padding-top: 16px;
+  padding-bottom: max(36px, env(safe-area-inset-bottom));
+  background: #faf9f6;
+  color: #202024;
+}
+.fac-tea-search {
+  box-sizing: border-box;
+  height: 52px;
+  border-radius: 40px;
+  margin: 0 8px 24px;
+  padding: 0 8px 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #eeeeec;
+}
+.fac-tea-search > img { width: 24px; height: 24px; flex: 0 0 24px; }
+.fac-tea-search__input.MuiInputBase-root {
+  min-width: 0;
+  height: 52px;
+  flex: 1 1 auto;
+  color: #323234;
+  font-size: 16px;
+  font-family: "Roboto Mono", monospace;
+}
+.fac-tea-search__input input {
+  padding: 0 !important;
+  height: 48px;
+  font-size: 16px;
+  outline: none;
+}
+.fac-tea-search__scanner.MuiIconButton-root {
+  width: 48px; height: 48px; min-width: 48px;
+  padding: 12px; border-radius: 100px;
+}
+.fac-tea-search__scanner img { width: 24px; height: 24px; }
+.fac-tea-search__file { display: none; }
+
+/* Reusable Tea Card: 94px header + 192px image, with a 30px clip. */
+.fac-tea-card {
+  width: 100%;
+  height: 286px;
+  border-radius: 30px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.14),
+              0 2px 1px -1px rgba(0,0,0,.2);
+}
+.fac-tea-card__header {
+  box-sizing: border-box;
+  height: 94px;
+  padding: 8px 8px 8px 24px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.fac-tea-card__identity {
+  padding-top: 13px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.fac-tea-card__name.MuiTypography-root {
+  font-size: 16px; font-weight: 700; line-height: 21px;
+  color: #202024; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fac-tea-card__brand.MuiTypography-root {
+  font-size: 16px; font-weight: 400; line-height: 21px; margin-top: 4px;
+  color: #202024; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fac-tea-card__actions {
+  display: flex; gap: 12px; flex-shrink: 0;
+}
+.fac-tea-card__icon.MuiIconButton-root {
+  width: 48px; height: 48px; min-width: 48px; padding: 0;
+  border-radius: 50%;
+}
+.fac-tea-card__icon img { display: block; width: 48px; height: 48px; }
+.fac-tea-card__image-area {
+  position: relative; width: 100%; height: 192px;
+  overflow: hidden; background: #60534b;
+}
+.fac-tea-card__photo {
+  width: 100%; height: 100%; display: block; object-fit: cover;
+}
+.fac-tea-card__photo.is-illustration { opacity: .8; }
+.fac-tea-card__type-symbol {
+  position: absolute; width: 60px; height: 60px;
+  left: 12px; bottom: 12px; object-fit: contain;
+}
+.fac-tea-card__tags {
+  position: absolute; right: 24px; bottom: 12px;
+  display: flex; align-items: center; gap: 12px;
+  max-width: calc(100% - 94px);
+}
+.fac-tea-card__tag {
+  height: 33px; box-sizing: border-box;
+  display: inline-flex; justify-content: center; align-items: center;
+  padding: 0 16px; border-radius: 100px;
+  background: #ebd8dc; color: #792b40;
+  font-family: "Roboto Mono", monospace; font-size: 14px;
+  font-weight: 600; line-height: 1; white-space: nowrap;
+  text-transform: uppercase; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 52px Figma segmented water selector, 250 / 500 / 1l / tune. */
+.fac-tea-volume {
+  height: 52px; margin: 12px 8px 0;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  border-radius: 100px; background: #eeeeec; overflow: hidden;
+}
+.fac-tea-volume__option.MuiButton-root {
+  min-height: 52px; height: 52px; min-width: 0; padding: 0;
+  border-radius: 100px; background: transparent;
+  font-family: "Roboto Mono", monospace; font-weight: 700;
+  color: #323234;
+}
+.fac-tea-volume__option.MuiButton-root:hover {
+  background: transparent;
+}
+.fac-tea-volume__option.is-selected.MuiButton-root,
+.fac-tea-volume__option.is-selected.MuiButton-root:hover {
+  background: #323234; color: #fff;
+}
+.fac-tea-volume__number { font-size: 16px; letter-spacing: .02em; }
+.fac-tea-volume__unit {
+  margin-left: 3px; font-size: 11px; color: #9c9c9c; align-self: center;
+}
+.fac-tea-volume__custom img { width: 24px; height: 24px; display: block; }
+.fac-tea-volume__custom.is-selected img { filter: brightness(0) invert(1); }
+.fac-tea-custom-field.MuiTextField-root {
+  display: block; margin: 8px 8px 0; width: calc(100% - 16px);
+}
+.fac-tea-custom-field .MuiFilledInput-root {
+  height: 48px; border-radius: 6px; border: 3px solid transparent;
+  background: #eeeeec;
+}
+.fac-tea-custom-field .MuiFilledInput-root.Mui-focused { border-color: #792b40; }
+.fac-tea-custom-field .MuiFilledInput-input {
+  font-size: 16px; font-weight: 500; padding: 8px 12px;
+}
+
+/* White preparation panel, 40px top corners, 307px Figma minimum height. */
+.fac-tea-result {
+  min-height: 307px; box-sizing: border-box;
+  margin-top: 12px;
+  padding: 24px 8px 8px;
+  background: #fff;
+  border-radius: 40px 40px 0 0;
+}
+.fac-tea-result__dose {
+  min-height: 28px; margin: 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.fac-tea-result__label.MuiTypography-root {
+  font-family: "Roboto Mono", monospace;
+  font-size: 14px; font-weight: 400; line-height: 20px;
+  color: #202024; white-space: nowrap;
+}
+.fac-tea-result__value.MuiTypography-root {
+  font-family: "Roboto Mono", monospace;
+  font-size: 21px; font-weight: 700; line-height: 28px;
+  color: #202024; white-space: nowrap;
+}
+.fac-tea-result__divider {
+  height: 1px; background: #e5e5e5; margin: 18px 24px 0;
+}
+.fac-tea-result__timer {
+  margin-top: 47px;
+  height: 66px; display: flex; align-items: center;
+  justify-content: center; gap: 16px;
+}
+.fac-tea-result__time-button.MuiButton-root {
+  width: 66px; height: 66px; min-width: 66px; padding: 0;
+  border-radius: 100px; background: transparent;
+}
+.fac-tea-result__time-button.MuiButton-root:hover { background: transparent; }
+.fac-tea-result__time-button img { width: 66px; height: 66px; display: block; }
+.fac-tea-result__time-button.Mui-disabled { opacity: .4; }
+.fac-tea-result__minutes.MuiTypography-root {
+  min-width: 85px; text-align: center; white-space: nowrap;
+  font-size: 28px; font-weight: 700; line-height: 34px;
+  font-family: "Roboto Mono", monospace; color: #202024;
+}
+.fac-tea-result__brew.MuiButton-root {
+  margin-top: 48px; width: 100%; height: 66px; min-height: 66px;
+  border-radius: 100px; padding: 0 20px;
+  background: #782b40; color: #fff;
+  font-family: "Roboto Mono", monospace;
+  font-size: 16px; font-weight: 600; text-transform: uppercase;
+  box-shadow: none;
+}
+.fac-tea-result__brew.MuiButton-root:hover { background: #782b40; box-shadow: none; }
+.fac-tea-result__brew.Mui-disabled { opacity: .6; }
+
+/* Temporary search results: not yet defined in Figma. */
+.fac-tea-catalog { margin: 0 8px 20px; }
+.fac-tea-catalog__title.MuiTypography-root {
+  font-size: 14px; font-weight: 600; margin: 16px 0 8px;
+}
+.fac-tea-catalog__list {
+  background: white; border-radius: 12px; overflow: hidden;
+}
+.fac-tea-catalog__item.MuiButton-root {
+  height: auto; min-height: 66px; padding: 12px 16px;
+  justify-content: flex-start; text-align: left;
+  border-radius: 0; color: #202024; overflow-wrap: anywhere;
+  background: #fff;
+}
+.fac-tea-catalog__item.MuiButton-root:hover { background: #eeeeec; }

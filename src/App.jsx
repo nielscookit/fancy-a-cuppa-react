@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Box, Button, IconButton, Paper, Stack, TextField, Typography,
-} from '@mui/material';
+import { Box, Button, Paper, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
-  CATEGORY_LABELS, VOLUMES, calculateDose, formatDose, teaMatches, recentTeaIds,
+  teaMatches, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import TeaEditor from './components/TeaEditor.jsx';
-import TeaTimer from './components/TeaTimer.jsx';
+import TeaDetail from './components/TeaDetail.jsx';
+import TeaSearchBar from './components/TeaSearchBar.jsx';
+import { initialDetailMinutes } from './features/teaDetailModel.js';
+import './components/tea-detail.css';
 import HomeScreen from './components/HomeScreen.jsx';
 import QuickTimerView from './components/QuickTimerView.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
@@ -18,32 +19,12 @@ import { flushSync } from 'react-dom';
 import { animateScrollTo } from './features/scrollMotion.js';
 
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
-const searchSx = {
-  '& .MuiFilledInput-root': {
-    height:48, borderRadius:'6px', backgroundColor:'rgba(29,29,29,.07)',
-    border:'3px solid transparent',
-    '&:hover': {backgroundColor:'rgba(29,29,29,.09)'},
-    '&.Mui-focused': {backgroundColor:'rgba(29,29,29,.07)'},
-    '&:has(input:focus-visible)': {borderColor:'#792b40'},
-  },
-  '& .MuiFilledInput-input': {fontSize:16,fontWeight:500,py:'10px'},
-};
-function Symbol({ children, size = 22 }) {
-  return <span aria-hidden="true" className="material-symbols-outlined"
-    style={{ fontSize:size, lineHeight:1, display:'inline-block' }}>{children}</span>;
-}
 function readRecents() {
   try {
     const value = JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
     return Array.isArray(value) ? value.filter(id => typeof id === 'string').slice(0,5) : [];
   } catch { return []; }
 }
-function teaSubtitle(tea) {
-  const category = CATEGORY_LABELS[tea.category] || tea.category;
-  const variety = tea.subcategory === 'other' ? tea.subcategory_other : tea.subcategory;
-  return [category,variety,tea.type === 'bag' ? 'Teebeutel' : 'Loser Tee'].filter(Boolean).join(' · ');
-}
-
 /**
  * The approved selection/preparation flow in the V3 main app.
  * Existing iPhone-validated video controllers and /timer-test/ are untouched.
@@ -56,6 +37,7 @@ export default function App() {
   const [recentIds, setRecentIds] = useState(readRecents);
   const [volume, setVolume] = useState(250);
   const [customMl, setCustomMl] = useState('900');
+  const [detailMinutes, setDetailMinutes] = useState(4);
   const [scannerBusy, setScannerBusy] = useState(false);
   const [scanError, setScanError] = useState('');
   const [scannedCode, setScannedCode] = useState(null);
@@ -152,7 +134,7 @@ export default function App() {
       scrollingRef.current = animateScrollTo(targetY);
     });
   };
-  const startQuickTimer = () => {
+  const openTimerWithSeconds = (seconds) => {
     if (quickVideoStatus === 'error') {
       setQuickNotice('Video preparation failed. Retrying…');
       quickTimerRef.current?.retryPreload();
@@ -162,22 +144,34 @@ export default function App() {
       setQuickNotice('Preparing the videos. Please try again shortly.');
       return;
     }
-
-    // The actual video element must be visible BEFORE .play(): a hidden
-    // ancestor can cause video stalls on iPhone. React's flushSync changes
-    // the overlay immediately but still inside the SAME user tap.
-    // No Promise, await or delayed effect may intervene before begin().
+    // Both Home and selected-tea BREW use the same already-mounted session.
+    // iPhone Safari needs the first .play() within the ORIGINAL button tap:
+    // make the overlay visible synchronously, then immediately start it.
     flushSync(() => setQuickTimerOpen(true));
-    const started = quickTimerRef.current?.begin(quickMinutes * 60);
+    const started = quickTimerRef.current?.begin(seconds);
     if (!started) {
       setQuickTimerOpen(false);
       setQuickNotice('Timer not ready. Please try again.');
     }
   };
+  const startQuickTimer = () => openTimerWithSeconds(quickMinutes * 60);
+  const startDetailTimer = () => openTimerWithSeconds(detailMinutes * 60);
 
   const closeQuickTimer = () => {
-    // Called exclusively by QuickTimerView.RESET after media and countdown
-    // have been stopped/reset. Home keeps the last selected minute value.
+    // RESET must return to HOME, even when BREW was started from Tea Detail.
+    // Media/audio reset has already run synchronously inside QuickTimerView.
+    if (pendingScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingScrollFrameRef.current);
+      pendingScrollFrameRef.current = null;
+    }
+    scrollingRef.current?.();
+    scrollingRef.current = null;
+    window.scrollTo(0, 0);
+    assistantHasLeftHomeRef.current = false;
+    assistantReturningHomeRef.current = false;
+    setAssistantActive(false);
+    setAssistantVisible(false);
+    setMode('closed');
     setQuickTimerOpen(false);
   };
   const photoRef = useRef(null);
@@ -197,13 +191,10 @@ export default function App() {
   const selected = teas.find(tea => tea.id === selectedId) || null;
   const results = useMemo(() => teas.filter(tea => teaMatches(tea,query)), [teas,query]);
   const recents = recentIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean);
-  const water = volume == null ? Number(customMl) : volume;
-  const validWater = Number.isInteger(water) && water >= 50 && water <= 5000;
-  const dosage = selected && validWater ? formatDose(calculateDose(selected, water), selected.unit) : '–';
-
   function chooseTea(tea) {
     setSelectedId(tea.id);
     setVolume(250);
+    setDetailMinutes(initialDetailMinutes(tea));
     setQuery('');
     setScanError('');
     setMessage('');
@@ -278,16 +269,13 @@ export default function App() {
     setMode(selected ? 'prep' : 'search');
   };
   const renderTeaRow = tea => (
-    <Box key={tea.id} sx={{borderBottom:'1px solid',borderColor:'divider'}}>
-      <Button onClick={() => chooseTea(tea)} fullWidth
-        sx={{
-          height:'auto', minHeight:66, textAlign:'left', justifyContent:'flex-start',
-          py:1.2, px:1.4, bgcolor:'transparent', color:'text.primary',
-          '&:hover':{bgcolor:'rgba(29,29,29,.05)'},
-        }}>
-        <Box sx={{minWidth:0}}>
-          <Typography sx={{fontSize:16,fontWeight:600,overflowWrap:'anywhere'}}>{tea.rawName}</Typography>
-          <Typography sx={{fontSize:12,color:'text.secondary'}}>{tea.brand} · {teaSubtitle(tea)}</Typography>
+    <Box key={tea.id} sx={{ borderBottom: '1px solid #eeeeec' }}>
+      <Button type="button" fullWidth
+        className="fac-tea-catalog__item"
+        onClick={() => chooseTea(tea)}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize:16,fontWeight:600 }}>{tea.rawName}</Typography>
+          <Typography sx={{ fontSize:12,color:'text.secondary' }}>{tea.brand}</Typography>
         </Box>
       </Button>
     </Box>
@@ -318,157 +306,90 @@ export default function App() {
           assistantButtonRef={assistantButtonRef}
         />
         {assistantVisible && (
-        <Box ref={assistantSectionRef} component="main"
-        sx={{maxWidth:500,mx:'auto',px:2.5,pt:'14px',pb:'max(45px, env(safe-area-inset-bottom))',position:'relative',zIndex:1,bgcolor:'background.default'}}> 
-      <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
-        Fancy a Cuppa
-      </Typography>
-      <Typography sx={{fontSize:12,color:'text.secondary',mt:.5}}>V3 · Testversion</Typography>
+        <Box ref={assistantSectionRef} component="main" className="fac-tea-assistant">
+          {(mode !== 'add' && mode !== 'edit') && (
+            <>
+              <TeaSearchBar
+                value={mode === 'search' ? query : ''}
+                onChange={value => { setQuery(value); setMode('search'); }}
+                onFocus={() => { if (mode !== 'search') openSearch(); }}
+                onScan={() => photoRef.current?.click()}
+                photoRef={photoRef}
+                scanning={scannerBusy}
+                onPhoto={scanPhoto}
+              />
+              {scannerBusy && <Typography role="status" sx={{fontSize:12,mx:2,mb:1}}>
+                Reading barcode…
+              </Typography>}
+              {scanError && <Typography role="alert" color="error" sx={{fontSize:12,mx:2,mb:1}}>
+                {scanError}
+              </Typography>}
 
-      {mode === 'closed' && (
-        <Button variant="contained" fullWidth onClick={openSearch}
-          sx={{mt:4,bgcolor:'#1d1d1d','&:hover':{bgcolor:'#333'}}}>
-          How do you take it?
-        </Button>
-      )}
-
-      {mode !== 'closed' && (
-        <>
-          {mode !== 'add' && mode !== 'edit' && (
-            <Box sx={{mt:3}}>
-              <Typography component="h2" sx={{fontSize:20,fontWeight:600,mb:1.5}}>
-                How do you take it?
-              </Typography>
-              <Stack direction="row" gap={1}>
-                <TextField
-                  inputRef={searchRef}
-                  aria-label="Tee suchen"
-                  placeholder="Tee suchen…"
-                  fullWidth variant="filled" hiddenLabel
-                  value={mode === 'search' ? query : ''}
-                  onFocus={() => { if (mode !== 'search') openSearch(); }}
-                  onChange={e => {setQuery(e.target.value);setMode('search');}}
-                  slotProps={{input:{disableUnderline:true}}}
-                  sx={searchSx}
-                />
-                <Button variant="outlined" aria-label="Barcode scannen"
-                  onClick={() => photoRef.current?.click()}
-                  disabled={scannerBusy}
-                  sx={{minWidth:66,width:66,px:0}}>
-                  <Symbol>qr_code_scanner</Symbol>
-                </Button>
-              </Stack>
-              <input ref={photoRef} type="file" accept="image/*" capture="environment"
-                onChange={scanPhoto} style={{display:'none'}} aria-label="Barcode-Foto aufnehmen" />
-              {scannerBusy && <Typography sx={{fontSize:12,mt:1}}>Barcode wird gelesen…</Typography>}
-              {scanError && <Typography role="alert" color="error" sx={{fontSize:12,mt:1}}>{scanError}</Typography>}
-            </Box>
-          )}
-
-          {mode === 'search' && (
-            <Box sx={{mt:2}}>
-              {message && <Typography role="status" sx={{fontSize:13,mb:1}}>{message}</Typography>}
-              {!query.trim() && recents.length > 0 && (
-                <Box sx={{mb:2}}>
-                  <Typography component="h3" sx={{fontSize:16,fontWeight:600,mb:1}}>Recently searched</Typography>
-                  <Paper variant="outlined" sx={{borderRadius:'6px',overflow:'hidden'}}>
-                    {recents.map(renderTeaRow)}
-                  </Paper>
+              {mode === 'search' && (
+                <Box className="fac-tea-catalog">
+                  {message && <Typography role="status" sx={{fontSize:13,mb:1}}>{message}</Typography>}
+                  {!query.trim() && recents.length > 0 && (
+                    <>
+                      <Typography component="h2" className="fac-tea-catalog__title">
+                        Recently searched
+                      </Typography>
+                      <Paper variant="outlined" className="fac-tea-catalog__list">
+                        {recents.map(renderTeaRow)}
+                      </Paper>
+                    </>
+                  )}
+                  <Typography component="h2" className="fac-tea-catalog__title">
+                    {query.trim() ? 'Search results' : 'Tea catalogue'}
+                  </Typography>
+                  {catalog.status === 'loading' && <Typography sx={{fontSize:14}}>
+                    Loading tea catalogue…
+                  </Typography>}
+                  {catalog.status === 'error' && <Typography role="alert" color="error">
+                    {catalog.error}
+                  </Typography>}
+                  {catalog.status === 'ready' && results.length === 0 &&
+                    <Typography sx={{fontSize:14}}>No matching tea found.</Typography>}
+                  {results.length > 0 && (
+                    <Paper variant="outlined" className="fac-tea-catalog__list">
+                      {results.map(renderTeaRow)}
+                    </Paper>
+                  )}
+                  <Button variant="contained" fullWidth onClick={openAdd}
+                    sx={{
+                      mt:2,height:66,borderRadius:'100px',bgcolor:'#323234',
+                      fontWeight:600,fontSize:16,
+                      '&:hover':{bgcolor:'#323234'},
+                    }}>
+                    ADD NEW TEA
+                  </Button>
                 </Box>
               )}
-              <Typography component="h3" sx={{fontSize:16,fontWeight:600,mb:1}}>
-                {query ? 'Search results' : 'Tees im Katalog'}
-              </Typography>
-              {catalog.status === 'loading' && <Typography>Teekatalog wird geladen…</Typography>}
-              {catalog.status === 'error' &&
-                <Typography role="alert" color="error">{catalog.error}</Typography>}
-              {catalog.status === 'ready' && results.length === 0 &&
-                <Typography sx={{fontSize:14,color:'text.secondary'}}>Kein passender Tee gefunden.</Typography>}
-              {results.length > 0 && (
-                <Paper variant="outlined" sx={{borderRadius:'6px',overflow:'hidden'}}>
-                  {results.map(renderTeaRow)}
-                </Paper>
+              {mode === 'prep' && selected && (
+                <TeaDetail
+                  tea={selected}
+                  volume={volume} onVolumeChange={setVolume}
+                  customMl={customMl} onCustomChange={setCustomMl}
+                  minutes={detailMinutes}
+                  onMinuteStep={step => setDetailMinutes(previous =>
+                    stepQuickMinutes(previous,step))}
+                  onEdit={() => setMode('edit')}
+                  onClose={() => { setSelectedId(null);setMode('search'); }}
+                  onBrew={startDetailTimer}
+                  brewDisabled={quickVideoStatus !== 'ready'}
+                />
               )}
-              <Stack gap={1} sx={{mt:2}}>
-                <Button variant="outlined" fullWidth onClick={openAdd}>Add new tea</Button>
-                {selected && <Button variant="text" fullWidth onClick={() => {setMode('prep');setQuery('');}}>
-                  Abbrechen
-                </Button>}
-              </Stack>
-            </Box>
-          )}
-
-          {(mode === 'add' || mode === 'edit') && (
-            <>
-              {message && <Typography role="status" sx={{fontSize:13,mt:2}}>{message}</Typography>}
-              <TeaEditor key={(mode === 'edit' ? selected?.id : 'new') || 'new'}
-              tea={mode === 'edit' ? selected : null}
-              barcode={scannedCode}
-              onCancel={previousView}
-              onSaved={formSaved} />
             </>
           )}
-
-          {/* Keep the timer mounted while searching/editing, preserving its state
-              and the confirmed iPhone video element references. */}
-          {selected && (
-            <Box sx={mode === 'prep'
-              ? {mt:2}
-              : {height:0,opacity:0,overflow:'hidden',pointerEvents:'none'}}>
-              <Paper variant="outlined" sx={{p:2,borderRadius:'6px'}}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
-                  <Box sx={{minWidth:0}}>
-                    <Typography component="h2" sx={{fontSize:20,fontWeight:600,overflowWrap:'anywhere'}}>
-                      {selected.rawName}
-                    </Typography>
-                    <Typography sx={{fontSize:14,color:'text.secondary',mt:.5}}>{selected.brand}</Typography>
-                    <Typography sx={{fontSize:12,color:'text.secondary',mt:.5}}>{teaSubtitle(selected)}</Typography>
-                  </Box>
-                  <Stack direction="row" gap={0}>
-                    <IconButton aria-label="Tee bearbeiten" onClick={()=>setMode('edit')}
-                      sx={{minWidth:48,width:48,height:48}}>
-                      <Symbol>edit</Symbol>
-                    </IconButton>
-                    <IconButton aria-label="Teeauswahl entfernen" onClick={() => {setSelectedId(null);setMode('search');}}
-                      sx={{minWidth:48,width:48,height:48}}>
-                      <Symbol>close</Symbol>
-                    </IconButton>
-                  </Stack>
-                </Stack>
-              </Paper>
-
-              <Typography component="h2" sx={{fontSize:18,fontWeight:600,mt:3,mb:1.5}}>
-                How much tea?
-              </Typography>
-              <Box sx={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:1}}>
-                {VOLUMES.map(ml=>(
-                  <Button key={ml} variant={volume === ml ? 'contained' : 'outlined'}
-                    onClick={()=>setVolume(ml)} sx={{minWidth:0,px:.5,height:66}}>
-                    {ml >= 1000 ? (ml/1000).toLocaleString('de-DE')+' L' : ml+' ml'}
-                  </Button>
-                ))}
-                <Button variant={volume === null ? 'contained' : 'outlined'}
-                  onClick={()=>setVolume(null)} sx={{minWidth:0,px:.5,height:66}}>
-                  Custom
-                </Button>
-              </Box>
-              {volume === null && (
-                <TextField variant="filled" type="number" label="Wassermenge (ml)"
-                  value={customMl} onChange={e=>setCustomMl(e.target.value)}
-                  fullWidth sx={{...searchSx,mt:1.5}} />
-              )}
-              <Paper variant="outlined" sx={{p:2,mt:2,borderRadius:'6px',bgcolor:'#fff'}}>
-                <Typography sx={{fontSize:13,color:'text.secondary'}}>Dosierung</Typography>
-                <Typography sx={{fontSize:28,fontWeight:600,mt:.5}}>{dosage}</Typography>
-                <Typography sx={{fontSize:12,color:'text.secondary'}}>
-                  {validWater ? water.toLocaleString('de-DE')+' ml Wasser' : 'Bitte 50–5000 ml eingeben'}
-                </Typography>
-              </Paper>
-              <TeaTimer key={selected.id} initialSeconds={selected.brewSeconds || selected.min * 60} />
+          {(mode === 'add' || mode === 'edit') && (
+            <Box sx={{px:2,pb:2}}>
+              {message && <Typography role="status" sx={{fontSize:13,mt:2}}>{message}</Typography>}
+              <TeaEditor key={(mode === 'edit' ? selected?.id : 'new') || 'new'}
+                tea={mode === 'edit' ? selected : null}
+                barcode={scannedCode}
+                onCancel={previousView}
+                onSaved={formSaved} />
             </Box>
           )}
-        </>
-      )}
         </Box>
         )}
       </Box>

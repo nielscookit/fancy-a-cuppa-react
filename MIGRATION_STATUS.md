@@ -356,3 +356,33 @@
   media <video> elements; original sync/user gesture preserved.
 - No changes to V2, Supabase, /timer-test/ or media controllers.
 - Real iPhone Safari validation pending.
+
+## 2026-11-04: Phase 2 Figma Tea Detail integrated
+
+- Source: approved Figma node 67:6557, 375x880 screenshot and exact
+  exported SVG assets (search, document-scanner, edit, close, type-tag,
+  tune), plus exported tea image mask as a temporary JPEG illustration.
+  Original 66px Home plus/minus SVGs are reused.
+- New reusable TeaCard / TeaDetail / TeaSearchBar use the screenshot
+  dimensions: 52px Search, 286px card (94 header + 192 image), 52px
+  water segmented control (250/500/1000/custom), 307px result with
+  dosage, 66px +/- time control and 66px BREW pill.
+- English tea category/units are presentation-only; original Supabase
+  schema and V2-normalized data remain intact. Illustration is clearly
+  labelled until image URLs exist in backend.
+- The old inline selected TeaTimer in App is replaced by BREW -> the SAME
+  already-preloaded QuickTimerView as Home. Each chosen tea initializes its
+  own detailMinutes from brewSeconds; both Home and Tea Detail call the
+  same synchronous openTimerWithSeconds(seconds) preserving iPhone gesture
+  via flushSync followed immediately by begin(seconds).
+- Search results intentionally remain a provisional catalogue list
+  because Search Results Figma frame is not approved. Scanner photo and
+  edit/add form kept functional. Database read only during CI; no writes.
+- Figma Home layout, approved 8px scroll landing, selected state,
+  scroll-to-top hide behaviour, QuickTimer media/audio controllers,
+  /timer-test/, V2 and MUI lab all unchanged.
+- Final iPhone acceptance needed for Tea Detail layout and both BREW paths.
+
+- QuickTimer RESET now clears the selected assistant view and scrolls to
+  document top from both Home and Tea Detail, matching the approved
+  single-RESET navigation. Persisted Home minutes remain unchanged.
