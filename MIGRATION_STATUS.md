@@ -173,3 +173,8 @@
 - Confirmed: first timer start, complete four-video sequence, Reset and restarting, closing selected tea while timer running, selecting another tea without a white screen or ongoing media.
 - Pause/Resume in the integrated app is not separately confirmed by this feedback; QA-08 stays partially open.
 - Next manual acceptance: QA-04 and QA-05 (quantity/dosage for preset and custom 900 ml); no write operations necessary.
+
+## 2026-11-04: user confirms preset and custom dose calculations
+
+- User confirmed checklist point 3: switching 250/500/1000/1500 ml and custom 900 ml updates dosage as expected in integrated V3.
+- QA-04 and QA-05 accepted on actual iPhone. Next: QA-11 to QA-13 form and photo barcode checks, without production database writes.

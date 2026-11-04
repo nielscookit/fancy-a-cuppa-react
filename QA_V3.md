@@ -12,8 +12,8 @@
 | QA-01 | App in Safari neu öffnen, »How do you take it?« antippen | Suchansicht öffnet, Katalog lädt, kein weißer Bildschirm | Zu prüfen |
 | QA-02 | In der Suche `Schwarztee`, `Black Tea` und `Assam` eingeben | Passende Ergebnisse ohne Absturz | Zu prüfen |
 | QA-03 | Vorhandenen Tee auswählen, mit X schließen, anderen Tee auswählen | Zurück in die Suche, neuer Tee öffnet, kein weißer Bildschirm | Nutzer hat X-Fix bereits bestätigt |
-| QA-04 | Wassermenge 250 / 500 / 1000 / 1500 ml ändern | Dosierung wird proportional neu berechnet | Zu prüfen |
-| QA-05 | »Custom« auswählen, 900 ml eingeben | 900 ml und proportional berechnete Dosierung | Zu prüfen |
+| QA-04 | Wassermenge 250 / 500 / 1000 / 1500 ml ändern | Dosierung wird proportional neu berechnet | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
+| QA-05 | »Custom« auswählen, 900 ml eingeben | 900 ml und proportional berechnete Dosierung | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
 | QA-06 | Timer beim ersten Öffnen starten | Countdown startet zusammen mit dem Einfüllvideo; kein Blindstart | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
 | QA-07 | Fill → Brew → Still Loop → Milk komplett ablaufen lassen | Reihenfolge stimmt; Milch beginnt bei 5 s Restzeit, Abschlusston folgt | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
 | QA-08 | Timer pausieren, fortsetzen, zurücksetzen | Pause hält Zeit/Video an, Reset zeigt angehaltenes erstes Frame | **Teilweise bestätigt:** Reset und erneuter Start; Pause/Fortsetzen in der Haupt-App noch nicht separat bestätigt |
