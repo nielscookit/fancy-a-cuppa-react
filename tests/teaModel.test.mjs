@@ -31,3 +31,18 @@ test('barcode preserves V2 EAN13 normalization',()=>{
   assert.deepEqual(normalizeBarcode({format:'EAN13',text:'0123456789012'}),{type:'upc_a',value:'123456789012'});
   assert.equal(normalizeBarcode({format:'EAN13',text:'invalid'}),null);
 });
+
+test('fruit and herbal categories work across English and German queries', () => {
+  assert.ok(teaMatches({name:'Beerenmix', category:'fruit',type:'loose'}, 'Früchtetee'));
+  assert.ok(teaMatches({name:'Beerenmix', category:'fruit',type:'loose'}, 'fruit tea'));
+  assert.ok(teaMatches({name:'Pfefferminz', category:'herbal',type:'loose'}, 'Kräutertee'));
+  assert.ok(!teaMatches({name:'Pfefferminz', category:'herbal',type:'loose'}, 'white tea'));
+});
+
+test('bag and measure dosage scales with selected vessel size', () => {
+  const bag={qty:1,base:250,unit:'bag'};
+  assert.equal(calculateDose(bag,500),2);
+  assert.equal(formatDose(calculateDose(bag,500),'bag'),'2 Beutel');
+  assert.equal(formatDose(calculateDose({qty:1,base:250,unit:'measure'},900),'measure'),'3,6 Teemaß');
+  assert.equal(calculateDose(bag,0),null);
+});

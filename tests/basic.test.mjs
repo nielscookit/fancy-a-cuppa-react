@@ -107,3 +107,69 @@ test('deletion is not available in the existing V2 API', async () => {
 test('V3 browser storage keys are namespaced', () => {
   assert.equal(v3StorageKey('recent'), 'fac-v3:recent');
 });
+
+test('bag preparation roundtrip keeps bag units and original seconds', () => {
+  const bags = normalizeTea({
+    ...example,
+    tea_preparations: [{
+      dose_teaspoons: null, dose_grams: null, dose_bags: 2,
+      dose_measures: null, dose_water_ml: 500,
+      brew_seconds: 180, water_temp_c: 98,
+    }],
+  });
+  assert.equal(bags.type, 'bag');
+  assert.equal(bags.unit, 'bag');
+  assert.equal(bags.qty, 2);
+  assert.equal(bags.base, 500);
+  assert.equal(bags.brewSeconds, 180);
+  assert.equal(bags.min, 3);
+});
+
+test('bag create payload sends only bag dosage, barcode and exact brewing time', async () => {
+  let payload;
+  await createTea({
+    brand: 'QA-Mock', name: 'Teebeutel', category: 'black',
+    subcategory: 'Assam', type: 'bag', unit: 'bag',
+    qty: 2, base: 500, mins: 3, temperature: 100,
+    code: { type: 'ean_13', value: '1234567890123' },
+  }, { fetchImpl: async (_url, options) => {
+    payload = JSON.parse(options.body);
+    return response({ id: 'mock-id' });
+  } });
+  assert.equal(payload.action, 'create');
+  assert.equal(payload.dose_bags, 2);
+  assert.equal(payload.dose_teaspoons, null);
+  assert.equal(payload.dose_grams, null);
+  assert.equal(payload.dose_measures, null);
+  assert.equal(payload.dose_unit, 'bag');
+  assert.equal(payload.dose_water_ml, 500);
+  assert.equal(payload.brew_seconds, 180);
+  assert.equal(payload.code_type, 'ean_13');
+});
+
+test('invalid save payload never performs a network request', async () => {
+  let requests = 0;
+  const fetchImpl = async () => { requests++; return response({}); };
+  const base = {
+    name: 'Assam', brand: 'QA-Mock', category: 'black',
+    subcategory: 'Assam', type: 'loose', unit: 'tsp',
+    qty: 2, base: 500, mins: 4,
+  };
+  await assert.rejects(createTea({ ...base, qty: -1 }, { fetchImpl }), /Invalid tea preparation/);
+  await assert.rejects(createTea({ ...base, type: 'bag' }, { fetchImpl }), /does not match tea format/);
+  await assert.rejects(updateTea({ ...base, id: null }, { fetchImpl }), /cloud tea ID/i);
+  assert.equal(requests, 0);
+});
+
+test('write API reports Edge Function error without retrying itself', async () => {
+  let calls = 0;
+  await assert.rejects(createTea({
+    brand: 'QA-Mock', name: 'Assam', category: 'black',
+    subcategory: 'Assam', type: 'loose', unit: 'tsp',
+    qty: 2, base: 500, mins: 4,
+  }, { fetchImpl: async () => {
+    calls++;
+    return response({ error: 'Test server rejected save' }, 409);
+  } }), /Test server rejected save/);
+  assert.equal(calls, 1);
+});

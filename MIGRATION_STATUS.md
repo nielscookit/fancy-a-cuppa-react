@@ -153,3 +153,16 @@
   asserts cleanup of every video succeeds without exceptions.
 - Existing iPhone-approved media, timer, audio controllers and /timer-test/
   remain untouched. X continues to clear selection and return to search.
+
+## 2026-11-04: Phase-1 functional QA baseline
+
+- Created rollback branch `freeze/v3-2026-11-04-functional` at
+  `b5b722620f913e40dec51dceaa0c95e4ca28470c`.
+- Added `QA_V3.md`: 14 explicit manual acceptance cases with expected results.
+- Added mock-only coverage of tea create/update payloads, invalid-input
+  network protection, failure reporting, category aliases, dosage and X-close
+  cleanup wiring. No real Supabase writes.
+- Existing iPhone-confirmed `/timer-test/`, V2 source and media controllers unchanged.
+- Next manual gate: QA-06 through QA-09 inside the integrated main V3 app
+  (not just standalone timer test). Real DB writes remain gated pending a
+  dedicated test environment.

@@ -25,3 +25,14 @@ test('approved iPhone media source files stay unchanged in new integrated UI', a
   assert.match(css,/fac-timer-video\.visible/);
   assert.match(css,/radial-gradient/);
 });
+
+test('closing a tea returns to search and unmounts the isolated timer', () => {
+  const app=readFileSync('src/App.jsx','utf8');
+  const bridge=readFileSync('src/timer/teaTimerSession.js','utf8');
+  const hook=readFileSync('src/timer/useTeaTimer.js','utf8');
+  assert.match(app, /aria-label="Teeauswahl entfernen"/);
+  assert.match(app, /setSelectedId\(null\);setMode\('search'\)/);
+  assert.match(app, /\{selected && \(/);
+  assert.match(bridge,/mountedVideos\s*=\s*Array\.isArray\(videos\)\s*\?\s*videos\.slice\(\)/);
+  assert.match(hook,/session\.destroy\(\)/);
+});
