@@ -70,3 +70,29 @@ test('stage diagnostic is independent of the validated media controller', () => 
   assert.match(view,/setPlaybackStalled\(sample\.stalled\)/);
   assert.doesNotMatch(view,/createMediaController\(/);
 });
+
+test('iOS rubber-band scroll never reveals the preloaded inactive timer', () => {
+  const css=readFileSync('src/components/home.css','utf8');
+  const timerCss=readFileSync('src/components/quick-timer.css','utf8');
+  const app=readFileSync('src/App.jsx','utf8');
+  assert.match(css,/html,\s*body\s*\{\s*overscroll-behavior-y:\s*none/);
+  const shield=css.split('.fac-viewport-shield {')[1].split('}')[0];
+  assert.match(shield,/position:\s*fixed/);
+  assert.match(shield,/inset:\s*-200px 0/);
+  assert.match(shield,/z-index:\s*1/);
+  assert.match(shield,/background-color:\s*#ffffff/);
+  assert.match(shield,/pointer-events:\s*none/);
+
+  const page=app.split('<Box className="fac-app-page"')[1].split('}>')[0];
+  assert.match(page,/zIndex:\s*2/);
+  assert.match(page,/minHeight:\s*'100svh'/);
+
+  const shieldAt=app.indexOf('<Box className="fac-viewport-shield"');
+  const pageAt=app.indexOf('<Box className="fac-app-page"');
+  const timerAt=app.indexOf('<QuickTimerView',pageAt);
+  assert.ok(shieldAt>=0 && pageAt>shieldAt && timerAt>pageAt,
+    'The fixed mask, opaque page and pre-mounted timer remain separate siblings');
+  assert.match(timerCss,/\.fac-quick-timer\s*\{[\s\S]*?z-index:\s*0/);
+  assert.match(timerCss,/\.fac-quick-timer--active\s*\{\s*z-index:\s*1400/);
+  assert.doesNotMatch(timerCss,/opacity:\s*0|visibility:\s*hidden/);
+});

@@ -126,3 +126,23 @@
   background-color: #782b40;
   opacity: 0.65;
 }
+
+/* iOS overscroll guard. The document must remain normally scrollable:
+   only the elastic movement PAST its top/bottom edges is suppressed. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+/* This stays fixed to the viewport even when iOS rubber-band scrolling
+   shifts the foreground page. It masks the preloaded timer (z-index:0),
+   while Home/Tea Assistant (z-index:2) and active timer (z-index:1400)
+   remain fully usable. Do NOT hide the video container with opacity or
+   visibility: its native iPhone playback depends on normal compositing. */
+.fac-viewport-shield {
+  position: fixed;
+  inset: -200px 0;
+  z-index: 1;
+  background-color: #ffffff;
+  pointer-events: none;
+}

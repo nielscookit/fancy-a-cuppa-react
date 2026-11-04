@@ -337,3 +337,22 @@
   the continuous Home/assistant document semantics during navigation.
 - Existing approved cubic ease-out and media/timer/audio controllers
   unchanged. On-device confirmation pending.
+
+## 2026-11-04: iOS rubber-band scroll exposes inactive QuickTimer
+
+- User confirmed previous scroll-state and 8px positioning, but showed
+  that dragging Home beyond its upper edge can reveal the QuickTimer
+  interface underneath the foreground document.
+- Root cause: idle QuickTimer intentionally remains a fully composed fixed
+  background layer for iPhone media reliability, whereas the foreground
+  page may shift under iOS rubber-band overscroll.
+- Added a viewport-fixed opaque white shield, extended 200px beyond top
+  and bottom for rubber-band movement. Stacking: inactive timer z=0,
+  shield z=1, normal Home+Assistant page z=2, active timer z=1400.
+- Also suppress document-edge overscroll via
+  `html,body { overscroll-behavior-y: none }`. Scrolling inside the long
+  Home+Tea document and button-based ease-out remain unchanged.
+- No opacity, visibility, display or positioning change to QuickTimer or
+  media <video> elements; original sync/user gesture preserved.
+- No changes to V2, Supabase, /timer-test/ or media controllers.
+- Real iPhone Safari validation pending.

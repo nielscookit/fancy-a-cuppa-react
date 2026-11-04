@@ -295,11 +295,15 @@ export default function App() {
 
   return (
     <>
-      {/* One opaque, scrolling document. It covers the pre-mounted timer
-          underneath even at the bottom of the tea list and during scrolling. */}
+      {/* The inactive, preloaded QuickTimer is a fixed layer below Home.
+          iOS rubber-band scrolling can displace document content and expose
+          that layer. This viewport-fixed opaque shield covers it without
+          hiding videos via opacity/visibility, which harmed Safari playback. */}
+      <Box className="fac-viewport-shield" aria-hidden="true" />
+      {/* One opaque, scrolling document above the fixed shield. */}
       <Box className="fac-app-page" sx={{
         position: 'relative',
-        zIndex: 1,
+        zIndex: 2,
         minHeight: '100svh',
         bgcolor: 'background.default',
       }}>
