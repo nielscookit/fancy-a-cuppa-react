@@ -14,10 +14,10 @@
 | QA-03 | Vorhandenen Tee auswählen, mit X schließen, anderen Tee auswählen | Zurück in die Suche, neuer Tee öffnet, kein weißer Bildschirm | Nutzer hat X-Fix bereits bestätigt |
 | QA-04 | Wassermenge 250 / 500 / 1000 / 1500 ml ändern | Dosierung wird proportional neu berechnet | Zu prüfen |
 | QA-05 | »Custom« auswählen, 900 ml eingeben | 900 ml und proportional berechnete Dosierung | Zu prüfen |
-| QA-06 | Timer beim ersten Öffnen starten | Countdown startet zusammen mit dem Einfüllvideo; kein Blindstart | Zu prüfen – separate Timer-Testseite bereits bestätigt |
-| QA-07 | Fill → Brew → Still Loop → Milk komplett ablaufen lassen | Reihenfolge stimmt; Milch beginnt bei 5 s Restzeit, Abschlusston folgt | Zu prüfen – separate Timer-Testseite bereits bestätigt |
-| QA-08 | Timer pausieren, fortsetzen, zurücksetzen | Pause hält Zeit/Video an, Reset zeigt angehaltenes erstes Frame | Zu prüfen – separate Timer-Testseite bereits bestätigt |
-| QA-09 | Tee während der laufenden Timer-Wiedergabe mit X schließen | Kein weißer Bildschirm, keine weiterlaufenden Medien | Zu prüfen |
+| QA-06 | Timer beim ersten Öffnen starten | Countdown startet zusammen mit dem Einfüllvideo; kein Blindstart | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
+| QA-07 | Fill → Brew → Still Loop → Milk komplett ablaufen lassen | Reihenfolge stimmt; Milch beginnt bei 5 s Restzeit, Abschlusston folgt | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
+| QA-08 | Timer pausieren, fortsetzen, zurücksetzen | Pause hält Zeit/Video an, Reset zeigt angehaltenes erstes Frame | **Teilweise bestätigt:** Reset und erneuter Start; Pause/Fortsetzen in der Haupt-App noch nicht separat bestätigt |
+| QA-09 | Tee während der laufenden Timer-Wiedergabe mit X schließen | Kein weißer Bildschirm, keine weiterlaufenden Medien | **Bestätigt durch Nutzer, V3-Haupt-App, 04.11.2026** |
 | QA-10 | Suche erneut öffnen und »Recently searched« kontrollieren | Ausgewählte Tees werden wieder angeboten | Zu prüfen |
 | QA-11 | Formular »Add new tea« öffnen; Felder und dynamische Sorte prüfen; ohne Speichern abbrechen | Formular passt Kategorie/Sorte/Einheit an, kein Schreibzugriff | Zu prüfen |
 | QA-12 | Formular »Bearbeiten« öffnen, nichts speichern, abbrechen | Vorherige Teeauswahl bleibt erhalten, kein Schreibzugriff | Zu prüfen |

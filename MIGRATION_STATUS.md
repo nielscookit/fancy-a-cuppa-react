@@ -166,3 +166,10 @@
 - Next manual gate: QA-06 through QA-09 inside the integrated main V3 app
   (not just standalone timer test). Real DB writes remain gated pending a
   dedicated test environment.
+
+## 2026-11-04: User acceptance, integrated V3 app
+
+- User explicitly confirmed previous checklist points 1 and 2 working in the V3 main app on iPhone.
+- Confirmed: first timer start, complete four-video sequence, Reset and restarting, closing selected tea while timer running, selecting another tea without a white screen or ongoing media.
+- Pause/Resume in the integrated app is not separately confirmed by this feedback; QA-08 stays partially open.
+- Next manual acceptance: QA-04 and QA-05 (quantity/dosage for preset and custom 900 ml); no write operations necessary.
