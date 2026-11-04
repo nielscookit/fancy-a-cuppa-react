@@ -117,7 +117,18 @@ export default function App() {
     finally { setScannerBusy(false); }
   }
   async function formSaved(payload) {
-    const updated = await listTeas();
+    // The preceding create/update request has already succeeded. A catalog
+    // refresh failure must not produce a false "save failed" state that could
+    // invite users to submit a duplicate tea.
+    let updated;
+    try { updated = await listTeas(); }
+    catch (error) {
+      setScannedCode(null);
+      setMode('search');
+      setMessage('Tee gespeichert. Der Katalog konnte nicht aktualisiert werden: ' +
+        (error?.message || String(error)));
+      return;
+    }
     setCatalog({status:'ready',teas:updated,error:''});
     const match = updated.find(tea => payload.id
       ? tea.id === payload.id
@@ -236,11 +247,14 @@ export default function App() {
           )}
 
           {(mode === 'add' || mode === 'edit') && (
-            <TeaEditor key={(mode === 'edit' ? selected?.id : 'new') || 'new'}
+            <>
+              {message && <Typography role="status" sx={{fontSize:13,mt:2}}>{message}</Typography>}
+              <TeaEditor key={(mode === 'edit' ? selected?.id : 'new') || 'new'}
               tea={mode === 'edit' ? selected : null}
               barcode={scannedCode}
               onCancel={previousView}
               onSaved={formSaved} />
+            </>
           )}
 
           {/* Keep the timer mounted while searching/editing, preserving its state
