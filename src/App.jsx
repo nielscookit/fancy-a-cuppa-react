@@ -60,12 +60,41 @@ export default function App() {
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
   const [quickNotice, setQuickNotice] = useState(false);
   const assistantSectionRef = useRef(null);
+  const [assistantActive, setAssistantActive] = useState(false);
+  const [assistantPinned, setAssistantPinned] = useState(false);
+
+  // The same Home button becomes the pinned, dark selected control once it
+  // reaches 12px from the viewport top. Scrolling back restores Home state.
+  useEffect(() => {
+    function syncAssistantPosition() {
+      const sectionTop = assistantSectionRef.current?.getBoundingClientRect().top;
+      if (sectionTop == null) return;
+      const pinned = sectionTop <= 86; // 66px button + 8px bottom + 12px sticky top
+      setAssistantPinned(current => current === pinned ? current : pinned);
+      if (pinned) setAssistantActive(true);
+      else if (window.scrollY <= 2) setAssistantActive(false);
+    }
+    window.addEventListener('scroll', syncAssistantPosition, { passive: true });
+    window.addEventListener('resize', syncAssistantPosition);
+    syncAssistantPosition();
+    return () => {
+      window.removeEventListener('scroll', syncAssistantPosition);
+      window.removeEventListener('resize', syncAssistantPosition);
+    };
+  }, []);
 
   useEffect(() => {
     saveQuickMinutes(quickMinutes);
   }, [quickMinutes]);
 
   const showTeaAssistant = () => {
+    if (assistantActive) {
+      // Keep the selected button pinned until smooth scrolling crosses back
+      // into the Home frame. The scroll observer restores its original state.
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setAssistantActive(true);
     setMode('search');
     setQuery('');
     requestAnimationFrame(() => {
@@ -197,9 +226,11 @@ export default function App() {
         onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous, delta))}
         onBrew={() => setQuickNotice(true)}
         onTeaAssistant={showTeaAssistant}
+        assistantActive={assistantActive}
+        assistantPinned={assistantPinned}
       />
       <Box ref={assistantSectionRef} component="main"
-        sx={{maxWidth:500,mx:'auto',px:2.5,pt:3,pb:'max(45px, env(safe-area-inset-bottom))'}}> 
+        sx={{maxWidth:500,mx:'auto',px:2.5,pt:'100px',pb:'max(45px, env(safe-area-inset-bottom))'}}> 
       <Typography component="h1" sx={{fontSize:30,fontWeight:600,letterSpacing:'-.04em'}}>
         Fancy a Cuppa
       </Typography>

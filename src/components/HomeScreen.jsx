@@ -8,7 +8,7 @@ const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
  * Approved Figma 01 · Home (node 19:47, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant }) {
+export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false, assistantPinned = false }) {
   return (
     <Box component="section" className="fac-home" aria-label="Home">
       <Box className="fac-home__canvas">
@@ -42,13 +42,16 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant }) 
           className="fac-home__action fac-home__action--primary"
           onClick={onBrew}
         >
-          Fancy a Cuppa
+          Fancy a Cuppa?
         </Button>
         <Button
           variant="contained"
           disableElevation
           disableRipple
-          className="fac-home__action fac-home__action--secondary"
+          className={'fac-home__action fac-home__action--secondary' +
+            (assistantActive ? ' is-active' : '') +
+            (assistantPinned ? ' is-pinned' : '')}
+          aria-pressed={assistantActive}
           onClick={onTeaAssistant}
         >
           How do you take it?

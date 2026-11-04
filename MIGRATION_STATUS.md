@@ -197,3 +197,19 @@
 - Next: Phase 1B direct BREW tap to standalone timer view must retain the
   original iPhone media user-gesture semantics and preload all four clips
   before enabling Start. Then obtain real iPhone acceptance.
+
+## 2026-11-04: approved Phase 1A navigation refinement
+
+- User accepted Home layout and +/- minutes; requested primary label
+  "Fancy a Cuppa?" with a literal question mark.
+- "How do you take it?" is now a reversible selected-state control:
+  grey when inactive; Figma dark grey #323234 with white type while
+  the assistant area is active.
+- On Home-to-assistant scroll the *same button* follows page until its
+  top reaches 12px, then is position:fixed at 12px. Tapping it again
+  scrolls smoothly to Home; on return it resumes its original bottom
+  position and inactive colour. Manual scrolling is handled too.
+- Assistant content receives sufficient top clearance so the pinned
+  button does not obscure content. Tea Detail Figma implementation is
+  still Phase 2; existing V3 search/card/dosing is retained unchanged.
+- No changes to V2, validated timer/audio/media controllers or Supabase.

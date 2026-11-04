@@ -90,3 +90,20 @@
   outline: 3px solid #782b40;
   outline-offset: 2px;
 }
+
+/* Approved Home interaction: dark selected state, pinned 12px from viewport top.
+   A single accessible button transitions between the Home and assistant states. */
+.fac-home__action--secondary.is-active.MuiButton-root,
+.fac-home__action--secondary.is-active.MuiButton-root:hover {
+  color: #ffffff;
+  background-color: #323234;
+}
+.fac-home__action--secondary.is-pinned.MuiButton-root {
+  position: fixed;
+  top: 12px;
+  bottom: auto;
+  left: 50%;
+  width: min(359px, calc(100vw - 16px));
+  transform: translateX(-50%);
+  z-index: 1100;
+}

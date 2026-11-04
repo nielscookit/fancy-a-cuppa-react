@@ -31,7 +31,7 @@ test('quick timer time is retained in V3 storage without touching V2', () => {
 test('Figma 01 Home faithfully reflects exact sizes, positions and colours', () => {
   const home = readFileSync('src/components/HomeScreen.jsx', 'utf8');
   const css = readFileSync('src/components/home.css', 'utf8');
-  assert.match(home, /Fancy a Cuppa/);
+  assert.match(home, /Fancy a Cuppa\?/);
   assert.match(home, /How do you take it\?/);
   assert.match(home, /home-minus\.svg/);
   assert.match(home, /home-plus\.svg/);
@@ -65,4 +65,27 @@ test('home keeps tea assistant and validated timer integration isolated', () => 
   assert.match(app, /<TeaTimer/);
   assert.match(app, /<TeaEditor/);
   assert.doesNotMatch(readFileSync('src/components/HomeScreen.jsx','utf8'), /createMediaController|createTimerController|createAudioController/);
+});
+
+test('assistant button has reversible selected state and sticks at 12px', () => {
+  const app=readFileSync('src/App.jsx','utf8');
+  const home=readFileSync('src/components/HomeScreen.jsx','utf8');
+  const css=readFileSync('src/components/home.css','utf8');
+  assert.match(home,/assistantActive\s*=\s*false/);
+  assert.match(home,/assistantPinned\s*=\s*false/);
+  assert.match(home,/aria-pressed=\{assistantActive\}/);
+  assert.match(home,/is-active/);
+  assert.match(home,/is-pinned/);
+  assert.match(css,/\.fac-home__action--secondary\.is-active\.MuiButton-root/);
+  assert.match(css,/background-color:\s*#323234/);
+  assert.match(css,/\.fac-home__action--secondary\.is-pinned\.MuiButton-root\s*\{/);
+  assert.match(css,/position:\s*fixed/);
+  assert.match(css,/top:\s*12px/);
+  assert.match(css,/z-index:\s*1100/);
+  assert.match(app,/window\.scrollTo\(\{\s*top:\s*0,\s*behavior:\s*'smooth'\s*\}\)/);
+  assert.match(app,/scrollIntoView\(/);
+  assert.match(app,/sectionTop\s*<=\s*86/);
+  assert.match(app,/assistantActive=\{assistantActive\}/);
+  assert.match(app,/assistantPinned=\{assistantPinned\}/);
+  assert.match(app,/window\.addEventListener\('scroll',\s*syncAssistantPosition,\s*\{ passive: true \}\)/);
 });
