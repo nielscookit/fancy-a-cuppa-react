@@ -72,3 +72,13 @@ test('Figma 123:144 vertical geometry aligns at y=545, 645, 692, 740, 854', () =
   assert.deepEqual([water,dose,divider,timer,brew,brew+66+48],
     [545,645,692,740,854,968]);
 });
+
+test('Figma 123:144 leaves the photograph bottom edge square (0px)', () => {
+  const css = readFileSync('src/components/tea-detail.css', 'utf8');
+  const card = css.split('.fac-tea-card {')[1].split('}')[0];
+  const image = css.split('.fac-tea-card__image-area {')[1].split('}')[0];
+  const photo = css.split('.fac-tea-card__photo {')[1].split('}')[0];
+  assert.match(card, /border-radius:\s*30px 30px 0 0/);
+  assert.doesNotMatch(image, /border-radius|clip-path/);
+  assert.doesNotMatch(photo, /border-radius|clip-path/);
+});

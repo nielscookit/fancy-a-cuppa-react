@@ -404,3 +404,11 @@
   local SVGs are used, preserving the original Home components.
 - Existing Home, scroll, media controller, quick timer, Supabase and V2
   are untouched. Awaiting mobile review before bug fixes.
+
+## 2026-11-05: Figma v2 photo bottom radius corrected
+
+- User confirms the revised Figma image has a straight 0px bottom edge.
+- Replaced TeaCard's 30px all-corners rounding with 30px 30px 0 0:
+  top corners remain rounded; photo/image mask bottom corners are square.
+- No change to the continuous white detail surface, Home, scroll, timer,
+  Supabase or media functionality.
