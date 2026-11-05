@@ -26,10 +26,10 @@ test('Figma static assets are local and each is exactly placed',()=>{
     assert.match(svg,/<svg/);
     assert.ok(svg.length>100);
   }
-  const image=fs('public/figma/tea-photo-v2.jpg');
+  const image=fs('public/figma/tea-photo-square.jpg');
   assert.ok(image.length>10000);
   assert.equal(image[0],0xff);assert.equal(image[1],0xd8);
-  for(const asset of ['tea-close.svg','tea-edit.svg','tea-category.svg','tea-photo-v2.jpg']) assert.ok(card.includes(asset));
+  for(const asset of ['tea-close.svg','tea-edit.svg','tea-category.svg','tea-photo-square.jpg']) assert.ok(card.includes(asset));
   assert.match(search,/tea-search\.svg/);
   assert.match(search,/tea-scanner\.svg/);
   assert.match(detail,/tea-tune\.svg/);
@@ -81,4 +81,19 @@ test('Figma 123:144 leaves the photograph bottom edge square (0px)', () => {
   assert.match(card, /border-radius:\s*30px 30px 0 0/);
   assert.doesNotMatch(image, /border-radius|clip-path/);
   assert.doesNotMatch(photo, /border-radius|clip-path/);
+});
+
+test('the replacement is the full original Figma image fill, not a rounded export', () => {
+  const bytes = readFileSync('public/figma/tea-photo-square.jpg');
+  const css = readFileSync('src/components/tea-detail.css','utf8');
+  const card = readFileSync('src/components/TeaCard.jsx','utf8');
+  // Original image hash from node 123:157 produces a 132893-byte JPEG.
+  assert.equal(bytes.length, 132893);
+  assert.equal(bytes[0], 0xff);
+  assert.equal(bytes[1], 0xd8);
+  assert.match(card, /tea-photo-square\.jpg/);
+  const photoRule=css.split('.fac-tea-card__photo {')[1].split('}')[0];
+  assert.match(photoRule, /object-fit:\s*cover/);
+  assert.match(photoRule, /object-position:\s*50% 74\.3%/);
+  assert.doesNotMatch(photoRule, /border-radius|clip-path/);
 });

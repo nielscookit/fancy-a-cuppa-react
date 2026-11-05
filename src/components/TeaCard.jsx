@@ -11,7 +11,7 @@ export default function TeaCard({ tea, onEdit, onClose }) {
   const variety = tea.subcategory === 'other'
     ? tea.subcategory_other || 'OTHER'
     : tea.subcategory || 'OTHER';
-  const image = tea.imageUrl || asset + 'tea-photo-v2.jpg';
+  const image = tea.imageUrl || asset + 'tea-photo-square.jpg';
   const illustration = !tea.imageUrl;
   return (
     <article className="fac-tea-card" aria-label={tea.rawName || tea.name}>

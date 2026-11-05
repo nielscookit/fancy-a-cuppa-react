@@ -412,3 +412,19 @@
   top corners remain rounded; photo/image mask bottom corners are square.
 - No change to the continuous white detail surface, Home, scroll, timer,
   Supabase or media functionality.
+
+## 2026-11-05: Source photo mask removed to obtain true 0px lower image corners
+
+- iPhone screenshot exposed visible rounding even after adjusting the
+  card CSS. Figma node 123:157 FotoMaske actually has 30px on both
+  bottom corners; exporting the 375x192 node baked that shape into
+  the replacement JPEG.
+- Obtained the original unmasked 1200x1500 JPEG (132893 bytes) from the
+  image fill hash, stored at tea-photo-square.jpg (a new filename to
+  avoid Safari reusing the cached rounded export).
+- Recreated the source crop via CSS object-fit:cover,
+  object-position:50% 74.3%; this matches the original Figma crop
+  top=-107.14% when rendered at 375x192.
+- The card itself still rounds only its top corners, leaving the
+  image's lower edge completely straight. Figma source unchanged.
+- No changes to media, Home, Supabase, or navigation.
