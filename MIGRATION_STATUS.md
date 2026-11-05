@@ -386,3 +386,21 @@
 - QuickTimer RESET now clears the selected assistant view and scrolls to
   document top from both Home and Tea Detail, matching the approved
   single-RESET navigation. Persisted Home minutes remain unchanged.
+
+## 2026-11-05: Tea Detail v2 (Figma 123:144)
+
+- Replaces the prior Tea Detail 67:6557 visual layout with the revised
+  375×968 design, without altering behaviour.
+- The detail from y=211 to y=968 is now one continuous white surface
+  with 30px top corners and the original subtle shadow.
+- The 286px card header/image and its 192px image area stay unchanged.
+  The quantity toggle shifts to y=545 (48px after the image), the dosage
+  to y=645, divider to y=692, timer +/- to y=740 and BREW to y=854.
+- Roboto Mono Bold timer value increases from 28px to 34px.
+- New Figma tea sachet photograph (node 123:157) exported locally to
+  tea-photo-v2.jpg. Still illustrative, not a Supabase product photo.
+- Six icons are identical to local SVGs except export IDs; reused.
+  The minus/plus path coordinates changed minimally, so dedicated v2
+  local SVGs are used, preserving the original Home components.
+- Existing Home, scroll, media controller, quick timer, Supabase and V2
+  are untouched. Awaiting mobile review before bug fixes.

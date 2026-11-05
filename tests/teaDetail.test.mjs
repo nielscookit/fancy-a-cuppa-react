@@ -26,21 +26,49 @@ test('Figma static assets are local and each is exactly placed',()=>{
     assert.match(svg,/<svg/);
     assert.ok(svg.length>100);
   }
-  const image=fs('public/figma/tea-photo.jpg');
+  const image=fs('public/figma/tea-photo-v2.jpg');
   assert.ok(image.length>10000);
   assert.equal(image[0],0xff);assert.equal(image[1],0xd8);
-  for(const asset of ['tea-close.svg','tea-edit.svg','tea-category.svg','tea-photo.jpg']) assert.ok(card.includes(asset));
+  for(const asset of ['tea-close.svg','tea-edit.svg','tea-category.svg','tea-photo-v2.jpg']) assert.ok(card.includes(asset));
   assert.match(search,/tea-search\.svg/);
   assert.match(search,/tea-scanner\.svg/);
   assert.match(detail,/tea-tune\.svg/);
-  assert.match(detail,/home-minus\.svg/);
-  assert.match(detail,/home-plus\.svg/);
+  assert.match(detail,/tea-v2-minus\.svg/);
+  assert.match(detail,/tea-v2-plus\.svg/);
   assert.match(css,/height:\s*286px/);
   assert.match(css,/height:\s*192px/);
   assert.match(css,/border-radius:\s*30px/);
   assert.match(css,/height:\s*52px/);
-  assert.match(css,/min-height:\s*307px/);
-  assert.match(css,/border-radius:\s*40px 40px 0 0/);
+  assert.match(css,/min-height:\s*757px/);
+  assert.match(css,/border-radius:\s*30px 30px 0 0/);
+  assert.match(css,/height:\s*52px; margin:\s*48px 8px 0/);
+  assert.match(css,/font-size:\s*34px; font-weight:\s*700; line-height:\s*41px/);
+  assert.match(css,/padding:\s*0 8px 48px/);
+  for(const name of ['minus','plus']){
+    const svg=fs('public/figma/tea-v2-'+name+'.svg','utf8');
+    assert.match(svg,/<svg width="66" height="66"/);
+  }
   assert.match(css,/#782b40/);
   assert.match(css,/#eeeeec/);
+});
+
+test('Figma 123:144 vertical geometry aligns at y=545, 645, 692, 740, 854', () => {
+  const css=readFileSync('src/components/tea-detail.css','utf8');
+  const container=css.split('.fac-tea-detail {')[1].split('}')[0];
+  const card=css.split('.fac-tea-card {')[1].split('}')[0];
+  const panel=css.split('.fac-tea-result {')[1].split('}')[0];
+  assert.match(container,/background:\s*#fff/);
+  assert.match(container,/min-height:\s*757px/);
+  assert.match(card,/box-shadow:\s*none/);
+  assert.match(panel,/margin-top:\s*48px/);
+  assert.doesNotMatch(panel,/border-radius/);
+  assert.match(css,/margin:\s*19px 24px 0/);
+  assert.match(css,/margin-top:\s*47px/);
+  const water=211+286+48;
+  const dose=water+52+48;
+  const divider=dose+28+19;
+  const timer=divider+1+47;
+  const brew=timer+66+48;
+  assert.deepEqual([water,dose,divider,timer,brew,brew+66+48],
+    [545,645,692,740,854,968]);
 });

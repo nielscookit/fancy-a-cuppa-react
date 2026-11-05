@@ -22,7 +22,7 @@ function VolumeOption({ value, current, onChange }) {
   );
 }
 
-/** Node 67:6557 — selected tea preparation, mounted in the continuous Home page. */
+/** Node 123:144 — selected tea preparation, mounted in the continuous Home page. */
 export default function TeaDetail({
   tea, volume, onVolumeChange, customMl, onCustomChange,
   minutes, onMinuteStep, onEdit, onClose, onBrew, brewDisabled,
@@ -74,7 +74,7 @@ export default function TeaDetail({
           <Button type="button" aria-label="Decrease brewing time"
             className="fac-tea-result__time-button"
             onClick={() => onMinuteStep(-1)} disabled={minutes <= 1} disableRipple>
-            <img src={asset + 'home-minus.svg'} width="66" height="66" alt="" />
+            <img src={asset + 'tea-v2-minus.svg'} width="66" height="66" alt="" />
           </Button>
           <Typography component="output" className="fac-tea-result__minutes">
             {minutes} MIN
@@ -82,7 +82,7 @@ export default function TeaDetail({
           <Button type="button" aria-label="Increase brewing time"
             className="fac-tea-result__time-button"
             onClick={() => onMinuteStep(1)} disabled={minutes >= 30} disableRipple>
-            <img src={asset + 'home-plus.svg'} width="66" height="66" alt="" />
+            <img src={asset + 'tea-v2-plus.svg'} width="66" height="66" alt="" />
           </Button>
         </div>
         <Button type="button" variant="contained" fullWidth disableRipple disableElevation

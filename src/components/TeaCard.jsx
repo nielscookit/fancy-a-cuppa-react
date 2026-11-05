@@ -4,14 +4,14 @@ import './tea-detail.css';
 
 const asset = import.meta.env.BASE_URL + 'figma/';
 
-/** Figma 03 · Tea Detail, reusable product card (node 87:6608). */
+/** Figma 03 · Tea Detail, reusable product card (node 123:155). */
 export default function TeaCard({ tea, onEdit, onClose }) {
   if (!tea) return null;
   const category = CATEGORY_ENGLISH[tea.category] || 'TEA';
   const variety = tea.subcategory === 'other'
     ? tea.subcategory_other || 'OTHER'
     : tea.subcategory || 'OTHER';
-  const image = tea.imageUrl || asset + 'tea-photo.jpg';
+  const image = tea.imageUrl || asset + 'tea-photo-v2.jpg';
   const illustration = !tea.imageUrl;
   return (
     <article className="fac-tea-card" aria-label={tea.rawName || tea.name}>
@@ -34,7 +34,7 @@ export default function TeaCard({ tea, onEdit, onClose }) {
       <div className="fac-tea-card__image-area">
         <img className={'fac-tea-card__photo' + (illustration ? ' is-illustration' : '')}
           src={image}
-          alt={illustration ? 'Illustrative brewed tea photograph' : 'Photograph of ' + (tea.rawName || tea.name)}
+          alt={illustration ? 'Illustrative tea sachet photograph' : 'Photograph of ' + (tea.rawName || tea.name)}
         />
         <img className="fac-tea-card__type-symbol"
           src={asset + 'tea-category.svg'} width="60" height="60"

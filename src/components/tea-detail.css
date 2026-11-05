@@ -1,4 +1,4 @@
-/* Figma 03 · Tea Detail, node 67:6557 — 375px reference width.
+/* Figma 03 · Tea Detail, node 123:144 — 375 × 968px reference width.
    Home/assistant scrolling and the iPhone video layer are intentionally not
    altered by these component-scoped rules. */
 .fac-tea-assistant {
@@ -43,15 +43,25 @@
 .fac-tea-search__scanner img { width: 24px; height: 24px; }
 .fac-tea-search__file { display: none; }
 
-/* Reusable Tea Card: 94px header + 192px image, with a 30px clip. */
+/* Figma v2: one continuous white surface, 757px tall below the search. */
+.fac-tea-detail {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 757px;
+  background: #fff;
+  border-radius: 30px 30px 0 0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.14),
+              0 2px 1px -1px rgba(0,0,0,.2);
+}
+/* The nested 286px image/header card is now part of the single surface. */
 .fac-tea-card {
   width: 100%;
   height: 286px;
   border-radius: 30px;
   background: #fff;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.14),
-              0 2px 1px -1px rgba(0,0,0,.2);
+  box-shadow: none;
 }
 .fac-tea-card__header {
   box-sizing: border-box;
@@ -111,7 +121,7 @@
 
 /* 52px Figma segmented water selector, 250 / 500 / 1l / tune. */
 .fac-tea-volume {
-  height: 52px; margin: 12px 8px 0;
+  height: 52px; margin: 48px 8px 0;
   display: grid; grid-template-columns: repeat(4, 1fr);
   border-radius: 100px; background: #eeeeec; overflow: hidden;
 }
@@ -146,13 +156,13 @@
   font-size: 16px; font-weight: 500; padding: 8px 12px;
 }
 
-/* White preparation panel, 40px top corners, 307px Figma minimum height. */
+/* Result remains on the white card; Figma y=645, divider y=692,
+   +/- y=740 and BREW y=854 at 375px reference width. */
 .fac-tea-result {
-  min-height: 307px; box-sizing: border-box;
-  margin-top: 12px;
-  padding: 24px 8px 8px;
+  box-sizing: border-box;
+  margin-top: 48px;
+  padding: 0 8px 48px;
   background: #fff;
-  border-radius: 40px 40px 0 0;
 }
 .fac-tea-result__dose {
   min-height: 28px; margin: 0 24px;
@@ -170,7 +180,7 @@
   color: #202024; white-space: nowrap;
 }
 .fac-tea-result__divider {
-  height: 1px; background: #e5e5e5; margin: 18px 24px 0;
+  height: 1px; background: #e5e5e5; margin: 19px 24px 0;
 }
 .fac-tea-result__timer {
   margin-top: 47px;
@@ -186,7 +196,7 @@
 .fac-tea-result__time-button.Mui-disabled { opacity: .4; }
 .fac-tea-result__minutes.MuiTypography-root {
   min-width: 85px; text-align: center; white-space: nowrap;
-  font-size: 28px; font-weight: 700; line-height: 34px;
+  font-size: 34px; font-weight: 700; line-height: 41px;
   font-family: "Roboto Mono", monospace; color: #202024;
 }
 .fac-tea-result__brew.MuiButton-root {
