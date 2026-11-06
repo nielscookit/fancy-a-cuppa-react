@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import {
-  CATEGORY_LABELS, TEA_VARIETIES, DOSE_UNITS, LEAF_STYLE_LABELS,
+  UI_CATEGORY_LABELS, TEA_VARIETIES, DOSE_UNITS, LEAF_STYLE_LABELS,
   initialTeaForm, validateTeaForm,
 } from '../features/teaModel.js';
 import { createTea, updateTea } from '../data/teaRepository.js';
@@ -87,7 +87,7 @@ export default function TeaEditor({ tea, barcode, onCancel, onSaved }) {
     finally{setSaving(false);}
   }
 
-  const cats=options(CATEGORY_LABELS);
+  const cats=options(UI_CATEGORY_LABELS);
   const leaves=[{value:'',label:'Not specified'},...options(LEAF_STYLE_LABELS).filter(x=>
     form.type==='bag'?x.value==='bag':x.value!=='bag')];
   const units=options(DOSE_UNITS).filter(x=>

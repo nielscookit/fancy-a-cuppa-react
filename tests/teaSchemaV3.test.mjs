@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  CATEGORY_LABELS, LEAF_STYLE_LABELS, initialTeaForm,
+  CATEGORY_LABELS, UI_CATEGORY_LABELS, LEAF_STYLE_LABELS, initialTeaForm,
   validateTeaForm, teaMatches,
 } from '../src/features/teaModel.js';
 import {
@@ -133,4 +133,26 @@ test('new editor exposes all schema fields but does not directly modify database
   assert.match(ui,/createTea/);
   assert.match(ui,/updateTea/);
   assert.doesNotMatch(ui,/service_role|SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test('tea editor offers only the eight UX-approved categories',()=>{
+  assert.deepEqual(Object.entries(UI_CATEGORY_LABELS),[
+    ['black','Black Tea'],
+    ['green','Green Tea'],
+    ['fruit','Fruit Infusions'],
+    ['herbal','Herbal Infusions'],
+    ['white','White Tea'],
+    ['oolong','Oolong Tea'],
+    ['rooibos','Rooibos'],
+    ['other','Other Infusions'],
+  ]);
+  assert.equal(Object.keys(CATEGORY_LABELS).length,12,
+    'Retain the 12 Supabase enum keys for backwards-compatible reading');
+  const editor=readFileSync('src/components/TeaEditor.jsx','utf8');
+  assert.match(editor,/const cats=options\(UI_CATEGORY_LABELS\)/);
+  assert.doesNotMatch(editor,/const cats=options\(CATEGORY_LABELS\)/);
+  for(const legacy of ['yellow','dark','pu_erh','mate']){
+    assert.ok(!(legacy in UI_CATEGORY_LABELS),
+      'No extra category choices in Add/Edit Tea: '+legacy);
+  }
 });

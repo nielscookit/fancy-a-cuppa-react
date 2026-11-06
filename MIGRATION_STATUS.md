@@ -447,3 +447,16 @@
   Asset transfer to GitHub needs separate verification; no surrogate
   images or format conversion are permitted.
 - Home, scrolling, V2, media controllers and Supabase rows are untouched.
+
+## 2026-11-06: Corrected UX category count (8 vs 12 database keys)
+
+- Product/UX contract is exactly eight categories on all Add/Edit tea
+  selectors: Black Tea, Green Tea, Fruit Infusions, Herbal Infusions,
+  White Tea, Oolong Tea, Rooibos, Other Infusions.
+- The expanded Supabase schema currently accepts 12 category keys; the
+  four additional technical categories yellow, dark, pu_erh and mate
+  remain readable for legacy compatibility, but are not selectable in
+  the UI. This does not migrate or recategorise existing records.
+- Shared display labels now use Fruit Infusions, Herbal Infusions and
+  Other Infusions consistently. Database enum keys unchanged.
+- No changes to timer, media, assets, V2 or existing Supabase records.
