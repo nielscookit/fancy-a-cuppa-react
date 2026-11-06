@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, Drawer, IconButton, Paper, Typography } from '@mui/material';
+import { Box, Button, Drawer, IconButton, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
   teaMatches, recentTeaIds,
@@ -13,7 +13,6 @@ import './components/tea-detail.css';
 import HomeScreen from './components/HomeScreen.jsx';
 import QuickTimerView from './components/QuickTimerView.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
-import { v3StorageKey } from './storage.js';
 import Snackbar from '@mui/material/Snackbar';
 import { flushSync } from 'react-dom';
 import './components/tea-sheet.css';
@@ -48,7 +47,7 @@ export default function App() {
   const [quickVideoStatus, setQuickVideoStatus] = useState('loading');
   const quickTimerRef = useRef(null);
   const [pinnedIds, setPinnedIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('fac-v3-pinned-teas') || '[]'); }
+    try { const value = JSON.parse(localStorage.getItem('fac-v3-pinned-teas') || '[]'); return Array.isArray(value) ? value.filter(id => typeof id === 'string') : []; }
     catch { return []; }
   });
   const togglePin = (id) => setPinnedIds(previous => {
@@ -89,6 +88,7 @@ export default function App() {
   };
   const startQuickTimer = () => openTimerWithSeconds(quickMinutes * 60);
   const startDetailTimer = () => {
+    if (quickVideoStatus === 'ready') setMode('closed');
     openTimerWithSeconds(detailMinutes * 60);
   };
 
@@ -97,7 +97,6 @@ export default function App() {
     setQuickTimerOpen(false);
   };
   const photoRef = useRef(null);
-  const searchRef = useRef(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -112,7 +111,8 @@ export default function App() {
   const teas = catalog.teas;
   const selected = teas.find(tea => tea.id === selectedId) || null;
   const results = useMemo(() => teas.filter(tea => teaMatches(tea,query)), [teas,query]);
-  const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean).filter(tea => teaMatches(tea, query));\n  const unpinnedResults = results.filter(tea => !pinnedIds.includes(tea.id));
+  const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean).filter(tea => teaMatches(tea, query));
+  const unpinnedResults = results.filter(tea => !pinnedIds.includes(tea.id));
   function chooseTea(tea) {
     setSelectedId(tea.id);
     setVolume(250);
