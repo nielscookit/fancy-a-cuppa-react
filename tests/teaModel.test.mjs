@@ -13,15 +13,15 @@ test('keyword search handles translated tea types, umlauts and combined filters'
 test('reference dosage scales without arbitrary unit conversion',()=>{
   assert.equal(calculateDose(tea,500),3);
   assert.equal(calculateDose(tea,250),1.5);
-  assert.equal(formatDose(1.5,'tsp'),'1,5 TL');
-  assert.equal(formatDose(2,'bag'),'2 Beutel');
+  assert.equal(formatDose(1.5,'tsp'),'1,5 tsp');
+  assert.equal(formatDose(2,'bag'),'2 bags');
 });
 test('shared V2 form respects exact fields, units and safe numeric validation',()=>{
   const f=initialTeaForm(tea);
   assert.equal(f.mins,'4');
   assert.equal(validateTeaForm(f).base,1000);
-  assert.throws(()=>validateTeaForm({...f,unit:'bag'}),/Einheit/);
-  assert.throws(()=>validateTeaForm({...f,mins:'2.5'}),/volle Minuten/);
+  assert.throws(()=>validateTeaForm({...f,unit:'bag'}),/Dosage unit/);
+  assert.throws(()=>validateTeaForm({...f,mins:'2.5'}),/whole minutes/);
 });
 test('recents max five, newest first, unique',()=>{
   assert.deepEqual(recentTeaIds(['a','b','c','d','e'],'c'),['c','a','b','d','e']);
@@ -42,7 +42,7 @@ test('fruit and herbal categories work across English and German queries', () =>
 test('bag and measure dosage scales with selected vessel size', () => {
   const bag={qty:1,base:250,unit:'bag'};
   assert.equal(calculateDose(bag,500),2);
-  assert.equal(formatDose(calculateDose(bag,500),'bag'),'2 Beutel');
-  assert.equal(formatDose(calculateDose({qty:1,base:250,unit:'measure'},900),'measure'),'3,6 Teemaß');
+  assert.equal(formatDose(calculateDose(bag,500),'bag'),'2 bags');
+  assert.equal(formatDose(calculateDose({qty:1,base:250,unit:'measure'},900),'measure'),'3,6 measures');
   assert.equal(calculateDose(bag,0),null);
 });

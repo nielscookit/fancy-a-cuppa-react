@@ -3,7 +3,7 @@ import { supabaseConfig } from './supabaseConfig.js';
 // Framework-independent V3 adapter, behavior based on app-v2/cloud.js.
 // For later migration: changing backend settings does not require React changes.
 const endpoint = supabaseConfig.url;
-const selectFields = 'id,brand,name,category,subcategory,subcategory_other,tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c)';
+const selectFields = 'id,brand,name,category,subcategory,subcategory_other,leaf_style,photo_url,tea_codes(code_type,code_value),tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c,instructions,source_label)';
 const codeSelect = 'tea_id,teas(' + selectFields + ')';
 const unitField = {
   bag: 'dose_bags',
@@ -46,8 +46,19 @@ export function normalizeTea(tea) {
     brand: tea.brand,
     rawName: tea.name,
     category: tea.category || 'other',
-    subcategory: tea.subcategory || 'other',
+    subcategory: tea.subcategory || null,
     subcategory_other: tea.subcategory_other || '',
+    leafStyle: tea.leaf_style || null,
+    photoUrl: typeof tea.photo_url === 'string' && /^https:\/\//i.test(tea.photo_url)
+      ? tea.photo_url : null,
+    instructions: prep.instructions || '',
+    sourceLabel: prep.source_label || '',
+    codes: Array.isArray(tea.tea_codes)
+      ? tea.tea_codes.map(c => ({ type:c.code_type, value:c.code_value }))
+      : [],
+    code: Array.isArray(tea.tea_codes) && tea.tea_codes.length
+      ? { type:tea.tea_codes[0].code_type, value:tea.tea_codes[0].code_value }
+      : null,
     qty,
     base,
     temperature: prep.water_temp_c,
@@ -58,16 +69,26 @@ export function normalizeTea(tea) {
   };
 }
 
+const CATALOG_PAGE_SIZE = 500;
+const MAX_CATALOG_PAGES = 20;
+
 export async function listTeas({ signal, fetchImpl = fetch } = {}) {
-  const url = endpoint + '/rest/v1/teas?select=' + encodeURIComponent(selectFields)
-    + '&status=eq.published&order=created_at.desc&limit=500';
-  const response = await fetchImpl(url, {
-    headers: { apikey: supabaseConfig.publishableKey },
-    signal,
-  });
-  const rows = await readJson(response, 'Cloud catalog unavailable');
-  if (!Array.isArray(rows)) throw new Error('Invalid cloud catalog response.');
-  return rows.map(normalizeTea).filter(Boolean);
+  const all = [];
+  for (let page = 0; page < MAX_CATALOG_PAGES; page++) {
+    const url = endpoint + '/rest/v1/teas?select=' + encodeURIComponent(selectFields)
+      + '&status=eq.published&order=created_at.desc,id.desc'
+      + '&limit=' + CATALOG_PAGE_SIZE
+      + '&offset=' + (page * CATALOG_PAGE_SIZE);
+    const response = await fetchImpl(url, {
+      headers: { apikey: supabaseConfig.publishableKey },
+      signal,
+    });
+    const rows = await readJson(response, 'Cloud catalog unavailable');
+    if (!Array.isArray(rows)) throw new Error('Invalid cloud catalog response.');
+    all.push(...rows);
+    if (rows.length < CATALOG_PAGE_SIZE) return all.map(normalizeTea).filter(Boolean);
+  }
+  throw new Error('The tea catalogue exceeds the current 10,000-item safety limit.');
 }
 
 export async function lookupTeaByCode(code, { signal, fetchImpl = fetch } = {}) {
@@ -86,7 +107,7 @@ export async function lookupTeaByCode(code, { signal, fetchImpl = fetch } = {}) 
 }
 
 function requireTeaIdentity(data) {
-  if (!data?.name?.trim() || !data?.brand?.trim() || !data.category || !data.subcategory) {
+  if (!data?.name?.trim() || !data?.brand?.trim() || !data.category) {
     throw new Error('Please complete the tea identity fields.');
   }
   if (!unitField[data.unit]) throw new Error('Unknown dosage unit.');
@@ -101,6 +122,46 @@ function requireTeaIdentity(data) {
   }
 }
 
+const SUPPORTED_CREATE_CATEGORIES = new Set([
+  'black','green','white','oolong','pu_erh','herbal','fruit','rooibos','other',
+]);
+const SUPPORTED_UPDATE_CATEGORIES = new Set([
+  'black','green','white','oolong','herbal','fruit','rooibos','other',
+]);
+const SUPPORTED_CREATE_LEAVES = new Set(['whole','broken','ctc','bag','other']);
+
+/**
+ * The live legacy backend does not yet support the complete new schema.
+ * In particular update_community_tea forcibly changes leaf_style to other
+ * or bag. Never submit an update that silently corrupts the existing tea.
+ * This guard can be removed ONLY after the DB team upgrades both RPCs.
+ */
+export function assertLegacyWriteIsSafe(data) {
+  const editing = Boolean(data.id);
+  const message = 'The database write API must be updated for these fields. ' +
+    'Nothing has been saved. Please contact the database team.';
+  if (!(editing ? SUPPORTED_UPDATE_CATEGORIES : SUPPORTED_CREATE_CATEGORIES)
+    .has(data.category)) throw new Error(message);
+  if (!data.subcategory ||
+    data.subcategory === 'other' && !data.subcategory_other) throw new Error(message);
+  const leaf = data.type === 'bag' ? 'bag' : data.leafStyle || null;
+  if (!editing && leaf && !SUPPORTED_CREATE_LEAVES.has(leaf)) throw new Error(message);
+  const old = data.original || null;
+  if (editing && (!old || old.leafStyle !== leaf ||
+    !['bag','other'].includes(leaf))) throw new Error(message);
+  const originalPhoto = old?.photoUrl || null;
+  const originalInstructions = old?.instructions || null;
+  const originalSource = old?.sourceLabel || null;
+  if ((data.photoUrl || null) !== originalPhoto ||
+    (data.instructions || null) !== originalInstructions ||
+    (data.sourceLabel || null) !== originalSource) throw new Error(message);
+  // An existing barcode cannot be removed or changed by the legacy RPC.
+  if (editing && old?.code &&
+    (old.code.type !== data.code?.type ||
+     old.code.value !== data.code?.value)) throw new Error(message);
+  return true;
+}
+
 function normalizeCloudId(id) {
   if (!id) return null;
   return String(id).startsWith('cloud-') ? String(id).slice(6) : String(id);
@@ -112,6 +173,7 @@ function normalizeCloudId(id) {
  */
 export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
   requireTeaIdentity(data);
+  assertLegacyWriteIsSafe(data);
   const id = normalizeCloudId(data.id);
   const payload = {
     action: id ? 'update' : 'create',
@@ -121,7 +183,7 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
     category: data.category,
     subcategory: data.subcategory,
     subcategory_other: data.subcategory === 'other' ? data.subcategory_other || null : null,
-    leaf_style: data.type === 'bag' ? 'bag' : 'other',
+    leaf_style: data.type === 'bag' ? 'bag' : (data.leafStyle || null),
     dose_unit: data.unit,
     dose_quantity: Number(data.qty),
     brew_seconds: Math.round(Number(data.mins) * 60),

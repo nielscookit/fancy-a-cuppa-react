@@ -1,7 +1,9 @@
 /** British-English Tea Detail copy, with comma decimal following Figma. */
 export const CATEGORY_ENGLISH = Object.freeze({
   black:'BLACK TEA',green:'GREEN TEA',white:'WHITE TEA',
-  oolong:'OOLONG',fruit:'FRUIT TEA',herbal:'HERBAL TEA',
+  oolong:'OOLONG',yellow:'YELLOW TEA',dark:'DARK TEA',
+  pu_erh:'PU-ERH TEA',mate:'MATÉ',
+  fruit:'FRUIT TEA',herbal:'HERBAL TEA',
   rooibos:'ROOIBOS',other:'TEA',
 });
 

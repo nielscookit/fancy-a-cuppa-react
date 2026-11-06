@@ -9,8 +9,9 @@ export default function TeaCard({ tea, onEdit, onClose }) {
   if (!tea) return null;
   const category = CATEGORY_ENGLISH[tea.category] || 'TEA';
   const variety = tea.subcategory === 'other'
-    ? tea.subcategory_other || 'OTHER'
-    : tea.subcategory || 'OTHER';
+    ? tea.subcategory_other || ''
+    : tea.subcategory || '';
+  const leaf = tea.leafStyle === 'bag' ? 'TEA BAG' : tea.leafStyle || '';
   const image = tea.imageUrl || asset + 'tea-photo-square.jpg';
   const illustration = !tea.imageUrl;
   return (
@@ -41,7 +42,8 @@ export default function TeaCard({ tea, onEdit, onClose }) {
           alt={tea.type === 'bag' ? 'Tea bags' : 'Loose tea'} />
         <div className="fac-tea-card__tags">
           <span className="fac-tea-card__tag">{category}</span>
-          <span className="fac-tea-card__tag">{variety.toUpperCase()}</span>
+          {variety && <span className="fac-tea-card__tag">{variety.toUpperCase()}</span>}
+          {!variety && leaf && <span className="fac-tea-card__tag">{leaf.toUpperCase().replaceAll('_',' ')}</span>}
         </div>
       </div>
     </article>
