@@ -204,7 +204,7 @@ export default function App() {
   return (
     <>
       <Box className="fac-viewport-shield" aria-hidden="true" />
-      <Box className="fac-app-page" sx={{ position:'relative', zIndex:2, minHeight:'100svh', bgcolor:'#fff' }}>
+      <Box className="fac-app-page" sx={{ position:'relative', zIndex:2, minHeight:'100svh', bgcolor:'background.default' }}>
         <HomeScreen
           minutes={quickMinutes}
           onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous,delta))}
