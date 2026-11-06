@@ -13,9 +13,10 @@ test('Home mounts all four inline clips with a Fill poster and separate mask', (
   assert.match(stage, /background:#fff/);
 });
 
-test('Home reuses its button slots for pause, resume and reset', () => {
+test('Home switches from duration controls to countdown and reset', () => {
   const home = readFileSync('src/components/HomeScreen.jsx','utf8');
-  assert.match(home, /running \|\| preparing \? 'Pause'/);
-  assert.match(home, /inSession \? 'Resume'/);
-  assert.match(home, /onClick=\{inSession \? reset : onTeaAssistant\}/);
+  assert.match(home, /inSession \? 'Reset'/);
+  assert.match(home, /else if \(inSession\) reset\(\)/);
+  assert.match(home, /onClick=\{onTeaAssistant\}\s+disabled=\{inSession\}/);
+  assert.doesNotMatch(home, /actions\.toggle|Brew again/);
 });

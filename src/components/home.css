@@ -150,9 +150,6 @@ body {
 /* Figma 152:151 geometry, 375 x 812 reference. Responsive bottom anchoring
    keeps the controls usable on other iPhone heights without scaling labels. */
 .fac-home__countdown.MuiTypography-root {
-  position:absolute; z-index:2;
-  left:50%; transform:translateX(-50%);
-  top:calc(72px + min(100vw, 375px) - 18px);
   width:194px; height:49px;
   background:#E8FBCB;
   color:#1B272B;
@@ -167,23 +164,22 @@ body {
 .fac-home__time-button img {
   filter: none;
 }
-.fac-home__action--primary.MuiButton-root { bottom:98px; color:#1B272B; background:#B9FC69; }
-.fac-home__action--primary.MuiButton-root:hover { background:#B9FC69; }
+.fac-home__action--primary.MuiButton-root { bottom:98px; color:#1B272B; background:#A3E153; }
+.fac-home__action--primary.MuiButton-root:hover { background:#A3E153; }
 .fac-home__action--secondary.MuiButton-root,
 .fac-home__action--secondary.MuiButton-root:hover { background:#1B272B; color:#fff; }
 .fac-home__assistant-slot { margin:-82px auto 16px; }
 .fac-home__action--primary.MuiButton-root.Mui-disabled {
-  background:#B9FC69; color:#1B272B; opacity:.65;
+  background:#A3E153; color:#1B272B; opacity:.65;
 }
-.fac-home__action.MuiButton-root[data-timer-control="playback"] {
-  background:#1B272B; color:#fff;
+.fac-home__action--primary.MuiButton-root[data-timer-control="reset"] {
+  background:#B9FC69; color:#1B272B;
 }
-.fac-home__action.MuiButton-root[data-timer-control="reset"] {
-  background:#E8E6E3; color:#1B272B;
+.fac-home__action--secondary.MuiButton-root.Mui-disabled {
+  background:#F3F2F0; color:#E8E6E3;
 }
 @media (max-height:760px) {
   .fac-home__canvas { --image-size: min(100vw, 375px, calc(max(100svh, 560px) - 340px)); }
   .fac-home__tea-stage.timer-kit-stage { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }
-  .fac-home__countdown.MuiTypography-root { top:calc(30px + var(--image-size) - 18px); }
   .fac-home__time-control { bottom:196px; }
 }

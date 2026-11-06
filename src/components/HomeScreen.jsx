@@ -22,8 +22,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const { countdown, preload, error } = snapshot;
   const { running, preparing, finished, total, remaining } = countdown;
   const inSession = running || preparing || finished || remaining < total;
-  const selectedMinutes = inSession ? total / 60 : minutes;
-  const seconds = inSession ? Math.ceil(remaining) : minutes * 60;
+  const seconds = Math.ceil(remaining);
   const timeLabel = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
 
   const begin = seconds => {
@@ -39,14 +38,11 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const reset = () => actions.setSeconds(minutes * 60);
   const handlePrimary = () => {
     if (preload === 'error') void actions.retryPreload();
-    else if (preparing) reset();
-    else if (inSession) actions.toggle();
+    else if (inSession) reset();
     else begin(minutes * 60);
   };
-  const primaryLabel = preload === 'error' ? 'Retry videos'
-    : running || preparing ? 'Pause'
-    : finished ? 'Brew again'
-    : inSession ? 'Resume' : 'Fancy a Cuppa';
+  const primaryLabel = inSession ? 'Reset'
+    : preload === 'error' ? 'Retry videos' : 'Fancy a Cuppa';
 
   return (
     <>
@@ -60,37 +56,42 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
               poster={phase === 'fill' ? FILL_POSTER : undefined} />
           ))}
         </Box>
-        <Typography component="output" role="timer" className="fac-home__countdown"
-          aria-label="Brewing countdown">{timeLabel}</Typography>
         <Box className="fac-home__time-control" aria-label="Brewing time">
-          <IconButton
-            aria-label="Decrease brewing time by one minute"
-            className="fac-home__time-button"
-            onClick={() => onStep(-1)}
-            disabled={inSession || minutes <= MIN_QUICK_MINUTES}
-            disableRipple
-          >
-            <img src={SVG_BASE + 'home-minus.svg'} width="66" height="66" alt="" />
-          </IconButton>
-          <Typography component="output" aria-live="polite" className="fac-home__time-value">
-            {selectedMinutes} MIN
-          </Typography>
-          <IconButton
-            aria-label="Increase brewing time by one minute"
-            className="fac-home__time-button"
-            onClick={() => onStep(1)}
-            disabled={inSession || minutes >= MAX_QUICK_MINUTES}
-            disableRipple
-          >
-            <img src={SVG_BASE + 'home-plus.svg'} width="66" height="66" alt="" />
-          </IconButton>
+          {inSession ? (
+            <Typography component="output" role="timer" className="fac-home__countdown"
+              aria-label="Brewing countdown">{timeLabel}</Typography>
+          ) : (
+            <>
+              <IconButton
+                aria-label="Decrease brewing time by one minute"
+                className="fac-home__time-button"
+                onClick={() => onStep(-1)}
+                disabled={minutes <= MIN_QUICK_MINUTES}
+                disableRipple
+              >
+                <img src={SVG_BASE + 'home-minus.svg'} width="66" height="66" alt="" />
+              </IconButton>
+              <Typography component="output" aria-live="polite" className="fac-home__time-value">
+                {minutes} MIN
+              </Typography>
+              <IconButton
+                aria-label="Increase brewing time by one minute"
+                className="fac-home__time-button"
+                onClick={() => onStep(1)}
+                disabled={minutes >= MAX_QUICK_MINUTES}
+                disableRipple
+              >
+                <img src={SVG_BASE + 'home-plus.svg'} width="66" height="66" alt="" />
+              </IconButton>
+            </>
+          )}
         </Box>
         <Button
           variant="contained"
           disableElevation
           disableRipple
           className="fac-home__action fac-home__action--primary"
-          data-timer-control={inSession && !finished ? 'playback' : undefined}
+          data-timer-control={inSession ? 'reset' : undefined}
           onClick={handlePrimary}
           disabled={preload === 'loading'}
         >
@@ -104,10 +105,10 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
           disableElevation
           disableRipple
           className="fac-home__action fac-home__action--secondary"
-          data-timer-control={inSession ? 'reset' : undefined}
-          onClick={inSession ? reset : onTeaAssistant}
+          onClick={onTeaAssistant}
+          disabled={inSession}
         >
-          {inSession ? 'Reset' : 'How do you take it?'}
+          How do you take it?
         </Button>
       </Box>
     </>
