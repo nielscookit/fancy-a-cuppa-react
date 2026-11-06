@@ -460,3 +460,14 @@
 - Shared display labels now use Fruit Infusions, Herbal Infusions and
   Other Infusions consistently. Database enum keys unchanged.
 - No changes to timer, media, assets, V2 or existing Supabase records.
+
+## 2026-11-06: final category selector reduced to six
+
+- Designer explicitly approved exactly six choices in Add/Edit Tea:
+  Black Tea, Green Tea, Fruit, Herbal, Rooibos and Other.
+- `UI_CATEGORY_LABELS` contains only these six database keys:
+  `black`, `green`, `fruit`, `herbal`, `rooibos`, `other`.
+- The underlying Supabase category enum and read support for all twelve
+  technical categories remain unchanged. No data was rewritten or removed.
+- No changes to category image mappings, timer, media playback, V2, search
+  implementation, database, or the approved Figma layout.

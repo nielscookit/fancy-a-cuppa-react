@@ -6,20 +6,17 @@ export const CATEGORY_LABELS = Object.freeze({
   mate:'Maté', other:'Other Infusions',
 });
 /**
- * The eight UX-approved categories. These are the only category options
- * in Add/Edit Tea. Keep CATEGORY_LABELS separate: it supports all legacy
- * Supabase enum keys when reading historical records, without displaying
- * unsupported new choices in the editor.
+ * Six approved UX categories in Add/Edit Tea.
+ * All twelve Supabase enum keys remain readable in CATEGORY_LABELS;
+ * this UI list never mutates, deletes or recategorises existing records.
  */
 export const UI_CATEGORY_LABELS = Object.freeze({
   black:'Black Tea',
   green:'Green Tea',
-  fruit:'Fruit Infusions',
-  herbal:'Herbal Infusions',
-  white:'White Tea',
-  oolong:'Oolong Tea',
+  fruit:'Fruit',
+  herbal:'Herbal',
   rooibos:'Rooibos',
-  other:'Other Infusions',
+  other:'Other',
 });
 
 export const LEAF_STYLE_LABELS = Object.freeze({
