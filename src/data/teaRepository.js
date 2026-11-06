@@ -122,33 +122,9 @@ function requireTeaIdentity(data) {
   }
 }
 
-const SUPPORTED_CREATE_CATEGORIES = new Set([
-  'black','green','white','oolong','pu_erh','herbal','fruit','rooibos','other',
-]);
-const SUPPORTED_UPDATE_CATEGORIES = new Set([
-  'black','green','white','oolong','herbal','fruit','rooibos','other',
-]);
-const SUPPORTED_CREATE_LEAVES = new Set(['whole','broken','ctc','bag','other']);
-
-/**
- * The live legacy backend does not yet support the complete new schema.
- * In particular update_community_tea forcibly changes leaf_style to other
- * or bag. Never submit an update that silently corrupts the existing tea.
- * This guard can be removed ONLY after the DB team upgrades both RPCs.
- */
-export function assertLegacyWriteIsSafe(data) {
-  const editing = Boolean(data.id);
-  const message = 'The database write API must be updated for these fields. ' +
-    'Nothing has been saved. Please contact the database team.';
-  if (!(editing ? SUPPORTED_UPDATE_CATEGORIES : SUPPORTED_CREATE_CATEGORIES)
-    .has(data.category)) throw new Error(message);
-  if (!data.subcategory ||
-    data.subcategory === 'other' && !data.subcategory_other) throw new Error(message);
-  const leaf = data.type === 'bag' ? 'bag' : data.leafStyle || null;
-  if (!editing && leaf && !SUPPORTED_CREATE_LEAVES.has(leaf)) throw new Error(message);
+function assertSupportedMetadata(data) {
   const old = data.original || null;
-  if (editing && (!old || old.leafStyle !== leaf ||
-    !['bag','other'].includes(leaf))) throw new Error(message);
+  const message = 'The tea’s photo, notes, source, or existing barcode cannot be changed here.';
   const originalPhoto = old?.photoUrl || null;
   const originalInstructions = old?.instructions || null;
   const originalSource = old?.sourceLabel || null;
@@ -156,10 +132,9 @@ export function assertLegacyWriteIsSafe(data) {
     (data.instructions || null) !== originalInstructions ||
     (data.sourceLabel || null) !== originalSource) throw new Error(message);
   // An existing barcode cannot be removed or changed by the legacy RPC.
-  if (editing && old?.code &&
+  if (data.id && old?.code &&
     (old.code.type !== data.code?.type ||
      old.code.value !== data.code?.value)) throw new Error(message);
-  return true;
 }
 
 function normalizeCloudId(id) {
@@ -173,10 +148,11 @@ function normalizeCloudId(id) {
  */
 export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
   requireTeaIdentity(data);
-  assertLegacyWriteIsSafe(data);
+  assertSupportedMetadata(data);
   const id = normalizeCloudId(data.id);
   const payload = {
     action: id ? 'update' : 'create',
+    write_version: 3,
     id,
     brand: data.brand.trim(),
     name: data.name.trim(),

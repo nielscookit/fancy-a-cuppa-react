@@ -6,7 +6,7 @@ import {
   validateTeaForm, teaMatches,
 } from '../src/features/teaModel.js';
 import {
-  normalizeTea, listTeas, assertLegacyWriteIsSafe, saveTea,
+  normalizeTea, listTeas, saveTea,
 } from '../src/data/teaRepository.js';
 
 const prepared = {
@@ -92,33 +92,33 @@ test('catalogue pagination reads beyond 500 results without inventing missing en
   assert.match(requests[1],/offset=500/);
 });
 
-test('legacy RPC guard blocks edits that would overwrite existing leaf style',()=>{
-  const original=normalizeTea(cloudRow());
-  const form={...validateTeaForm(initialTeaForm(original)),original};
-  assert.throws(()=>assertLegacyWriteIsSafe(form),/database write API/);
-  assert.throws(()=>assertLegacyWriteIsSafe({...form,subcategory:'Assam'}),/database write API/);
-  const safeOriginal={...original,subcategory:'Assam',leafStyle:'other'};
-  const safe=validateTeaForm(initialTeaForm(safeOriginal));
-  assert.equal(assertLegacyWriteIsSafe({...safe,original:safeOriginal}),true);
+test('write API accepts optional subtypes and preserves leaf style when editing', async () => {
+  const original = normalizeTea(cloudRow());
+  const form = validateTeaForm(initialTeaForm(original));
+  const fetchImpl = async (_url, request) => {
+    const body = JSON.parse(request.body);
+    assert.equal(body.action, 'update');
+    assert.equal(body.write_version, 3);
+    assert.equal(body.subcategory, form.subcategory);
+    assert.equal(body.leaf_style, original.leafStyle);
+    return {ok:true, json:async () => ({updated:true})};
+  };
+  assert.deepEqual(await saveTea({...form, original}, {fetchImpl}), {updated:true});
 });
 
-test('legacy API rejects new categories, missing subtype and new photo without network write',async()=>{
-  const initial=initialTeaForm();
-  const working={...initial,name:'Test',brand:'Test',
-    subcategory:'Assam',leafStyle:'whole'};
-  let called=false;
-  const forbidden=[
-    {...working,category:'yellow'},
-    {...working,subcategory:''},
-    {...working,photoUrl:'https://example.org/new.jpg'},
-    {...working,leafStyle:'powder'},
-  ];
-  for(const item of forbidden){
-    await assert.rejects(saveTea(validateTeaForm(item),{
-      fetchImpl:()=>{called=true;throw Error('Unexpected database write');},
-    }),/database write API/);
-  }
-  assert.equal(called,false);
+test('write API creates a tea without a subtype and rejects changes to hidden metadata', async () => {
+  const form = validateTeaForm({...initialTeaForm(), name:'Test', brand:'Test', leafStyle:'powder'});
+  const fetchImpl = async (_url, request) => {
+    const body = JSON.parse(request.body);
+    assert.equal(body.action, 'create');
+    assert.equal(body.subcategory, null);
+    assert.equal(body.leaf_style, 'powder');
+    return {ok:true, json:async () => ({id:'test'})};
+  };
+  assert.deepEqual(await saveTea(form, {fetchImpl}), {id:'test'});
+  await assert.rejects(saveTea({...form, photoUrl:'https://example.org/new.jpg'}, {
+    fetchImpl:() => assert.fail('Unexpected database write'),
+  }), /cannot be changed here/);
 });
 
 test('editor exposes the ten approved fields and retains the guarded write path',()=>{

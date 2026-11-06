@@ -9,9 +9,9 @@ import { createTea, updateTea } from '../data/teaRepository.js';
 const fieldSx = {
   '& .MuiFilledInput-root': {
     height:48, borderRadius:'6px',
-    backgroundColor:'rgba(29,29,29,0.07)',border:'3px solid transparent',
+    backgroundColor:'rgba(29,29,29,0.07)',
     '&:hover':{ backgroundColor:'rgba(29,29,29,0.09)' },
-    '&.Mui-focused':{ backgroundColor:'rgba(29,29,29,0.07)',borderColor:'#792b40' },
+    '&.Mui-focused':{ backgroundColor:'rgba(29,29,29,0.09)' },
   },
   '& .MuiFilledInput-input':{fontSize:16,fontWeight:500,py:'10px'},
   '& .MuiSelect-select':{fontSize:16,fontWeight:500,py:'10px !important'},
@@ -46,9 +46,7 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
 }
 
 /**
- * V3 extended schema editor.
- * The existing community-tea endpoint has a narrower write contract;
- * teaRepository rejects any request that could discard new-model fields.
+ * V3 editor for tea identity and preparation.
  */
 export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) {
   const [form,setForm]=useState(()=>{
@@ -125,9 +123,6 @@ export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) 
           <Field label="Temperature (°C, optional)" type="number" value={form.temperature}
             onChange={e=>set('temperature',e.target.value)} />
         </Stack>
-        <Typography sx={{mt:2,fontSize:12,color:'text.secondary'}}>
-          Entries that the current database writer cannot preserve are blocked rather than silently discarded.
-        </Typography>
         <Box className="fac-sheet-editor-actions">
           {error && <Typography role="alert" color="error" sx={{fontSize:13}}>{error}</Typography>}
           <Button variant="contained" type="button" onClick={onCancel} disabled={saving}

@@ -1,5 +1,16 @@
 # Fancy a Cuppa V3 – Backend handoff (2026-11-06)
 
+## Implemented for the V3 editor
+
+Supabase migration `support_v3_tea_form_writes` accepts an omitted subtype,
+all schema categories and supported leaf styles. V3 sends `write_version: 3`
+so edits store the chosen leaf style, including NULL. Existing V2 callers
+retain their leaf-style behavior. Photo references, preparation notes,
+source labels and existing barcodes remain outside the editor's write scope.
+Both RPCs were tested with a temporary record inside a rolled-back transaction.
+
+## Original handoff
+
 **For the Database chat. This file is an engineering request, not a database migration.**
 
 The V3 frontend has been extended to read all fields from the live schema
