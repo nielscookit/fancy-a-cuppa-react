@@ -175,6 +175,12 @@ body {
 .fac-home__action--primary.MuiButton-root.Mui-disabled {
   background:#B9FC69; color:#1B272B; opacity:.65;
 }
+.fac-home__action.MuiButton-root[data-timer-control="playback"] {
+  background:#1B272B; color:#fff;
+}
+.fac-home__action.MuiButton-root[data-timer-control="reset"] {
+  background:#E8E6E3; color:#1B272B;
+}
 @media (max-height:760px) {
   .fac-home__canvas { --image-size: min(100vw, 375px, calc(max(100svh, 560px) - 340px)); }
   .fac-home__tea-stage.timer-kit-stage { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }

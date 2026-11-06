@@ -90,6 +90,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
           disableElevation
           disableRipple
           className="fac-home__action fac-home__action--primary"
+          data-timer-control={inSession && !finished ? 'playback' : undefined}
           onClick={handlePrimary}
           disabled={preload === 'loading'}
         >
@@ -103,6 +104,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
           disableElevation
           disableRipple
           className="fac-home__action fac-home__action--secondary"
+          data-timer-control={inSession ? 'reset' : undefined}
           onClick={inSession ? reset : onTeaAssistant}
         >
           {inSession ? 'Reset' : 'How do you take it?'}
