@@ -16,4 +16,5 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check:safety
+      - run: node scripts/check-timer-kit.mjs
       - run: npm run build
