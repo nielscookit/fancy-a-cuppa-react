@@ -223,7 +223,7 @@ export default function App() {
         </IconButton>
       )}
       <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
-        ModalProps={{ keepMounted:true }}
+        ModalProps={{ keepMounted:true, BackdropProps:{ sx:{backgroundColor:'#fff'} } }}
         PaperProps={{ className:'fac-sheet-paper' }}>
         <Box className="fac-sheet" component="main">
           <Box className="fac-sheet-top" />
