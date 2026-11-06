@@ -6,7 +6,7 @@ const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
 const HOME_IMAGE = import.meta.env.BASE_URL + 'images/home-tea.png';
 
 /**
- * Approved Figma 01 · Home (node 19:47, 375 × 812).
+ * Approved Figma Home (node 152:151, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
 export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, brewDisabled = false }) {
@@ -15,6 +15,7 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, br
       <Box component="section" className="fac-home" aria-label="Home">
       <Box className="fac-home__canvas">
         <img className="fac-home__tea-image" src={HOME_IMAGE} alt="" />
+        <Typography component="output" className="fac-home__countdown" aria-label="Selected brewing time">{minutes}:00</Typography>
         <Box className="fac-home__time-control" aria-label="Brewing time">
           <IconButton
             aria-label="Decrease brewing time by one minute"
@@ -45,7 +46,7 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, br
           className="fac-home__action fac-home__action--primary"
           onClick={onBrew}
           disabled={brewDisabled}
-          aria-label={brewDisabled ? 'Preparing tea timer videos' : 'Fancy a Cuppa?'}
+          aria-label={brewDisabled ? 'Preparing tea timer videos' : 'Fancy a Cuppa'}
         >
           Fancy a Cuppa
         </Button>
