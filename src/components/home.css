@@ -175,7 +175,7 @@ body {
 }
 .fac-home__time-control { top:auto; bottom:212px; gap:16px; }
 .fac-home__time-value.MuiTypography-root {
-  font-size:34px; font-weight:400; min-width:119px; color:#1B272B;
+  font-size:34px; font-weight:400; min-width:103px; color:#1B272B;
 }
 .fac-home__time-button img {
   filter: none;
