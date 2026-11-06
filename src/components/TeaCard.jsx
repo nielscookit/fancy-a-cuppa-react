@@ -8,7 +8,7 @@ import './tea-detail.css';
 const iconBase = import.meta.env.BASE_URL + 'figma/';
 
 /** Reusable Figma Tea Card with centralised category imagery. */
-export default function TeaCard({ tea, onEdit, onClose }) {
+export default function TeaCard({ tea, onEdit, onClose, pinned = false, onTogglePin }) {
   const [failedImageUrl,setFailedImageUrl] = useState(null);
   if (!tea) return null;
 
@@ -31,6 +31,10 @@ export default function TeaCard({ tea, onEdit, onClose }) {
           <Typography className="fac-tea-card__brand">{tea.brand}</Typography>
         </div>
         <div className="fac-tea-card__actions">
+          <IconButton aria-label={pinned ? "Unpin tea" : "Pin tea"} aria-pressed={pinned}
+            className="fac-tea-card__icon" onClick={onTogglePin} disableRipple>
+            <span aria-hidden="true" style={{fontSize:24,color:"#1B272B"}}>{pinned ? "★" : "☆"}</span>
+          </IconButton>
           <IconButton aria-label="Edit tea" className="fac-tea-card__icon" onClick={onEdit} disableRipple>
             <img src={iconBase+'tea-edit.svg'} width="48" height="48" alt="" />
           </IconButton>
