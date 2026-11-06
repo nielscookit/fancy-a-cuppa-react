@@ -8,7 +8,7 @@ const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
  * Approved Figma 01 · Home (node 19:47, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, assistantActive = false, brewDisabled = false, assistantButtonRef }) {
+export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, brewDisabled = false }) {
   return (
     <>
       <Box component="section" className="fac-home" aria-label="Home">
@@ -45,20 +45,16 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, as
           disabled={brewDisabled}
           aria-label={brewDisabled ? 'Preparing tea timer videos' : 'Fancy a Cuppa?'}
         >
-          Fancy a Cuppa?
+          Fancy a Cuppa
         </Button>
       </Box>
       </Box>
-      {/* Ordinary long-page content: only button presses animate scrolling.
-          The button scrolls out of view naturally when the user swipes. */}
-      <Box ref={assistantButtonRef} className="fac-home__assistant-slot">
+      <Box className="fac-home__assistant-slot">
         <Button
           variant="contained"
           disableElevation
           disableRipple
-          className={'fac-home__action fac-home__action--secondary' +
-            (assistantActive ? ' is-active' : '')}
-          aria-pressed={assistantActive}
+          className="fac-home__action fac-home__action--secondary"
           onClick={onTeaAssistant}
         >
           How do you take it?
