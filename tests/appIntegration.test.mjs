@@ -9,7 +9,7 @@ test('search, dosage, editor and scanner remain connected',()=>{
   assert.match(app,/TeaEditor/);
   assert.match(app,/TeaDetail/);
   assert.match(app,/scanBarcodePhoto/);
-  assert.match(app,/Add New Tea/);
+  assert.match(app,/ADD NEW TEA/);
   assert.match(detail,/calculateDose/);
 });
 test('one sheet: search to detail to search; full close to Home',()=>{

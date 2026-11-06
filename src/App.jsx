@@ -274,7 +274,7 @@ export default function App() {
               </Box>
               <Box className="fac-sheet-footer">
                 <Button variant="contained" fullWidth onClick={openAdd} className="fac-sheet-add">
-                  Add New Tea
+                  ADD NEW TEA
                 </Button>
               </Box>
             </>
@@ -294,14 +294,12 @@ export default function App() {
             />
           )}
           {(mode === 'add' || mode === 'edit') && (
-            <Box className="fac-sheet-scroll fac-sheet-scroll--editor" key={mode}>
-              {message && <Typography role="status" sx={{px:2}}>{message}</Typography>}
-              <TeaEditor key={(mode === 'edit' ? selected?.id : 'new') || 'new'}
-                tea={mode === 'edit' ? selected : null}
-                barcode={scannedCode}
-                onCancel={previousView}
-                onSaved={formSaved} />
-            </Box>
+            <TeaEditor key={mode === 'edit' ? selected?.id : 'new'}
+              tea={mode === 'edit' ? selected : null}
+              barcode={scannedCode}
+              message={message}
+              onCancel={previousView}
+              onSaved={formSaved} />
           )}
         </Box>
       </Drawer>

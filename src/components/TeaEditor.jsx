@@ -50,7 +50,7 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
  * The existing community-tea endpoint has a narrower write contract;
  * teaRepository rejects any request that could discard new-model fields.
  */
-export default function TeaEditor({ tea, barcode, onCancel, onSaved }) {
+export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) {
   const [form,setForm]=useState(()=>{
     const next=initialTeaForm(tea);
     if(!tea&&barcode){
@@ -94,49 +94,49 @@ export default function TeaEditor({ tea, barcode, onCancel, onSaved }) {
   const suggestions=TEA_VARIETIES[form.category]||[];
   const subtype=form.subcategory==='other' ? form.subcategory_other : form.subcategory;
   return (
-    <Box component="form" onSubmit={save} noValidate sx={{mt:2}}>
-      <Typography component="h2" sx={{fontSize:20,fontWeight:600,mb:2}}>
-        {tea?'Edit tea':'Add new tea'}
-      </Typography>
-      <Stack gap={2}>
-        <Field label="Tea name" value={form.name} onChange={e=>set('name',e.target.value)} required />
-        <Field label="Manufacturer" value={form.brand} onChange={e=>set('brand',e.target.value)} required />
-        <Field label="Category" value={getUiTeaCategory(form.category)} onChange={e=>changeCategory(e.target.value)}
-          choices={cats} required />
-        <Field label="Tea subtype (optional)" value={subtype}
-          onChange={e=>setForm(previous=>({...previous,
-            subcategory: previous.subcategory === 'other' && e.target.value ? 'other' : e.target.value,
-            subcategory_other: (previous.subcategory === 'other' || e.target.value === 'other')
-              ? e.target.value : '',
-          }))}
-          helper={suggestions.length?'Examples: '+suggestions.join(', '):'Free text; leave blank if unknown.'} />
-        <Field label="Leaf style (optional)" value={form.leafStyle||''}
-          onChange={e=>set('leafStyle',e.target.value)} choices={leaves} />
-        <Field label="Reference quantity" type="number" value={form.qty}
-          onChange={e=>set('qty',e.target.value)} required />
-        <Field label="Dosage unit" value={form.unit} onChange={e=>changeUnit(e.target.value)}
-          choices={units} required />
-        <Field label="Reference water (ml)" type="number" value={form.base}
-          onChange={e=>set('base',e.target.value)} required />
-        <Field label="Brewing time (minutes)" type="number" value={form.mins}
-          onChange={e=>set('mins',e.target.value)} required />
-        <Field label="Temperature (°C, optional)" type="number" value={form.temperature}
-          onChange={e=>set('temperature',e.target.value)} />
-      </Stack>
-      <Typography sx={{mt:2,fontSize:12,color:'text.secondary'}}>
-        Entries that the current database writer cannot preserve are blocked rather than silently discarded.
-      </Typography>
-      {error&&<Typography role="alert" color="error" sx={{mt:2,fontSize:13}}>{error}</Typography>}
-      <Stack direction="row" gap={1} sx={{mt:3}}>
+    <Box component="form" onSubmit={save} noValidate className="fac-sheet-editor">
+      <Box className="fac-sheet-scroll fac-sheet-scroll--editor">
+        {message && <Typography role="status">{message}</Typography>}
+        <Typography component="h2" sx={{fontSize:20,fontWeight:600,mb:2}}>
+          {tea?'Edit tea':'Add new tea'}
+        </Typography>
+        <Stack gap={2}>
+          <Field label="Tea name" value={form.name} onChange={e=>set('name',e.target.value)} required />
+          <Field label="Manufacturer" value={form.brand} onChange={e=>set('brand',e.target.value)} required />
+          <Field label="Category" value={getUiTeaCategory(form.category)} onChange={e=>changeCategory(e.target.value)}
+            choices={cats} required />
+          <Field label="Tea subtype (optional)" value={subtype}
+            onChange={e=>setForm(previous=>({...previous,
+              subcategory: previous.subcategory === 'other' && e.target.value ? 'other' : e.target.value,
+              subcategory_other: (previous.subcategory === 'other' || e.target.value === 'other')
+                ? e.target.value : '',
+            }))}
+            helper={suggestions.length?'Examples: '+suggestions.join(', '):'Free text; leave blank if unknown.'} />
+          <Field label="Leaf style (optional)" value={form.leafStyle||''}
+            onChange={e=>set('leafStyle',e.target.value)} choices={leaves} />
+          <Field label="Reference quantity" type="number" value={form.qty}
+            onChange={e=>set('qty',e.target.value)} required />
+          <Field label="Dosage unit" value={form.unit} onChange={e=>changeUnit(e.target.value)}
+            choices={units} required />
+          <Field label="Reference water (ml)" type="number" value={form.base}
+            onChange={e=>set('base',e.target.value)} required />
+          <Field label="Brewing time (minutes)" type="number" value={form.mins}
+            onChange={e=>set('mins',e.target.value)} required />
+          <Field label="Temperature (°C, optional)" type="number" value={form.temperature}
+            onChange={e=>set('temperature',e.target.value)} />
+        </Stack>
+        <Typography sx={{mt:2,fontSize:12,color:'text.secondary'}}>
+          Entries that the current database writer cannot preserve are blocked rather than silently discarded.
+        </Typography>
+      </Box>
+      <Box className="fac-sheet-footer fac-sheet-editor-actions">
+        {error && <Typography role="alert" color="error" sx={{fontSize:13}}>{error}</Typography>}
         <Button variant="contained" type="button" onClick={onCancel} disabled={saving}
-          sx={{height:66,borderRadius:'100px',fontSize:16,bgcolor:'#eeeeec',color:'#323234',
-            '&:hover':{bgcolor:'#eeeeec'}}}>CANCEL</Button>
-        <Button variant="contained" type="submit" disabled={saving}
-          sx={{height:66,borderRadius:'100px',fontSize:16,bgcolor:'#782b40',
-            '&:hover':{bgcolor:'#782b40'}}}>
+          className="fac-sheet-add fac-sheet-editor-cancel">CANCEL</Button>
+        <Button variant="contained" type="submit" disabled={saving} className="fac-sheet-add">
           {saving?'SAVING…':'SAVE'}
         </Button>
-      </Stack>
+      </Box>
     </Box>
   );
 }
