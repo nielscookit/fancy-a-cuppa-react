@@ -10,9 +10,10 @@ permissions:
   pages: write
   id-token: write
 
+# Do not abort a Pages deployment mid-flight when a new commit arrives.
 concurrency:
   group: "v3-github-pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -44,6 +45,19 @@ jobs:
         run: npm run build
       - name: Verify independent Pages routes and media
         run: npm run verify:pages
+      # Temporary, precisely scoped recovery for the Pages deployment that
+      # remained active after the failed 2026-11-05 publishing attempt.
+      # The workflow's existing pages:write GitHub token is used here.
+      - name: Release stale Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Attempting to release stale Pages deployment 5933214a..."
+          if gh api -X POST "repos/${{ github.repository }}/pages/deployments/5933214a40c4a23ee762e4bdf32fe6d94deb1202/cancel" --silent; then
+            echo "Stale Pages deployment cancellation acknowledged."
+          else
+            echo "::warning::Pages cancellation request was not accepted; deployment will be attempted normally."
+          fi
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - name: Upload artifact
