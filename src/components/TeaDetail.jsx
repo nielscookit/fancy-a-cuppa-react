@@ -25,7 +25,7 @@ function VolumeOption({ value, current, onChange }) {
 /** Node 123:144 — selected tea preparation, mounted in the continuous Home page. */
 export default function TeaDetail({
   tea, volume, onVolumeChange, customMl, onCustomChange,
-  minutes, onMinuteStep, onEdit, onClose, onBrew, brewDisabled,
+  minutes, onMinuteStep, onEdit, onClose, pinned, onTogglePin, onBrew, brewDisabled,
 }) {
   if (!tea) return null;
   const water = volume === null ? Number(customMl) : volume;
@@ -33,7 +33,7 @@ export default function TeaDetail({
   const dose = validWater ? calculateDose(tea, water) : null;
   return (
     <section className="fac-tea-detail" aria-label="Tea preparation">
-      <TeaCard tea={tea} onEdit={onEdit} onClose={onClose} />
+      <TeaCard tea={tea} onEdit={onEdit} onClose={onClose} pinned={pinned} onTogglePin={onTogglePin} />
 
       <div className="fac-tea-volume" role="group" aria-label="Water quantity">
         {VOLUME_OPTIONS.map(value => (

@@ -1,0 +1,36 @@
+/* One bottom drawer, independent scroll areas for Search and Detail. */
+.fac-sheet-paper.MuiDrawer-paper {
+  height: calc(100dvh - 80px); max-height: calc(100dvh - 80px);
+  border-radius: 30px 30px 0 0; overflow: hidden;
+  background: #fff; box-shadow: 0 -1px 3px rgba(0,0,0,.14);
+}
+.fac-sheet { display:flex; flex-direction:column; height:100%; min-height:0; color:#1B272B; }
+.fac-sheet-top { height:32px; min-height:32px; flex-shrink:0; position:relative; }
+.fac-sheet-close.MuiIconButton-root { position:absolute; right:8px; top:0; width:48px; height:48px;
+  z-index:2; color:#1B272B; font-size:32px; }
+.fac-sheet-search { flex-shrink:0; padding-top:0; }
+.fac-sheet-search .fac-tea-search { margin:0 8px 8px; background:#F3F2F0; }
+.fac-sheet-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; }
+.fac-sheet-footer { flex-shrink:0; padding:12px 8px max(48px, env(safe-area-inset-bottom)); background:#fff; }
+.fac-sheet-add.MuiButton-root { height:66px; border-radius:100px; background:#1B272B; color:#fff;
+  font-family:"Roboto Mono",monospace; font-size:16px; font-weight:600; box-shadow:none; }
+.fac-sheet-add.MuiButton-root:hover { background:#1B272B; box-shadow:none; }
+.fac-sheet .fac-tea-catalog { margin:0 0 8px; }
+.fac-sheet .fac-tea-catalog__title.MuiTypography-root { margin:12px 12px 8px; font-size:14px; font-weight:500; }
+.fac-sheet .fac-tea-catalog__list { border-radius:0; }
+.fac-sheet .fac-tea-catalog__item.MuiButton-root { min-height:72px; border-bottom:1px solid #E8E6E3;
+  padding:12px 16px 12px 72px; font-family:"Roboto Mono",monospace; display:flex; }
+.fac-tea-row-arrow { font-size:28px; font-weight:400; margin-left:12px; }
+.fac-sheet-back { padding:0 8px; }
+.fac-sheet-back .MuiButton-root { color:#1B272B; text-transform:none; }
+.fac-sheet-scroll--detail .fac-tea-detail { min-height:0; border-radius:0; box-shadow:none; }
+.fac-sheet-scroll--detail .fac-tea-card { border-radius:0; }
+.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root { background:#B9FC69; color:#1B272B; }
+.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root:hover { background:#B9FC69; }
+.fac-sheet-scroll--detail .fac-tea-card__tag { background:rgba(27,39,43,.8); color:#fff; }
+.fac-sheet-scroll--editor { padding:0 8px max(32px,env(safe-area-inset-bottom)); }
+@media (max-height:600px) {
+  .fac-sheet-paper.MuiDrawer-paper { height:calc(100dvh - 16px); max-height:calc(100dvh - 16px); }
+  .fac-sheet-footer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+}

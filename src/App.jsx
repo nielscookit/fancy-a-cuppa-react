@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, Paper, Typography } from '@mui/material';
+import { Box, Button, Drawer, IconButton, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
   teaMatches, recentTeaIds,
@@ -13,10 +13,9 @@ import './components/tea-detail.css';
 import HomeScreen from './components/HomeScreen.jsx';
 import QuickTimerView from './components/QuickTimerView.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
-import { v3StorageKey } from './storage.js';
 import Snackbar from '@mui/material/Snackbar';
 import { flushSync } from 'react-dom';
-import { animateScrollTo } from './features/scrollMotion.js';
+import './components/tea-sheet.css';
 
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
 function readRecents() {
@@ -47,92 +46,25 @@ export default function App() {
   const [quickTimerOpen, setQuickTimerOpen] = useState(false);
   const [quickVideoStatus, setQuickVideoStatus] = useState('loading');
   const quickTimerRef = useRef(null);
-  const assistantSectionRef = useRef(null);
-  const assistantButtonRef = useRef(null);
-  const [assistantActive, setAssistantActive] = useState(false);
-  const [assistantVisible, setAssistantVisible] = useState(false);
-  const assistantHasLeftHomeRef = useRef(false);
-  const assistantReturningHomeRef = useRef(false);
-  const scrollingRef = useRef(null);
-  const pendingScrollFrameRef = useRef(null);
-
-  // Cancel scheduled/programmatic scrolling if this screen is unmounted.
-  useEffect(() => () => {
-    if (pendingScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(pendingScrollFrameRef.current);
-    }
-    scrollingRef.current?.();
-  }, []);
-
-
-  // The assistant button is in normal document flow. Clicking it selects
-  // immediately. Reaching the very top by hand (or by return animation)
-  // restores the default state and hides the search/detail section.
-  useEffect(() => {
-    saveQuickMinutes(quickMinutes);
-  }, [quickMinutes]);
-
-  useEffect(() => {
-    if (!assistantVisible) return undefined;
-    function onPageScroll() {
-      const y = Math.max(0, window.scrollY);
-      if (y >= 24) assistantHasLeftHomeRef.current = true;
-      if (y > 2 ||
-          !(assistantHasLeftHomeRef.current || assistantReturningHomeRef.current)) return;
-
-      assistantHasLeftHomeRef.current = false;
-      assistantReturningHomeRef.current = false;
-      setAssistantActive(false);
-      setAssistantVisible(false);
-      setMode('closed');
-    }
-    window.addEventListener('scroll', onPageScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onPageScroll);
-  }, [assistantVisible]);
-
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    try { const value = JSON.parse(localStorage.getItem('fac-v3-pinned-teas') || '[]'); return Array.isArray(value) ? value.filter(id => typeof id === 'string') : []; }
+    catch { return []; }
+  });
+  const togglePin = (id) => setPinnedIds(previous => {
+    const next = previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id];
+    try { localStorage.setItem('fac-v3-pinned-teas', JSON.stringify(next)); } catch { /* storage unavailable */ }
+    return next;
+  });
   const showTeaAssistant = () => {
-    const nextActive = !assistantActive;
-
-    // Button state changes immediately on press, before any scrolling.
-    setAssistantActive(nextActive);
-
-    // A second press may reverse the motion while the first is in progress.
-    if (pendingScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(pendingScrollFrameRef.current);
-      pendingScrollFrameRef.current = null;
-    }
-    scrollingRef.current?.();
-    scrollingRef.current = null;
-
-    if (nextActive) {
-      assistantReturningHomeRef.current = false;
-      assistantHasLeftHomeRef.current = false;
-      setAssistantVisible(true);
-      setMode('search');
-      setQuery('');
-    } else {
-      assistantReturningHomeRef.current = true;
-      if (window.scrollY <= 2) {
-        // Clicking twice before leaving Home should not leave a hidden
-        // search section mounted behind the Home screen.
-        assistantHasLeftHomeRef.current = false;
-        assistantReturningHomeRef.current = false;
-        setAssistantVisible(false);
-        setMode('closed');
-        return;
-      }
-    }
-
-    // Keep the approved cubic ease-out. The red Home button ends at y=0
-    // when the assistant button is positioned at 8px instead of 12px.
-    pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
-      pendingScrollFrameRef.current = null;
-      const button = assistantButtonRef.current;
-      const targetY = nextActive && button
-        ? Math.max(0, window.scrollY + button.getBoundingClientRect().top - 8)
-        : 0;
-      scrollingRef.current = animateScrollTo(targetY);
-    });
+    setMode('search');
+    setQuery('');
+    setScanError('');
+    setMessage('');
+  };
+  const closeSheet = () => {
+    setMode('closed');
+    setSelectedId(null);
+    setScanError('');
   };
   const openTimerWithSeconds = (seconds) => {
     if (quickVideoStatus === 'error') {
@@ -155,27 +87,16 @@ export default function App() {
     }
   };
   const startQuickTimer = () => openTimerWithSeconds(quickMinutes * 60);
-  const startDetailTimer = () => openTimerWithSeconds(detailMinutes * 60);
+  const startDetailTimer = () => {
+    if (quickVideoStatus === 'ready') setMode('closed');
+    openTimerWithSeconds(detailMinutes * 60);
+  };
 
   const closeQuickTimer = () => {
-    // RESET must return to HOME, even when BREW was started from Tea Detail.
-    // Media/audio reset has already run synchronously inside QuickTimerView.
-    if (pendingScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(pendingScrollFrameRef.current);
-      pendingScrollFrameRef.current = null;
-    }
-    scrollingRef.current?.();
-    scrollingRef.current = null;
-    window.scrollTo(0, 0);
-    assistantHasLeftHomeRef.current = false;
-    assistantReturningHomeRef.current = false;
-    setAssistantActive(false);
-    setAssistantVisible(false);
-    setMode('closed');
+    closeSheet();
     setQuickTimerOpen(false);
   };
   const photoRef = useRef(null);
-  const searchRef = useRef(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -190,12 +111,12 @@ export default function App() {
   const teas = catalog.teas;
   const selected = teas.find(tea => tea.id === selectedId) || null;
   const results = useMemo(() => teas.filter(tea => teaMatches(tea,query)), [teas,query]);
-  const recents = recentIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean);
+  const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean).filter(tea => teaMatches(tea, query));
+  const unpinnedResults = results.filter(tea => !pinnedIds.includes(tea.id));
   function chooseTea(tea) {
     setSelectedId(tea.id);
     setVolume(250);
     setDetailMinutes(initialDetailMinutes(tea));
-    setQuery('');
     setScanError('');
     setMessage('');
     setMode('prep');
@@ -268,121 +189,104 @@ export default function App() {
     setMessage('');
     setMode(selected ? 'prep' : 'search');
   };
+  const sheetOpen = mode !== 'closed';
+  const isSearch = mode === 'search';
   const renderTeaRow = tea => (
-    <Box key={tea.id} sx={{ borderBottom: '1px solid #eeeeec' }}>
-      <Button type="button" fullWidth
-        className="fac-tea-catalog__item"
-        onClick={() => chooseTea(tea)}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize:16,fontWeight:600 }}>{tea.rawName}</Typography>
-          <Typography sx={{ fontSize:12,color:'text.secondary' }}>{tea.brand}</Typography>
-        </Box>
-      </Button>
-    </Box>
+    <Button key={tea.id} type="button" fullWidth className="fac-tea-catalog__item"
+      onClick={() => chooseTea(tea)}>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontSize:16, fontWeight:700, textTransform:'none' }}>{tea.rawName}</Typography>
+        <Typography sx={{ fontSize:16, fontWeight:400, textTransform:'none' }}>{tea.brand}</Typography>
+      </Box>
+      <span aria-hidden="true" className="fac-tea-row-arrow">›</span>
+    </Button>
   );
-
   return (
     <>
-      {/* The inactive, preloaded QuickTimer is a fixed layer below Home.
-          iOS rubber-band scrolling can displace document content and expose
-          that layer. This viewport-fixed opaque shield covers it without
-          hiding videos via opacity/visibility, which harmed Safari playback. */}
       <Box className="fac-viewport-shield" aria-hidden="true" />
-      {/* One opaque, scrolling document above the fixed shield. */}
-      <Box className="fac-app-page" sx={{
-        position: 'relative',
-        zIndex: 2,
-        minHeight: '100svh',
-        bgcolor: 'background.default',
-      }}>
-        {/* Phase 1A Home and the assistant are one continuous long page. */}
+      <Box className="fac-app-page" sx={{ position:'relative', zIndex:2, minHeight:'100svh', bgcolor:'#fff' }}>
         <HomeScreen
           minutes={quickMinutes}
-          onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous, delta))}
+          onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous,delta))}
           onBrew={startQuickTimer}
           brewDisabled={quickVideoStatus === 'loading'}
           onTeaAssistant={showTeaAssistant}
-          assistantActive={assistantActive}
-          assistantButtonRef={assistantButtonRef}
         />
-        {assistantVisible && (
-        <Box ref={assistantSectionRef} component="main" className="fac-tea-assistant">
-          {(mode !== 'add' && mode !== 'edit') && (
+      </Box>
+      <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
+        ModalProps={{ keepMounted:true }}
+        PaperProps={{ className:'fac-sheet-paper' }}>
+        <Box className="fac-sheet" component="main">
+          <Box className="fac-sheet-top">
+            <IconButton onClick={closeSheet} aria-label="Close tea assistant" className="fac-sheet-close">
+              <span aria-hidden="true">×</span>
+            </IconButton>
+          </Box>
+          {(mode === 'search' || mode === 'prep') && (
             <>
-              <TeaSearchBar
-                value={mode === 'search' ? query : ''}
-                onChange={value => { setQuery(value); setMode('search'); }}
-                onFocus={() => { if (mode !== 'search') openSearch(); }}
-                onScan={() => photoRef.current?.click()}
-                photoRef={photoRef}
-                scanning={scannerBusy}
-                onPhoto={scanPhoto}
-              />
-              {scannerBusy && <Typography role="status" sx={{fontSize:12,mx:2,mb:1}}>
-                Reading barcode…
-              </Typography>}
-              {scanError && <Typography role="alert" color="error" sx={{fontSize:12,mx:2,mb:1}}>
-                {scanError}
-              </Typography>}
-
-              {mode === 'search' && (
-                <Box className="fac-tea-catalog">
-                  {message && <Typography role="status" sx={{fontSize:13,mb:1}}>{message}</Typography>}
-                  {!query.trim() && recents.length > 0 && (
-                    <>
-                      <Typography component="h2" className="fac-tea-catalog__title">
-                        Recently searched
-                      </Typography>
-                      <Paper variant="outlined" className="fac-tea-catalog__list">
-                        {recents.map(renderTeaRow)}
-                      </Paper>
-                    </>
-                  )}
-                  <Typography component="h2" className="fac-tea-catalog__title">
-                    {query.trim() ? 'Search results' : 'Tea catalogue'}
-                  </Typography>
-                  {catalog.status === 'loading' && <Typography sx={{fontSize:14}}>
-                    Loading tea catalogue…
-                  </Typography>}
-                  {catalog.status === 'error' && <Typography role="alert" color="error">
-                    {catalog.error}
-                  </Typography>}
-                  {catalog.status === 'ready' && results.length === 0 &&
-                    <Typography sx={{fontSize:14}}>No matching tea found.</Typography>}
-                  {results.length > 0 && (
-                    <Paper variant="outlined" className="fac-tea-catalog__list">
-                      {results.map(renderTeaRow)}
-                    </Paper>
-                  )}
-                  <Button variant="contained" fullWidth onClick={openAdd}
-                    sx={{
-                      mt:2,height:66,borderRadius:'100px',bgcolor:'#323234',
-                      fontWeight:600,fontSize:16,
-                      '&:hover':{bgcolor:'#323234'},
-                    }}>
-                    ADD NEW TEA
-                  </Button>
-                </Box>
-              )}
-              {mode === 'prep' && selected && (
-                <TeaDetail
-                  tea={selected}
-                  volume={volume} onVolumeChange={setVolume}
-                  customMl={customMl} onCustomChange={setCustomMl}
-                  minutes={detailMinutes}
-                  onMinuteStep={step => setDetailMinutes(previous =>
-                    stepQuickMinutes(previous,step))}
-                  onEdit={() => setMode('edit')}
-                  onClose={() => { setSelectedId(null);setMode('search'); }}
-                  onBrew={startDetailTimer}
-                  brewDisabled={quickVideoStatus !== 'ready'}
+              <Box className="fac-sheet-search">
+                <TeaSearchBar
+                  value={isSearch ? query : ''}
+                  onChange={value => { setQuery(value); setMode('search'); }}
+                  onFocus={() => { if (!isSearch) openSearch(); }}
+                  onScan={() => photoRef.current?.click()}
+                  photoRef={photoRef}
+                  scanning={scannerBusy}
+                  onPhoto={scanPhoto}
                 />
-              )}
+              </Box>
+              {scannerBusy && <Typography role="status" sx={{px:2}}>Reading barcode…</Typography>}
+              {scanError && <Typography role="alert" color="error" sx={{px:2}}>{scanError}</Typography>}
             </>
           )}
+          {isSearch && (
+            <>
+              <Box className="fac-sheet-scroll" key="search">
+                <Box className="fac-tea-catalog">
+                  {message && <Typography role="status">{message}</Typography>}
+                  {pinned.length > 0 && (
+                    <>
+                      <Typography component="h2" className="fac-tea-catalog__title">Pinned Teas</Typography>
+                      <Box className="fac-tea-catalog__list">{pinned.map(renderTeaRow)}</Box>
+                    </>
+                  )}
+                  <Typography component="h2" className="fac-tea-catalog__title">Search Results</Typography>
+                  {catalog.status === 'loading' && <Typography>Loading tea catalogue…</Typography>}
+                  {catalog.status === 'error' && <Typography role="alert" color="error">{catalog.error}</Typography>}
+                  {catalog.status === 'ready' && unpinnedResults.length === 0 && pinned.length === 0 && <Typography>No matching tea found.</Typography>}
+                  <Box className="fac-tea-catalog__list">{unpinnedResults.map(renderTeaRow)}</Box>
+                </Box>
+              </Box>
+              <Box className="fac-sheet-footer">
+                <Button variant="contained" fullWidth onClick={openAdd} className="fac-sheet-add">
+                  Add New Tea
+                </Button>
+              </Box>
+            </>
+          )}
+          {mode === 'prep' && selected && (
+            <Box className="fac-sheet-scroll fac-sheet-scroll--detail" key="detail">
+              <Box className="fac-sheet-back">
+                <Button onClick={openSearch} type="button">‹ Back to search</Button>
+              </Box>
+              <TeaDetail
+                tea={selected}
+                volume={volume} onVolumeChange={setVolume}
+                customMl={customMl} onCustomChange={setCustomMl}
+                minutes={detailMinutes}
+                onMinuteStep={step => setDetailMinutes(previous => stepQuickMinutes(previous,step))}
+                onEdit={() => setMode('edit')}
+                onClose={openSearch}
+                pinned={pinnedIds.includes(selected.id)}
+                onTogglePin={() => togglePin(selected.id)}
+                onBrew={startDetailTimer}
+                brewDisabled={quickVideoStatus !== 'ready'}
+              />
+            </Box>
+          )}
           {(mode === 'add' || mode === 'edit') && (
-            <Box sx={{px:2,pb:2}}>
-              {message && <Typography role="status" sx={{fontSize:13,mt:2}}>{message}</Typography>}
+            <Box className="fac-sheet-scroll fac-sheet-scroll--editor" key={mode}>
+              {message && <Typography role="status" sx={{px:2}}>{message}</Typography>}
               <TeaEditor key={(mode === 'edit' ? selected?.id : 'new') || 'new'}
                 tea={mode === 'edit' ? selected : null}
                 barcode={scannedCode}
@@ -391,24 +295,12 @@ export default function App() {
             </Box>
           )}
         </Box>
-        )}
-      </Box>
-      {/* The media session stays mounted and preloaded. The opaque page layer
-          completely masks its inactive UI; the active overlay rises above it
-          synchronously in the original Home tap. */}
-      <QuickTimerView
-        ref={quickTimerRef}
-        active={quickTimerOpen}
-        onClose={closeQuickTimer}
-        onPreloadChange={setQuickVideoStatus}
-      />
-      <Snackbar
-        open={Boolean(quickNotice)}
-        autoHideDuration={4200}
-        onClose={() => setQuickNotice('')}
-        message={quickNotice}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      />
+      </Drawer>
+      <QuickTimerView ref={quickTimerRef} active={quickTimerOpen}
+        onClose={closeQuickTimer} onPreloadChange={setQuickVideoStatus} />
+      <Snackbar open={Boolean(quickNotice)} autoHideDuration={4200}
+        onClose={() => setQuickNotice('')} message={quickNotice}
+        anchorOrigin={{vertical:'top',horizontal:'center'}} />
     </>
   );
 }
