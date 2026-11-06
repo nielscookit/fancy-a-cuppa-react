@@ -3,7 +3,7 @@ export const CATEGORY_ENGLISH = Object.freeze({
   black:'BLACK TEA',green:'GREEN TEA',white:'WHITE TEA',
   oolong:'OOLONG',yellow:'YELLOW TEA',dark:'DARK TEA',
   pu_erh:'PU-ERH TEA',mate:'MATÉ',
-  fruit:'FRUIT TEA',herbal:'HERBAL TEA',
+  fruit:'FRUIT INFUSIONS',herbal:'HERBAL INFUSIONS',
   rooibos:'ROOIBOS',other:'OTHER INFUSIONS',
 });
 
