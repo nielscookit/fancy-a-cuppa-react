@@ -26,6 +26,7 @@
   font-size:14px; line-height:20px; font-weight:500; color:#1B272B;
 }
 .fac-sheet .fac-tea-catalog__list { box-shadow:none; border:0; border-radius:0; }
+.fac-sheet .fac-tea-catalog__list + .fac-tea-catalog__title.MuiTypography-root { margin-top:15px; }
 .fac-sheet .fac-tea-catalog__item.MuiButton-root {
   box-sizing:border-box; height:72px; min-height:72px; padding:0 12px; gap:12px;
   display:flex; flex-direction:row; justify-content:flex-start; align-items:center;
