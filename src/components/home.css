@@ -71,8 +71,8 @@
 }
 .fac-home__action--primary.MuiButton-root {
   bottom: 82px;
-  color: #ffffff;
-  background-color: #782b40;
+  color: #1B272B;
+  background-color: #B9FC69;
 }
 .fac-home__action--primary.MuiButton-root:hover {
   background-color: #782b40;
@@ -80,8 +80,8 @@
 }
 .fac-home__action--secondary.MuiButton-root {
   bottom: 8px;
-  color: #323234;
-  background-color: #eeeeec;
+  color: #ffffff;
+  background-color: #1B272B;
 }
 .fac-home__action--secondary.MuiButton-root:hover {
   background-color: #eeeeec;
