@@ -19,6 +19,14 @@ export const UI_CATEGORY_LABELS = Object.freeze({
   other:'Other',
 });
 
+/** Present legacy/unknown Supabase categories as Other without rewriting
+ * the original category value in the stored tea or editor form.
+ */
+export function getUiTeaCategory(category) {
+  return Object.prototype.hasOwnProperty.call(UI_CATEGORY_LABELS, category)
+    ? category : 'other';
+}
+
 export const LEAF_STYLE_LABELS = Object.freeze({
   whole:'Whole leaf', broken:'Broken leaf', ctc:'CTC',
   fannings_dust:'Fannings / dust', powder:'Powder',
@@ -75,6 +83,7 @@ export function teaMatches(tea,query) {
     tea.subcategory,tea.subcategory_other,tea.type,
     tea.leafStyle,LEAF_STYLE_LABELS[tea.leafStyle],
     CATEGORY_LABELS[tea.category],CATEGORY_ALIASES[tea.category],
+    getUiTeaCategory(tea.category),UI_CATEGORY_LABELS[getUiTeaCategory(tea.category)],
     tea.code?.value,...(tea.codes||[]).map(c=>c.value),
     tea.type==='bag'?'tea bag teebeutel':'loose tea loser tee',
   ].join(' '));

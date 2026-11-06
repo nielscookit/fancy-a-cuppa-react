@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  CATEGORY_LABELS, UI_CATEGORY_LABELS, LEAF_STYLE_LABELS, initialTeaForm,
+  CATEGORY_LABELS, UI_CATEGORY_LABELS, getUiTeaCategory, LEAF_STYLE_LABELS, initialTeaForm,
   validateTeaForm, teaMatches,
 } from '../src/features/teaModel.js';
 import {
@@ -153,4 +153,31 @@ test('tea editor offers exactly the six approved categories',()=>{
     assert.ok(!(legacy in UI_CATEGORY_LABELS),
       'No extra category choices in Add/Edit Tea: '+legacy);
   }
+});
+
+test('all six non-selected Supabase keys are represented under Other in the UI',()=>{
+  for (const category of ['white','oolong','yellow','dark','pu_erh','mate']) {
+    assert.equal(getUiTeaCategory(category),'other');
+    const tea=normalizeTea(cloudRow(77,{category}));
+    assert.ok(teaMatches(tea,'Other'), 'Other search must include '+category);
+    assert.ok(teaMatches(tea,category), 'Underlying category remains searchable');
+    assert.equal(tea.category,category, 'Reading must not rewrite Supabase data');
+    assert.equal(initialTeaForm(tea).category,category, 'Editing retains original raw category');
+  }
+  for (const category of Object.keys(UI_CATEGORY_LABELS)) {
+    assert.equal(getUiTeaCategory(category),category);
+  }
+  assert.equal(getUiTeaCategory('unrecognised'),'other');
+  assert.equal(getUiTeaCategory(null),'other');
+});
+
+test('Tea Card and Edit dropdown use Other for legacy categories but retain raw form data',()=>{
+  const card=readFileSync('src/components/TeaCard.jsx','utf8');
+  const editor=readFileSync('src/components/TeaEditor.jsx','utf8');
+  assert.match(card,/const uiCategory=getUiTeaCategory\(tea.category\)/);
+  assert.match(card,/CATEGORY_ENGLISH\[uiCategory\]/);
+  assert.match(card,/getCategoryVisual\(uiCategory\)/);
+  assert.match(editor,/value=\{getUiTeaCategory\(form.category\)\}/);
+  assert.match(editor,/const next=initialTeaForm\(tea\)/);
+  assert.doesNotMatch(editor,/form.category=getUiTeaCategory/);
 });

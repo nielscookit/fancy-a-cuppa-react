@@ -57,7 +57,8 @@ test('category-specific crop settings are independently editable in one model',(
 test('TeaCard does not render individual product photos or a colour-only symbol',()=>{
   const card=readFileSync('src/components/TeaCard.jsx','utf8');
   const css=readFileSync('src/components/tea-detail.css','utf8');
-  assert.match(card,/getCategoryVisual\(tea.category\)/);
+  assert.match(card,/getCategoryVisual\(uiCategory\)/);
+  assert.match(card,/const uiCategory=getUiTeaCategory\(tea.category\)/);
   assert.match(card,/showImage && \(/);
   assert.match(card,/setFailedImageUrl\(visual.imageUrl\)/);
   assert.match(card,/visual.positionX/);

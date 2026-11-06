@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { IconButton, Typography } from '@mui/material';
 import { CATEGORY_ENGLISH } from '../features/teaDetailModel.js';
+import { getUiTeaCategory } from '../features/teaModel.js';
 import { getCategoryVisual } from '../features/categoryImages.js';
 import './tea-detail.css';
 
@@ -11,12 +12,13 @@ export default function TeaCard({ tea, onEdit, onClose }) {
   const [failedImageUrl,setFailedImageUrl] = useState(null);
   if (!tea) return null;
 
-  const category=CATEGORY_ENGLISH[tea.category] || 'TEA';
+  const uiCategory=getUiTeaCategory(tea.category);
+  const category=CATEGORY_ENGLISH[uiCategory] || 'OTHER';
   const variety=tea.subcategory==='other'
     ? tea.subcategory_other || ''
     : tea.subcategory || '';
   const leaf=tea.leafStyle==='bag' ? 'TEA BAG' : tea.leafStyle || '';
-  const visual=getCategoryVisual(tea.category);
+  const visual=getCategoryVisual(uiCategory);
   const showImage=Boolean(visual.imageUrl && visual.imageUrl!==failedImageUrl);
 
   return (

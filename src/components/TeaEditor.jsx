@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import {
-  UI_CATEGORY_LABELS, TEA_VARIETIES, DOSE_UNITS, LEAF_STYLE_LABELS,
+  UI_CATEGORY_LABELS, getUiTeaCategory, TEA_VARIETIES, DOSE_UNITS, LEAF_STYLE_LABELS,
   initialTeaForm, validateTeaForm,
 } from '../features/teaModel.js';
 import { createTea, updateTea } from '../data/teaRepository.js';
@@ -107,7 +107,7 @@ export default function TeaEditor({ tea, barcode, onCancel, onSaved }) {
       <Stack gap={2}>
         <Field label="Tea name" value={form.name} onChange={e=>set('name',e.target.value)} required />
         <Field label="Manufacturer" value={form.brand} onChange={e=>set('brand',e.target.value)} required />
-        <Field label="Category" value={form.category} onChange={e=>changeCategory(e.target.value)}
+        <Field label="Category" value={getUiTeaCategory(form.category)} onChange={e=>changeCategory(e.target.value)}
           choices={cats} required />
         <Field label="Tea subtype (optional)" value={form.subcategory}
           onChange={e=>set('subcategory',e.target.value)}

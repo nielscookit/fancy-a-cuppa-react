@@ -473,3 +473,15 @@
   implementation, database, or the approved Figma layout.
 
 - Tea Card visual category labels also now say FRUIT, HERBAL, OTHER, matching the six-choice editor; the underlying Supabase values remain unchanged.
+
+## 2026-11-06: category fallback semantics
+
+- All product categories outside the six UX-approved choices display and
+  search as Other, including white, oolong, yellow, dark, pu_erh and mate.
+- A single pure getUiTeaCategory() function performs the mapping. The
+  Tea Card label and artwork and the Add/Edit dropdown share this rule.
+  Text search for "Other" also includes those legacy teas.
+- For existing records, the edit form retains the original Supabase
+  category key until the user explicitly changes the category. Merely
+  opening Edit does not silently change the stored classification.
+- No database updates, no media/timer or V2 changes.
