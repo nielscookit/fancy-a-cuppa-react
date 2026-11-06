@@ -49,7 +49,7 @@
 .fac-tea-row-arrow { display:block; flex:0 0 48px; }
 .fac-sheet-footer {
   flex:0 0 auto; box-sizing:border-box;
-  background:#fff; padding:0 8px max(48px, env(safe-area-inset-bottom));
+  background:#fff; padding:0 8px max(49px, env(safe-area-inset-bottom));
 }
 .fac-sheet-add.MuiButton-root {
   width:100%; height:66px; min-height:66px; border-radius:100px;
@@ -58,9 +58,11 @@
   text-transform:none;
 }
 .fac-sheet-add.MuiButton-root:hover { background:#1B272B; box-shadow:none; }
-.fac-sheet-detail.fac-tea-detail {
-  display:flex; flex:1 1 auto; flex-direction:column; min-height:0;
-  border-radius:0; box-shadow:none;
+.fac-tea-detail.fac-sheet-scroll--detail {
+  min-height:0; border-radius:0; box-shadow:none; overflow-y:auto;
+}
+.fac-sheet-scroll--detail .fac-tea-result {
+  padding-bottom:max(49px, env(safe-area-inset-bottom));
 }
 .fac-sheet-scroll--detail .fac-tea-card {
   position:relative; height:326px; border-radius:0; box-shadow:none; overflow:visible;
@@ -101,9 +103,9 @@
 .fac-sheet-scroll--detail .fac-tea-result__minutes.MuiTypography-root {
   color:#1B272B; font-weight:400;
 }
-.fac-sheet-footer .fac-tea-result__brew.MuiButton-root,
-.fac-sheet-footer .fac-tea-result__brew.MuiButton-root:hover {
-  margin-top:0; background:#B9FC69; color:#1B272B;
+.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root,
+.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root:hover {
+  background:#B9FC69; color:#1B272B;
 }
 .fac-sheet-scroll--editor { padding:0 8px max(32px,env(safe-area-inset-bottom)); }
 
