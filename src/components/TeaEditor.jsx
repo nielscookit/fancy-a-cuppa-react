@@ -119,9 +119,6 @@ export default function TeaEditor({ tea, barcode, onCancel, onSaved }) {
           choices={[{value:'loose',label:'Loose tea'},{value:'bag',label:'Tea bags'}]} required />
         <Field label="Leaf style (optional)" value={form.leafStyle||''}
           onChange={e=>set('leafStyle',e.target.value)} choices={leaves} />
-        <Field label="Photo URL (optional)" value={form.photoUrl}
-          onChange={e=>set('photoUrl',e.target.value)}
-          helper="HTTPS image address. Photo upload and saving require the updated database API." />
         <Field label="Reference quantity" type="number" value={form.qty}
           onChange={e=>set('qty',e.target.value)} required />
         <Field label="Dosage unit" value={form.unit} onChange={e=>set('unit',e.target.value)}

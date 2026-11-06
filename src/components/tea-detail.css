@@ -96,16 +96,14 @@
 .fac-tea-card__icon img { display: block; width: 48px; height: 48px; }
 .fac-tea-card__image-area {
   position: relative; width: 100%; height: 192px;
-  overflow: hidden; background: #60534b;
+  overflow: hidden; background: #E8FBCB;
 }
-/* Display the original 1200×1500 image fill, without the rounding
-   permanently embedded in the old masked JPEG export. */
+/* Category image only: crop and positioning live in categoryImages.js.
+   No colour overlay, image opacity or rounded lower corners. */
 .fac-tea-card__photo {
   width: 100%; height: 100%; display: block;
-  object-fit: cover;
-  object-position: 50% 74.3%;
+  transform-origin: 50% 50%;
 }
-.fac-tea-card__photo.is-illustration { opacity: .8; }
 .fac-tea-card__type-symbol {
   position: absolute; width: 60px; height: 60px;
   left: 12px; bottom: 12px; object-fit: contain;

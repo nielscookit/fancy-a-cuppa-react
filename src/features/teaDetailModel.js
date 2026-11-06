@@ -4,7 +4,7 @@ export const CATEGORY_ENGLISH = Object.freeze({
   oolong:'OOLONG',yellow:'YELLOW TEA',dark:'DARK TEA',
   pu_erh:'PU-ERH TEA',mate:'MATÉ',
   fruit:'FRUIT TEA',herbal:'HERBAL TEA',
-  rooibos:'ROOIBOS',other:'TEA',
+  rooibos:'ROOIBOS',other:'OTHER INFUSIONS',
 });
 
 const UNIT_ENGLISH = Object.freeze({

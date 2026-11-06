@@ -428,3 +428,22 @@
 - The card itself still rounds only its top corners, leaving the
   image's lower edge completely straight. Figma source unchanged.
 - No changes to media, Home, Supabase, or navigation.
+
+## 2026-11-06: Category artwork replaces individual tea photos
+
+- Designer's new contract: exactly four static PNGs under
+  `public/images/categories` (black, green, fruit, herbal). All other
+  Supabase category keys use `#E8FBCB` with no image or extra symbol.
+- `src/features/categoryImages.js` owns all image paths and individual
+  crop/scale/object-fit/position settings; TeaCard never hardcodes paths.
+- TeaCard resolves visuals by `tea.category`, ignores `tea.photoUrl`,
+  hides a failed/missing PNG and its icon, and preserves the 192px viewport
+  and square bottom image edges.
+- The visible Photo URL input was removed from TeaEditor. The underlying
+  data normalization retains `photoUrl` only for backward compatibility
+  with existing Supabase rows/write-safety checks; it is never rendered
+  as a product image.
+- The four exact 1024x1024 PNGs were supplied as conversation uploads.
+  Asset transfer to GitHub needs separate verification; no surrogate
+  images or format conversion are permitted.
+- Home, scrolling, V2, media controllers and Supabase rows are untouched.

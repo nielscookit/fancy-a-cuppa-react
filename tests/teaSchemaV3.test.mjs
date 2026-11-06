@@ -124,10 +124,11 @@ test('legacy API rejects new categories, missing subtype and new photo without n
 test('new editor exposes all schema fields but does not directly modify database',()=>{
   const ui=readFileSync('src/components/TeaEditor.jsx','utf8');
   for(const field of ['Category','Tea subtype (optional)','Leaf style (optional)',
-    'Photo URL (optional)','Preparation instructions (optional)',
+    'Preparation instructions (optional)',
     'Preparation source (optional)','Barcode type (optional)','Barcode value']){
     assert.ok(ui.includes(field),field);
   }
+  assert.doesNotMatch(ui,/Photo URL \(optional\)/);
   assert.match(ui,/validateTeaForm/);
   assert.match(ui,/createTea/);
   assert.match(ui,/updateTea/);
