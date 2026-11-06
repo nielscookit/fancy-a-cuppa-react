@@ -58,7 +58,10 @@
   text-transform:none;
 }
 .fac-sheet-add.MuiButton-root:hover { background:#1B272B; box-shadow:none; }
-.fac-sheet-scroll--detail .fac-tea-detail { min-height:0; border-radius:0; box-shadow:none; overflow:visible; }
+.fac-sheet-detail.fac-tea-detail {
+  display:flex; flex:1 1 auto; flex-direction:column; min-height:0;
+  border-radius:0; box-shadow:none;
+}
 .fac-sheet-scroll--detail .fac-tea-card {
   position:relative; height:326px; border-radius:0; box-shadow:none; overflow:visible;
 }
@@ -98,13 +101,10 @@
 .fac-sheet-scroll--detail .fac-tea-result__minutes.MuiTypography-root {
   color:#1B272B; font-weight:400;
 }
-.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root,
-.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root:hover {
-  background:#B9FC69; color:#1B272B;
+.fac-sheet-footer .fac-tea-result__brew.MuiButton-root,
+.fac-sheet-footer .fac-tea-result__brew.MuiButton-root:hover {
+  margin-top:0; background:#B9FC69; color:#1B272B;
 }
 .fac-sheet-scroll--editor { padding:0 8px max(32px,env(safe-area-inset-bottom)); }
-@media (max-height:600px) {
-  .fac-sheet-footer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
-}
 
 /* Visual reference: approved Figma 152:339 and 158:614. */

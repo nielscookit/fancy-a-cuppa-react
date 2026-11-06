@@ -253,20 +253,18 @@ export default function App() {
             </>
           )}
           {mode === 'prep' && selected && (
-            <Box className="fac-sheet-scroll fac-sheet-scroll--detail" key="detail">
-              <TeaDetail
-                tea={selected}
-                volume={volume} onVolumeChange={setVolume}
-                customMl={customMl} onCustomChange={setCustomMl}
-                minutes={detailMinutes}
-                onMinuteStep={step => setDetailMinutes(previous => stepQuickMinutes(previous,step))}
-                onEdit={() => setMode('edit')}
-                onClose={openSearch}
-                pinned={pinnedIds.includes(selected.id)}
-                onTogglePin={() => togglePin(selected.id)}
-                onBrew={startDetailTimer}
-              />
-            </Box>
+            <TeaDetail
+              tea={selected}
+              volume={volume} onVolumeChange={setVolume}
+              customMl={customMl} onCustomChange={setCustomMl}
+              minutes={detailMinutes}
+              onMinuteStep={step => setDetailMinutes(previous => stepQuickMinutes(previous,step))}
+              onEdit={() => setMode('edit')}
+              onClose={openSearch}
+              pinned={pinnedIds.includes(selected.id)}
+              onTogglePin={() => togglePin(selected.id)}
+              onBrew={startDetailTimer}
+            />
           )}
           {(mode === 'add' || mode === 'edit') && (
             <Box className="fac-sheet-scroll fac-sheet-scroll--editor" key={mode}>
