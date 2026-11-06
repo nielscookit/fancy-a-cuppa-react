@@ -21,14 +21,14 @@ test('quick timer local storage is V3-only', () => {
   assert.equal(saveQuickMinutes(6,storage),true);
   assert.equal(readQuickMinutes(storage),6);
 });
-test('Figma Home 152:151 uses approved image and button text',()=>{
+test('Figma Home 152:151 uses approved media slot and button text',()=>{
   const home=readFileSync('src/components/HomeScreen.jsx','utf8');
   const css=readFileSync('src/components/home.css','utf8');
   assert.match(home,/Fancy a Cuppa/);
   assert.match(home,/How do you take it\?/);
-  assert.match(home,/home-tea\.png/);
-  assert.ok(statSync('public/images/home-tea.png').size>100000);
-  assert.match(css,/aspect-ratio:\s*1\s*\/\s*1/);
+  assert.match(home,/fac-home__tea-stage/);
+  assert.ok(statSync('public/media/timer-kit/fill-poster.png').size>0);
+  assert.match(readFileSync('src/timer-kit/media-stage.css','utf8'),/aspect-ratio:\s*1\s*\/\s*1/);
   assert.match(css,/top:\s*72px/);
   assert.match(css,/#B9FC69/i);
   assert.match(css,/#1B272B/i);
@@ -47,12 +47,9 @@ test('one MUI bottom drawer replaces previous scroll navigation',()=>{
   assert.match(css,/env\(safe-area-inset-bottom\)/);
 });
 test('validated timer start remains synchronous in original tap',()=>{
-  const app=readFileSync('src/App.jsx','utf8');
-  assert.match(app,/<QuickTimerView/);
-  const show=app.indexOf('flushSync(() => setQuickTimerOpen(true))');
-  const play=app.indexOf('quickTimerRef.current?.begin(seconds)');
-  assert.ok(show>=0&&play>show);
-  assert.doesNotMatch(app.slice(show,play),/await|\.then\(|setTimeout\(|requestAnimationFrame\(/);
+  const home=readFileSync('src/components/HomeScreen.jsx','utf8');
+  assert.match(home,/actions\.setSeconds\(seconds\);\s*return actions\.start\(\)/);
+  assert.match(home,/onClick=\{handlePrimary\}/);
 });
 test('Figma 66px minus/plus assets are local',()=>{
   for(const icon of ['minus','plus']){

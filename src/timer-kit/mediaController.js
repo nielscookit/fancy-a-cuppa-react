@@ -36,6 +36,7 @@ export function createMediaController({
   let active = false;
   let phase = -1;
   let transitioning = false;
+  let pendingPhase = null;
   let milkStarted = false;
   let bubblePlayed = false;
   let lastStillTime = 0;
@@ -215,6 +216,7 @@ export function createMediaController({
     active = false;
     phase = -1;
     transitioning = false;
+    pendingPhase = null;
     milkStarted = false;
     bubblePlayed = false;
     lastStillTime = 0;
@@ -321,6 +323,7 @@ export function createMediaController({
   async function show(i) {
     if (!active || destroyed || (transitioning && i !== 3)) return;
     transitioning = true;
+    pendingPhase = i;
     const id = session;
     const ownTransition = ++transitionId;
     const next = videos[i];
@@ -415,7 +418,12 @@ export function createMediaController({
       onPhase(i);
       if (i === 3) milkSoundTimer = schedule(() => playMilkSound(id), 60);
     } catch (error) { onError(error); }
-    finally { if (ownTransition === transitionId) transitioning = false; }
+    finally {
+      if (ownTransition === transitionId) {
+        transitioning = false;
+        pendingPhase = null;
+      }
+    }
   }
 
   listen(videos[0], 'ended', () => {
@@ -430,9 +438,22 @@ export function createMediaController({
 
   function pause() {
     active = false;
+    // Retain an interrupted destination for resume, but ignore its old play promise.
+    transitionId++;
+    transitioning = false;
     fillStartHandler = null;
     videos.forEach(v => v.pause());
     stopSounds();
+  }
+
+  function startMilk() {
+    if (destroyed || !active || milkStarted) return;
+    milkStarted = true;
+    milkPriming = false;
+    onMilkRequested();
+    milkEvent('requested');
+    // Loading is asynchronous in Safari; do NOT cancel this request at 0s.
+    void show(3);
   }
 
   return {
@@ -451,20 +472,15 @@ export function createMediaController({
     },
     resume: () => {
       active = true;
-      if (phase >= 0) videos[phase].play().catch(error => onError(error));
+      if (pendingPhase !== null) void show(pendingPhase);
+      else if (phase >= 0) videos[phase].play().catch(error => onError(error));
       else void show(0);
     },
     pause,
-    milk: () => {
-      if (destroyed || !active || milkStarted) return;
-      milkStarted = true;
-      milkPriming = false;
-      onMilkRequested();
-      milkEvent('requested');
-      // Loading is asynchronous in Safari; do NOT cancel this request at 0s.
-      void show(3);
-    },
+    milk: startMilk,
     finish: () => {
+      // A backgrounded browser can jump straight across the five-second cue.
+      startMilk();
       if (!milkStarted) {
         pause();
         return;

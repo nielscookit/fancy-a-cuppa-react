@@ -30,13 +30,10 @@ test('pinned teas stored locally and removed from duplicate results',()=>{
   assert.match(app,/Pinned Teas/);
   assert.match(card,/onTogglePin/);
 });
-test('iPhone timer controller remains mounted and retains gesture start',()=>{
+test('tea detail starts the mounted Home timer directly from the BREW tap',()=>{
   const app=readFileSync('src/App.jsx','utf8');
-  const quick=readFileSync('src/components/QuickTimerView.jsx','utf8');
-  assert.match(quick,/useTeaTimer/);
-  assert.match(quick,/PHASES\.map/);
-  assert.match(app,/flushSync\(\(\) => setQuickTimerOpen\(true\)\)/);
-  assert.match(app,/quickTimerRef\.current\?\.begin\(seconds\)/);
+  assert.match(app,/<HomeScreen\s+ref=\{quickTimerRef\}/);
+  assert.match(app,/if \(quickTimerRef\.current\?\.begin\(detailMinutes \* 60\)\) closeSheet\(\)/);
   assert.match(app,/onBrew=\{startDetailTimer\}/);
-  assert.match(app,/onClose=\{closeQuickTimer\}/);
+  assert.doesNotMatch(app,/QuickTimerView|setQuickTimerOpen/);
 });

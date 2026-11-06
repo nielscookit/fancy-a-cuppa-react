@@ -1,39 +1,85 @@
+import { useEffect, useImperativeHandle, useRef } from 'react';
 import { Box, Button, IconButton, Typography } from '@mui/material';
 import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js';
+import { useTeaTimer } from '../timer/useTeaTimer.js';
+import { createMediaController } from '../timer-kit/mediaController.js';
+import { MEDIA_ASSETS } from '../timer-kit/mediaManifest.js';
+import '../timer-kit/media-stage.css';
 import './home.css';
 
 const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
-export const HOME_IMAGE = import.meta.env.BASE_URL + 'images/home-tea.png';
+const MEDIA_BASE = import.meta.env.BASE_URL + 'media/';
+const PHASES = ['fill', 'brew', 'steep', 'milk'];
+const FILL_POSTER = MEDIA_BASE + MEDIA_ASSETS.fill.poster;
 
-/**
- * Approved Figma Home (node 152:151, 375 × 812).
- * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
- */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant }) {
+export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTimerError }) {
+  const videoRefs = useRef([]);
+  const { snapshot, actions } = useTeaTimer({
+    videoRefs,
+    assetBase: MEDIA_BASE,
+    mediaFactory: createMediaController,
+  });
+  const { countdown, preload, error } = snapshot;
+  const { running, preparing, finished, total, remaining } = countdown;
+  const inSession = running || preparing || finished || remaining < total;
+  const selectedMinutes = inSession ? total / 60 : minutes;
+  const seconds = inSession ? Math.ceil(remaining) : minutes * 60;
+  const timeLabel = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+
+  const begin = seconds => {
+    if (preload !== 'ready' || inSession) return false;
+    actions.setSeconds(seconds);
+    return actions.start();
+  };
+  useImperativeHandle(ref, () => ({ begin }));
+  useEffect(() => {
+    if (error) onTimerError(error);
+  }, [error, onTimerError]);
+
+  const reset = () => actions.setSeconds(minutes * 60);
+  const handlePrimary = () => {
+    if (preload === 'error') void actions.retryPreload();
+    else if (preparing) reset();
+    else if (inSession) actions.toggle();
+    else begin(minutes * 60);
+  };
+  const primaryLabel = preload === 'error' ? 'Retry videos'
+    : running || preparing ? 'Pause'
+    : finished ? 'Brew again'
+    : inSession ? 'Resume' : 'Fancy a Cuppa';
+
   return (
     <>
       <Box component="section" className="fac-home" aria-label="Home">
       <Box className="fac-home__canvas">
-        <img className="fac-home__tea-image" src={HOME_IMAGE} alt="" />
-        <Typography component="output" className="fac-home__countdown" aria-label="Selected brewing time">{minutes}:00</Typography>
+        <Box className="timer-kit-stage fac-home__tea-stage" aria-hidden="true"
+          style={{ backgroundImage: `url(${FILL_POSTER})` }}>
+          {PHASES.map((phase, index) => (
+            <video key={phase} ref={element => { videoRefs.current[index] = element; }}
+              className="timer-kit-video" muted playsInline preload="auto" loop={phase === 'steep'}
+              poster={phase === 'fill' ? FILL_POSTER : undefined} />
+          ))}
+        </Box>
+        <Typography component="output" role="timer" className="fac-home__countdown"
+          aria-label="Brewing countdown">{timeLabel}</Typography>
         <Box className="fac-home__time-control" aria-label="Brewing time">
           <IconButton
             aria-label="Decrease brewing time by one minute"
             className="fac-home__time-button"
             onClick={() => onStep(-1)}
-            disabled={minutes <= MIN_QUICK_MINUTES}
+            disabled={inSession || minutes <= MIN_QUICK_MINUTES}
             disableRipple
           >
             <img src={SVG_BASE + 'home-minus.svg'} width="66" height="66" alt="" />
           </IconButton>
           <Typography component="output" aria-live="polite" className="fac-home__time-value">
-            {minutes} MIN
+            {selectedMinutes} MIN
           </Typography>
           <IconButton
             aria-label="Increase brewing time by one minute"
             className="fac-home__time-button"
             onClick={() => onStep(1)}
-            disabled={minutes >= MAX_QUICK_MINUTES}
+            disabled={inSession || minutes >= MAX_QUICK_MINUTES}
             disableRipple
           >
             <img src={SVG_BASE + 'home-plus.svg'} width="66" height="66" alt="" />
@@ -44,9 +90,10 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant }) 
           disableElevation
           disableRipple
           className="fac-home__action fac-home__action--primary"
-          onClick={onBrew}
+          onClick={handlePrimary}
+          disabled={preload === 'loading'}
         >
-          Fancy a Cuppa
+          {primaryLabel}
         </Button>
       </Box>
       </Box>
@@ -56,9 +103,9 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant }) 
           disableElevation
           disableRipple
           className="fac-home__action fac-home__action--secondary"
-          onClick={onTeaAssistant}
+          onClick={inSession ? reset : onTeaAssistant}
         >
-          How do you take it?
+          {inSession ? 'Reset' : 'How do you take it?'}
         </Button>
       </Box>
     </>

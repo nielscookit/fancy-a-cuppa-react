@@ -134,29 +134,16 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* This stays fixed to the viewport even when iOS rubber-band scrolling
-   shifts the foreground page. It masks the preloaded timer (z-index:0),
-   while Home/Tea Assistant (z-index:2) and active timer (z-index:1400)
-   remain fully usable. Do NOT hide the video container with opacity or
-   visibility: its native iPhone playback depends on normal compositing. */
-.fac-viewport-shield {
-  position: fixed;
-  inset: -200px 0;
-  z-index: 1;
-  background-color: #ffffff;
-  pointer-events: none;
-}
-
-/* Approved Home frame 152:151: 375px square image starting at y=72px. */
-.fac-home__tea-image {
-  display:block;
+/* Approved Home frame 152:151: the media stage occupies the original image slot. */
+.fac-home__tea-stage.timer-kit-stage {
   position:absolute;
   width:100%;
-  height:auto;
-  aspect-ratio:1 / 1;
-  object-fit:cover;
+  margin:0;
   left:0;
   top:72px;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-size:contain;
   pointer-events:none;
 }
 
@@ -190,7 +177,7 @@ body {
 }
 @media (max-height:760px) {
   .fac-home__canvas { --image-size: min(100vw, 375px, calc(max(100svh, 560px) - 340px)); }
-  .fac-home__tea-image { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }
+  .fac-home__tea-stage.timer-kit-stage { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }
   .fac-home__countdown.MuiTypography-root { top:calc(30px + var(--image-size) - 18px); }
   .fac-home__time-control { bottom:196px; }
 }

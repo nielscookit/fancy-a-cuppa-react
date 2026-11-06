@@ -1,10 +1,10 @@
-# Timer Kit Lab (isolated, development branch)
+# Timer Kit and diagnostic lab
 
-This lab is **not** a replacement for the existing V3 timer or the validated `/timer-test/`.
+V3 Home uses the Timer Kit media controller and assets. The lab remains an independent diagnostic page alongside the existing `/timer-test/`.
 
 ## Media files
 
-Upload the four optimized MP4 files to this branch under:
+The four optimized MP4 files are located at:
 
 - `public/media/timer-kit/fill.mp4`
 - `public/media/timer-kit/brew.mp4`
@@ -27,14 +27,15 @@ The existing build workflow must include `timer-lab/index.html` in Vite inputs.
 
 ## Architecture
 
-- `mediaController.js`: **isolated copy** of the validated media controller, with only the preloader import changed. This keeps the production controller untouched and resolves the lab-local media manifest.
+- `mediaController.js`: Timer Kit media controller shared by Home and the diagnostic lab. The legacy controller for `/timer-test/` remains separate.
 - `mediaManifest.js`: lab video paths, existing V3 audio paths.
 - `../timer/timerController.js`: existing unchanged JS countdown.
 - `../timer/audioController.js`: existing unchanged audio engine.
 - `TimerKitLab.jsx`: mounted video elements, direct user-gesture start, diagnostics.
-- `timer-kit.css`: 375x375 white stage with soft-edge mask.
+- `media-stage.css`: shared 375×375 white stage with soft-edge mask.
+- `fill-poster.png`: the first decoded Fill frame, used on Home during preload.
 
-The lab remains separate from `src/App.jsx`, `src/components/QuickTimerView.jsx`, and `src/timer-test/`. No Supabase access.
+The lab has its own entry point and controls and does not use the Home view or the tea catalog.
 
 ## iPhone acceptance checks
 
@@ -47,5 +48,3 @@ The lab remains separate from `src/App.jsx`, `src/components/QuickTimerView.jsx`
 7. Lock the screen, switch apps, return; inspect clock correction and playback state.
 8. Check the event log and media error fields for rejected play requests.
 9. Inspect white mask at 375px; no sharp square edges or black frames.
-
-Do **not** merge the branch or replace production assets before live iPhone acceptance.

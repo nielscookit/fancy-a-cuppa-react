@@ -10,11 +10,9 @@ import TeaDetail from './components/TeaDetail.jsx';
 import TeaSearchBar from './components/TeaSearchBar.jsx';
 import { initialDetailMinutes } from './features/teaDetailModel.js';
 import './components/tea-detail.css';
-import HomeScreen, { HOME_IMAGE } from './components/HomeScreen.jsx';
-import QuickTimerView from './components/QuickTimerView.jsx';
+import HomeScreen from './components/HomeScreen.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
 import Snackbar from '@mui/material/Snackbar';
-import { flushSync } from 'react-dom';
 import './components/tea-sheet.css';
 
 const SHEET_DURATION = { enter: 225, exit: 195 };
@@ -54,7 +52,6 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
   const [quickNotice, setQuickNotice] = useState('');
-  const [quickTimerOpen, setQuickTimerOpen] = useState(false);
   const quickTimerRef = useRef(null);
   const [pinnedIds, setPinnedIds] = useState(() => {
     try { const value = JSON.parse(localStorage.getItem('fac-v3-pinned-teas') || '[]'); return Array.isArray(value) ? value.filter(id => typeof id === 'string') : []; }
@@ -76,25 +73,12 @@ export default function App() {
     setSelectedId(null);
     setScanError('');
   };
-  const openTimerWithSeconds = (seconds) => {
-    // Open and start in the originating tap so Safari can unlock timer audio.
-    flushSync(() => setQuickTimerOpen(true));
-    const started = quickTimerRef.current?.begin(seconds);
-    if (!started) {
-      setQuickTimerOpen(false);
-      setQuickNotice('Timer not ready. Please try again.');
-    }
-  };
-  const startQuickTimer = () => openTimerWithSeconds(quickMinutes * 60);
   const startDetailTimer = () => {
-    closeSheet();
-    openTimerWithSeconds(detailMinutes * 60);
+    // Start within the original BREW tap so iPhone Safari can unlock playback.
+    if (quickTimerRef.current?.begin(detailMinutes * 60)) closeSheet();
+    else setQuickNotice('Timer not ready. Please try again.');
   };
 
-  const closeQuickTimer = () => {
-    closeSheet();
-    setQuickTimerOpen(false);
-  };
   useEffect(() => { saveQuickMinutes(quickMinutes); }, [quickMinutes]);
   const photoRef = useRef(null);
 
@@ -209,12 +193,12 @@ export default function App() {
   );
   return (
     <>
-      <Box className="fac-viewport-shield" aria-hidden="true" />
       <Box className="fac-app-page" sx={{ position:'relative', zIndex:2, minHeight:'100svh', bgcolor:'background.default' }}>
         <HomeScreen
+          ref={quickTimerRef}
           minutes={quickMinutes}
           onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous,delta))}
-          onBrew={startQuickTimer}
+          onTimerError={setQuickNotice}
           onTeaAssistant={showTeaAssistant}
         />
       </Box>
@@ -303,8 +287,6 @@ export default function App() {
           )}
         </Box>
       </Drawer>
-      <QuickTimerView ref={quickTimerRef} active={quickTimerOpen}
-        onClose={closeQuickTimer} stillImage={HOME_IMAGE} />
       <Snackbar open={Boolean(quickNotice)} autoHideDuration={4200}
         onClose={() => setQuickNotice('')} message={quickNotice}
         anchorOrigin={{vertical:'top',horizontal:'center'}} />

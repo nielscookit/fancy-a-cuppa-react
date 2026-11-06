@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createTimerController } from '../src/timer/timerController.js';
 import { createMediaController } from '../src/timer/mediaController.js';
+import { createMediaController as createKitMediaController } from '../src/timer-kit/mediaController.js';
 import { MEDIA_ASSETS, V2_SOURCE_COMMIT } from '../src/timer/mediaManifest.js';
 
 function timerHarness(seconds = 40) {
@@ -696,4 +697,55 @@ test('reset during async middle-video play cannot activate stale transition', as
   assert.equal(videos[0].classList.contains('visible'), true);
   assert.equal(videos[1].classList.contains('visible'), false);
   media.destroy();
+});
+
+test('Timer Kit resumes an interrupted Milk transition without showing a stale frame', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const milk = videos[3];
+  const pending = [];
+  milk.play = () => new Promise(resolve => pending.push(resolve));
+  const media = createKitMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  try {
+    media.start();
+    media.milk();
+    assert.equal(pending.length, 1);
+    media.pause();
+    pending[0]();
+    await nextLoop();
+    assert.equal(media.phase, 0);
+    assert.equal(milk.classList.contains('visible'), false);
+    media.resume();
+    assert.equal(pending.length, 2);
+    pending[1]();
+    await nextLoop();
+    assert.equal(media.phase, 3);
+    media.finish();
+    milk.dispatchEvent(new Event('ended'));
+    assert.equal(milk.classList.contains('visible'), true);
+    media.reset();
+    assert.equal(videos[0].classList.contains('visible'), true);
+    assert.equal(videos[0].currentTime, 0);
+  } finally {
+    media.destroy();
+  }
+});
+
+test('Timer Kit still starts Milk when the clock skips the final cue', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const media = createKitMediaController({
+    videos, assetBase: '/fancy-a-cuppa-react/media/',
+    audioFactory: url => new FakeAudio(url),
+  });
+  try {
+    media.start();
+    media.finish();
+    await nextLoop();
+    assert.equal(media.phase, 3);
+    assert.equal(videos[3].plays, 1);
+  } finally {
+    media.destroy();
+  }
 });
