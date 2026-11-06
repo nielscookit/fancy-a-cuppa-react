@@ -117,7 +117,7 @@ export default function App() {
   );
   const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean);
   const recent = recentIds.filter(id => !pinnedIds.includes(id))
-    .map(id => teas.find(tea => tea.id === id)).filter(Boolean);
+    .map(id => teas.find(tea => tea.id === id)).filter(Boolean).slice(0, 3);
   function chooseTea(tea) {
     setSelectedId(tea.id);
     setVolume(250);
