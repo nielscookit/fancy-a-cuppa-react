@@ -146,3 +146,16 @@ body {
   background-color: #ffffff;
   pointer-events: none;
 }
+
+/* Approved Home frame 152:151: 375px square image starting at y=72px. */
+.fac-home__tea-image {
+  display:block;
+  position:absolute;
+  width:100%;
+  height:auto;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+  left:0;
+  top:72px;
+  pointer-events:none;
+}

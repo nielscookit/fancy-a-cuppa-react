@@ -3,6 +3,7 @@ import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js'
 import './home.css';
 
 const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
+const HOME_IMAGE = import.meta.env.BASE_URL + 'images/home-tea.png';
 
 /**
  * Approved Figma 01 · Home (node 19:47, 375 × 812).
@@ -13,6 +14,7 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, br
     <>
       <Box component="section" className="fac-home" aria-label="Home">
       <Box className="fac-home__canvas">
+        <img className="fac-home__tea-image" src={HOME_IMAGE} alt="" />
         <Box className="fac-home__time-control" aria-label="Brewing time">
           <IconButton
             aria-label="Decrease brewing time by one minute"
