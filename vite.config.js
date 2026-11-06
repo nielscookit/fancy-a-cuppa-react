@@ -11,5 +11,6 @@ export default defineConfig({
     app: resolve(import.meta.dirname, 'index.html'),
     lab: resolve(import.meta.dirname, 'lab/index.html'),
     timerTest: resolve(import.meta.dirname, 'timer-test/index.html'),
+    timerLab: resolve(import.meta.dirname, 'timer-lab/index.html'),
   },
 });
