@@ -1,36 +1,104 @@
-/* One bottom drawer, independent scroll areas for Search and Detail. */
+/* Figma 152:339 and 158:614. One MUI Drawer shared by both states. */
 .fac-sheet-paper.MuiDrawer-paper {
-  height: calc(100dvh - 80px); max-height: calc(100dvh - 80px);
-  border-radius: 30px 30px 0 0; overflow: hidden;
-  background: #fff; box-shadow: 0 -1px 3px rgba(0,0,0,.14);
+  height:calc(100dvh - 137px);
+  max-height:calc(100dvh - 137px);
+  border-radius:30px 30px 0 0;
+  background:#fff; overflow:hidden;
+  box-shadow:0 -1px 3px rgba(0,0,0,.14);
 }
-.fac-sheet { display:flex; flex-direction:column; height:100%; min-height:0; color:#1B272B; }
-.fac-sheet-top { height:32px; min-height:32px; flex-shrink:0; position:relative; }
-.fac-sheet-close.MuiIconButton-root { position:absolute; right:8px; top:0; width:48px; height:48px;
-  z-index:2; color:#1B272B; font-size:32px; }
-.fac-sheet-search { flex-shrink:0; padding-top:0; }
+.fac-sheet { display:flex; flex-direction:column; min-height:0; height:100%; color:#1B272B; }
+.fac-sheet-top { height:32px; flex:0 0 32px; }
+.fac-sheet-floating-close.MuiIconButton-root {
+  position:fixed; top:80px; right:max(12px, calc((100vw - 375px)/2 + 12px));
+  z-index:1401; width:48px; height:48px; padding:0; border-radius:50%;
+  background:#F3F2F0;
+}
+.fac-sheet-floating-close.MuiIconButton-root img { width:48px; height:48px; display:block; }
+.fac-sheet-search { flex:0 0 auto; }
 .fac-sheet-search .fac-tea-search { margin:0 8px 8px; background:#F3F2F0; }
-.fac-sheet-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
-  -webkit-overflow-scrolling:touch; }
-.fac-sheet-footer { flex-shrink:0; padding:12px 8px max(48px, env(safe-area-inset-bottom)); background:#fff; }
-.fac-sheet-add.MuiButton-root { height:66px; border-radius:100px; background:#1B272B; color:#fff;
-  font-family:"Roboto Mono",monospace; font-size:16px; font-weight:600; box-shadow:none; }
+.fac-sheet-search--detail .fac-tea-search { margin-bottom:24px; }
+.fac-sheet-scroll { flex:1 1 auto; min-height:0; overflow-y:auto;
+  -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+.fac-sheet .fac-tea-catalog { margin:0; }
+.fac-sheet .fac-tea-catalog__title.MuiTypography-root {
+  margin:8px 12px 14px;
+  font-family:"Roboto Mono", monospace;
+  font-size:14px; line-height:20px; font-weight:500; color:#1B272B;
+}
+.fac-sheet .fac-tea-catalog__list { box-shadow:none; border:0; border-radius:0; }
+.fac-sheet .fac-tea-catalog__list + .fac-tea-catalog__title.MuiTypography-root { margin-top:15px; }
+.fac-sheet .fac-tea-catalog__item.MuiButton-root {
+  box-sizing:border-box; height:72px; min-height:72px; padding:0 12px; gap:12px;
+  display:flex; flex-direction:row; justify-content:flex-start; align-items:center;
+  border:0; border-radius:0; background:#fff; color:#1B272B;
+  font-family:"Roboto Mono",monospace; text-align:left; text-transform:none;
+}
+.fac-sheet .fac-tea-catalog__item.MuiButton-root:hover { background:#fff; }
+.fac-tea-row-icon { flex:0 0 48px; width:48px; height:48px; display:block; }
+.fac-tea-row-content {
+  height:72px; min-width:0; display:flex; flex-direction:column; justify-content:center;
+  border-block:1px solid #E8E6E3;
+}
+.fac-tea-row-arrow {
+  display:flex; align-items:center; justify-content:center;
+  flex:0 0 48px; width:48px; height:48px; border-radius:50%;
+  background:#F3F2F0; color:#1B272B;
+}
+.fac-tea-row-arrow .material-symbols-outlined { font-size:24px; }
+.fac-sheet-footer {
+  flex:0 0 auto; box-sizing:border-box;
+  background:#fff; padding:0 8px max(48px, env(safe-area-inset-bottom));
+}
+.fac-sheet-add.MuiButton-root {
+  width:100%; height:66px; min-height:66px; border-radius:100px;
+  background:#1B272B; color:#fff; box-shadow:none;
+  font-family:"Roboto Mono",monospace; font-size:16px; font-weight:600;
+  text-transform:none;
+}
 .fac-sheet-add.MuiButton-root:hover { background:#1B272B; box-shadow:none; }
-.fac-sheet .fac-tea-catalog { margin:0 0 8px; }
-.fac-sheet .fac-tea-catalog__title.MuiTypography-root { margin:12px 12px 8px; font-size:14px; font-weight:500; }
-.fac-sheet .fac-tea-catalog__list { border-radius:0; }
-.fac-sheet .fac-tea-catalog__item.MuiButton-root { min-height:72px; border-bottom:1px solid #E8E6E3;
-  padding:12px 16px 12px 72px; font-family:"Roboto Mono",monospace; display:flex; }
-.fac-tea-row-arrow { font-size:28px; font-weight:400; margin-left:12px; }
-.fac-sheet-back { padding:0 8px; }
-.fac-sheet-back .MuiButton-root { color:#1B272B; text-transform:none; }
-.fac-sheet-scroll--detail .fac-tea-detail { min-height:0; border-radius:0; box-shadow:none; }
-.fac-sheet-scroll--detail .fac-tea-card { border-radius:0; }
-.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root { background:#B9FC69; color:#1B272B; }
-.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root:hover { background:#B9FC69; }
+.fac-sheet-scroll--detail .fac-tea-detail { min-height:0; border-radius:0; box-shadow:none; overflow:visible; }
+.fac-sheet-scroll--detail .fac-tea-card {
+  position:relative; height:326px; border-radius:0; box-shadow:none; overflow:visible;
+}
+.fac-sheet-scroll--detail .fac-tea-card__header {
+  position:relative; display:block; height:134px; padding:0; box-sizing:border-box;
+}
+.fac-sheet-scroll--detail .fac-tea-card__actions {
+  position:absolute; top:0; left:8px; right:8px; display:flex;
+  justify-content:flex-start; align-items:center; gap:12px;
+}
+.fac-sheet-scroll--detail .fac-tea-card__actions .fac-tea-card__icon:last-child {
+  margin-left:auto;
+}
+.fac-sheet-scroll--detail .fac-tea-card__identity {
+  position:absolute; left:24px; right:24px; top:64px; padding:0;
+}
+.fac-sheet-scroll--detail .fac-tea-card__name.MuiTypography-root,
+.fac-sheet-scroll--detail .fac-tea-card__brand.MuiTypography-root { color:#1B272B; }
+.fac-sheet-scroll--detail .fac-tea-card__image-area {
+  height:192px; border-radius:0 0 30px 30px; overflow:hidden;
+}
+.fac-sheet-scroll--detail .fac-tea-card__type-symbol { display:none; }
+.fac-sheet-scroll--detail .fac-tea-card__tags { right:12px; }
 .fac-sheet-scroll--detail .fac-tea-card__tag { background:rgba(27,39,43,.8); color:#fff; }
+.fac-sheet-scroll--detail .fac-tea-volume { margin-top:48px; background:#F3F2F0; }
+.fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root {
+  color:#fff; background:#1B272B;
+}
+.fac-sheet-scroll--detail .fac-tea-volume__option.MuiButton-root {
+  color:#1B272B;
+}
+.fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root { color:#fff; }
+.fac-sheet-scroll--detail .fac-tea-result__minutes.MuiTypography-root {
+  color:#1B272B; font-weight:400;
+}
+.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root,
+.fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root:hover {
+  background:#B9FC69; color:#1B272B;
+}
 .fac-sheet-scroll--editor { padding:0 8px max(32px,env(safe-area-inset-bottom)); }
 @media (max-height:600px) {
-  .fac-sheet-paper.MuiDrawer-paper { height:calc(100dvh - 16px); max-height:calc(100dvh - 16px); }
+  .fac-sheet-paper.MuiDrawer-paper { height:calc(100dvh - 105px); max-height:calc(100dvh - 105px); }
+  .fac-sheet-floating-close.MuiIconButton-root { top:48px; }
   .fac-sheet-footer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
 }
