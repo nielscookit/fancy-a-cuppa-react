@@ -102,3 +102,5 @@
   .fac-sheet-floating-close.MuiIconButton-root { top:48px; }
   .fac-sheet-footer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
 }
+
+/* Visual reference: approved Figma 152:339 and 158:614. */
