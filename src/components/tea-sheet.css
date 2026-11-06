@@ -49,7 +49,7 @@
 .fac-tea-row-arrow { display:block; flex:0 0 48px; }
 .fac-sheet-footer {
   flex:0 0 auto; box-sizing:border-box;
-  background:#fff; padding:0 8px max(49px, env(safe-area-inset-bottom));
+  background:#fff; padding:0 8px max(32px, env(safe-area-inset-bottom));
 }
 .fac-sheet-add.MuiButton-root {
   width:100%; height:66px; min-height:66px; border-radius:100px;

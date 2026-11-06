@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Drawer, IconButton, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
-  teaMatches, recentTeaIds,
+  normalizeQuery, teaMatches, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import TeaEditor from './components/TeaEditor.jsx';
@@ -99,9 +99,14 @@ export default function App() {
 
   const teas = catalog.teas;
   const selected = teas.find(tea => tea.id === selectedId) || null;
-  const results = useMemo(() => teas.filter(tea => teaMatches(tea,query)), [teas,query]);
-  const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean).filter(tea => teaMatches(tea, query));
-  const unpinnedResults = results.filter(tea => !pinnedIds.includes(tea.id));
+  const hasSearch = Boolean(normalizeQuery(query));
+  const results = useMemo(
+    () => hasSearch ? teas.filter(tea => teaMatches(tea, query)) : [],
+    [teas, query, hasSearch],
+  );
+  const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean);
+  const recent = recentIds.filter(id => !pinnedIds.includes(id))
+    .map(id => teas.find(tea => tea.id === id)).filter(Boolean);
   function chooseTea(tea) {
     setSelectedId(tea.id);
     setVolume(250);
@@ -232,17 +237,22 @@ export default function App() {
               <Box className="fac-sheet-scroll" key="search">
                 <Box className="fac-tea-catalog">
                   {message && <Typography role="status">{message}</Typography>}
-                  {pinned.length > 0 && (
+                  {catalog.status === 'loading' && <Typography>Loading tea catalogue…</Typography>}
+                  {catalog.status === 'error' && <Typography role="alert" color="error">{catalog.error}</Typography>}
+                  {catalog.status === 'ready' && (hasSearch ? (
+                    <>
+                      <Typography component="h2" className="fac-tea-catalog__title">Search Results</Typography>
+                      {results.length === 0 && <Typography>No matching tea found.</Typography>}
+                      <Box className="fac-tea-catalog__list">{results.map(renderTeaRow)}</Box>
+                    </>
+                  ) : (
                     <>
                       <Typography component="h2" className="fac-tea-catalog__title">Pinned Teas</Typography>
                       <Box className="fac-tea-catalog__list">{pinned.map(renderTeaRow)}</Box>
+                      <Typography component="h2" className="fac-tea-catalog__title">Last Search</Typography>
+                      <Box className="fac-tea-catalog__list">{recent.map(renderTeaRow)}</Box>
                     </>
-                  )}
-                  <Typography component="h2" className="fac-tea-catalog__title">Search Results</Typography>
-                  {catalog.status === 'loading' && <Typography>Loading tea catalogue…</Typography>}
-                  {catalog.status === 'error' && <Typography role="alert" color="error">{catalog.error}</Typography>}
-                  {catalog.status === 'ready' && unpinnedResults.length === 0 && pinned.length === 0 && <Typography>No matching tea found.</Typography>}
-                  <Box className="fac-tea-catalog__list">{unpinnedResults.map(renderTeaRow)}</Box>
+                  ))}
                 </Box>
               </Box>
               <Box className="fac-sheet-footer">

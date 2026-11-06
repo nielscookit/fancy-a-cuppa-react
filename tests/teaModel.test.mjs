@@ -46,3 +46,11 @@ test('bag and measure dosage scales with selected vessel size', () => {
   assert.equal(formatDose(calculateDose({qty:1,base:250,unit:'measure'},900),'measure'),'3,6 measures');
   assert.equal(calculateDose(bag,0),null);
 });
+
+test('search matches typed prefixes at the beginning of keywords', () => {
+  const tea = { name:'Assam Brahmaputra', brand:'Tea House', category:'black' };
+  assert.ok(teaMatches(tea, 'B'));
+  assert.ok(teaMatches(tea, 'bra ass'));
+  assert.ok(!teaMatches(tea, 'rahma'));
+  assert.ok(!teaMatches(tea, 'rba'));
+});

@@ -86,8 +86,8 @@ export function teaMatches(tea,query) {
     getUiTeaCategory(tea.category),UI_CATEGORY_LABELS[getUiTeaCategory(tea.category)],
     tea.code?.value,...(tea.codes||[]).map(c=>c.value),
     tea.type==='bag'?'tea bag teebeutel':'loose tea loser tee',
-  ].join(' '));
-  return words.every(word=>indexed.includes(word));
+  ].join(' ')).split(' ');
+  return words.every(word => indexed.some(keyword => keyword.startsWith(word)));
 }
 export function calculateDose(tea,waterMl) {
   if(!tea||!(waterMl>0)||!(tea.base>0))return null;
