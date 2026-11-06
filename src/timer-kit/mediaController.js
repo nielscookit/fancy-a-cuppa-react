@@ -316,7 +316,7 @@ export function createMediaController({
     }
     lastStillTime = t;
   }
-  listen(videos[2], 'timeupdate', onStillTime);
+  // Timer Kit: Steep animation remains silent; no loop bubble cue.
 
   async function show(i) {
     if (!active || destroyed || (transitioning && i !== 3)) return;
