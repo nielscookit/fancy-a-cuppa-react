@@ -128,14 +128,14 @@ export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) 
         <Typography sx={{mt:2,fontSize:12,color:'text.secondary'}}>
           Entries that the current database writer cannot preserve are blocked rather than silently discarded.
         </Typography>
-      </Box>
-      <Box className="fac-sheet-footer fac-sheet-editor-actions">
-        {error && <Typography role="alert" color="error" sx={{fontSize:13}}>{error}</Typography>}
-        <Button variant="contained" type="button" onClick={onCancel} disabled={saving}
-          className="fac-sheet-add fac-sheet-editor-cancel">CANCEL</Button>
-        <Button variant="contained" type="submit" disabled={saving} className="fac-sheet-add">
-          {saving?'SAVING…':'SAVE'}
-        </Button>
+        <Box className="fac-sheet-editor-actions">
+          {error && <Typography role="alert" color="error" sx={{fontSize:13}}>{error}</Typography>}
+          <Button variant="contained" type="button" onClick={onCancel} disabled={saving}
+            className="fac-sheet-add fac-sheet-editor-cancel">CANCEL</Button>
+          <Button variant="contained" type="submit" disabled={saving} className="fac-sheet-add">
+            {saving?'SAVING…':'SAVE'}
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

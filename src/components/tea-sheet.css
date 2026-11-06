@@ -121,8 +121,8 @@
 .fac-sheet-editor {
   display:flex; flex:1 1 auto; flex-direction:column; min-height:0;
 }
-.fac-sheet-scroll--editor { padding:16px 8px; }
-.fac-sheet-editor-actions { display:grid; gap:16px; }
+.fac-sheet-scroll--editor { padding:16px 8px 8px; }
+.fac-sheet-editor-actions { display:grid; gap:16px; margin-top:16px; }
 .fac-sheet-editor-cancel.MuiButton-root,
 .fac-sheet-editor-cancel.MuiButton-root:hover {
   background:#E8E6E3; color:#1B272B;
