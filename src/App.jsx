@@ -194,11 +194,14 @@ export default function App() {
   const renderTeaRow = tea => (
     <Button key={tea.id} type="button" fullWidth className="fac-tea-catalog__item"
       onClick={() => chooseTea(tea)}>
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography sx={{ fontSize:16, fontWeight:700, textTransform:'none' }}>{tea.rawName}</Typography>
-        <Typography sx={{ fontSize:16, fontWeight:400, textTransform:'none' }}>{tea.brand}</Typography>
+      <img className="fac-tea-row-icon" src={import.meta.env.BASE_URL + 'figma/tea-list-category.svg'} alt="" />
+      <Box className="fac-tea-row-content" sx={{flex:1}}>
+        <Typography sx={{ fontSize:16, lineHeight:'24px', fontWeight:700 }}>{tea.rawName}</Typography>
+        <Typography sx={{ fontSize:16, lineHeight:'24px', fontWeight:400 }}>{tea.brand}</Typography>
       </Box>
-      <span aria-hidden="true" className="fac-tea-row-arrow">›</span>
+      <span aria-hidden="true" className="fac-tea-row-arrow">
+        <span className="material-symbols-outlined">arrow_forward</span>
+      </span>
     </Button>
   );
   return (
@@ -213,18 +216,20 @@ export default function App() {
           onTeaAssistant={showTeaAssistant}
         />
       </Box>
+      {sheetOpen && !quickTimerOpen && (
+        <IconButton onClick={closeSheet} aria-label="Close tea assistant"
+          className="fac-sheet-floating-close">
+          <img src={import.meta.env.BASE_URL + 'figma/tea-close.svg'} alt="" />
+        </IconButton>
+      )}
       <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
         ModalProps={{ keepMounted:true }}
         PaperProps={{ className:'fac-sheet-paper' }}>
         <Box className="fac-sheet" component="main">
-          <Box className="fac-sheet-top">
-            <IconButton onClick={closeSheet} aria-label="Close tea assistant" className="fac-sheet-close">
-              <span aria-hidden="true">×</span>
-            </IconButton>
-          </Box>
+          <Box className="fac-sheet-top" />
           {(mode === 'search' || mode === 'prep') && (
             <>
-              <Box className="fac-sheet-search">
+              <Box className={mode === "prep" ? "fac-sheet-search fac-sheet-search--detail" : "fac-sheet-search"}>
                 <TeaSearchBar
                   value={isSearch ? query : ''}
                   onChange={value => { setQuery(value); setMode('search'); }}
@@ -266,9 +271,6 @@ export default function App() {
           )}
           {mode === 'prep' && selected && (
             <Box className="fac-sheet-scroll fac-sheet-scroll--detail" key="detail">
-              <Box className="fac-sheet-back">
-                <Button onClick={openSearch} type="button">‹ Back to search</Button>
-              </Box>
               <TeaDetail
                 tea={selected}
                 volume={volume} onVolumeChange={setVolume}
