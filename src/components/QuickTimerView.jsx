@@ -9,16 +9,16 @@ import './quick-timer.css';
 const PHASES = ['Fill', 'Brew', 'Steep', 'Milk'];
 
 /**
- * Phase 1B: separate presentation of the existing iPhone-validated timer.
+ * Shared countdown view with a still image or the validated video sequence.
  *
- * Stay mounted (with four real <video> elements) behind Home so prefetch
+ * In video mode, stay mounted with four video elements behind Home so prefetch
  * finishes BEFORE the first "Fancy a Cuppa?" tap. We never start from an
  * effect/Promise: begin(seconds) is called directly inside the Home click.
  */
 const QuickTimerView = forwardRef(function QuickTimerView({
   active = false,
   onClose,
-  onPreloadChange,
+  stillImage,
 }, ref) {
   const videoRefs = useRef([]);
   const [playbackStalled, setPlaybackStalled] = useState(false);
@@ -26,15 +26,11 @@ const QuickTimerView = forwardRef(function QuickTimerView({
   // Fixed initialSeconds ensures +/- changes on Home do not recreate the
   // controller and trigger a fresh four-video download.
   const { snapshot, actions } = useTeaTimer({
-    videoRefs,
+    videoRefs: stillImage ? undefined : videoRefs,
     assetBase: import.meta.env.BASE_URL + 'media/',
     initialSeconds: 120,
   });
   const { countdown, preload, phase, error } = snapshot;
-
-  useEffect(() => {
-    onPreloadChange?.(preload);
-  }, [onPreloadChange, preload]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -66,14 +62,14 @@ const QuickTimerView = forwardRef(function QuickTimerView({
     begin(seconds) {
       // Both calls run synchronously inside the originating click, preserving
       // Safari's direct gesture for milk priming, audio and Fill video.play().
-      if (preload !== 'ready') return false;
+      if (!stillImage && preload !== 'ready') return false;
       setPlaybackStalled(false);
       actions.setSeconds(seconds);
       return actions.start();
     },
     reset: () => actions.reset(),
     retryPreload: () => actions.retryPreload(),
-  }), [preload, actions]);
+  }), [stillImage, preload, actions]);
 
   const playbackLabel = countdown.finished ? 'FINISHED' :
     countdown.running || countdown.preparing ? 'PAUSE' : 'RESUME';
@@ -89,6 +85,9 @@ const QuickTimerView = forwardRef(function QuickTimerView({
     actions.reset();
     onClose?.();
   };
+  const displayedTime = stillImage
+    ? formatCountdown(Math.ceil(countdown.remaining)).slice(0, -2).replace(/^0/, '')
+    : formatCountdown(countdown.remaining);
   const milkMissing = (countdown.finished || countdown.remaining <= 2) &&
     phase !== 3 && phase >= 0;
 
@@ -108,7 +107,7 @@ const QuickTimerView = forwardRef(function QuickTimerView({
         </Typography>
         <Box className="fac-quick-timer__media">
           <Box className="fac-timer-visual fac-quick-timer__visual">
-            {PHASES.map((name, index) => (
+            {stillImage ? <img className="fac-quick-timer__still" src={stillImage} alt="" /> : PHASES.map((name, index) => (
               <video
                 key={name}
                 ref={element => { videoRefs.current[index] = element; }}
@@ -123,12 +122,12 @@ const QuickTimerView = forwardRef(function QuickTimerView({
           </Box>
           <Typography component="output" role="timer" aria-live="off"
             className="fac-quick-timer__countdown">
-            {formatCountdown(countdown.remaining)}
+            {displayedTime}
           </Typography>
           <Typography role="status" className="fac-quick-timer__state">
             {countdown.finished ? 'Your tea is ready' :
               countdown.preparing ? 'Starting video…' :
-              countdown.running ? 'Brewing · ' + (PHASES[phase] || 'Preparing') :
+              countdown.running ? (stillImage ? 'Brewing' : 'Brewing · ' + (PHASES[phase] || 'Preparing')) :
               countdown.remaining < countdown.total ? 'Paused' :
               preload === 'ready' ? 'Ready' :
               preload === 'error' ? 'Video loading failed' : 'Preparing videos…'}
@@ -147,7 +146,7 @@ const QuickTimerView = forwardRef(function QuickTimerView({
         <Box className="fac-quick-timer__controls">
           <Button type="button" variant="contained" disableElevation disableRipple
             className="fac-quick-timer__button fac-quick-timer__button--primary"
-            disabled={preload !== 'ready' || countdown.finished}
+            disabled={countdown.finished || (!stillImage && preload !== 'ready')}
             onClick={onPrimary}>
             {playbackLabel}
           </Button>

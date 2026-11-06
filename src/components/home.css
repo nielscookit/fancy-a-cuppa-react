@@ -188,8 +188,9 @@ body {
 .fac-home__action--primary.MuiButton-root.Mui-disabled {
   background:#B9FC69; color:#1B272B; opacity:.65;
 }
-@media (max-height:690px) {
-  .fac-home__tea-image { top:30px; }
-  .fac-home__countdown.MuiTypography-root { top:calc(30px + min(100vw, 375px) - 18px); }
+@media (max-height:760px) {
+  .fac-home__canvas { --image-size: min(100vw, 375px, calc(max(100svh, 560px) - 340px)); }
+  .fac-home__tea-image { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }
+  .fac-home__countdown.MuiTypography-root { top:calc(30px + var(--image-size) - 18px); }
   .fac-home__time-control { bottom:196px; }
 }

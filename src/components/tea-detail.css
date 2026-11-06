@@ -15,7 +15,7 @@
   height: 52px;
   border-radius: 40px;
   margin: 0 8px 24px;
-  padding: 0 8px 0 24px;
+  padding: 0 5px 0 24px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -37,10 +37,10 @@
   outline: none;
 }
 .fac-tea-search__scanner.MuiIconButton-root {
-  width: 48px; height: 48px; min-width: 48px;
-  padding: 12px; border-radius: 100px;
+  width: 42px; height: 42px; min-width: 42px;
+  padding: 0; border-radius: 100px;
 }
-.fac-tea-search__scanner img { width: 24px; height: 24px; }
+.fac-tea-search__scanner img { display:block; }
 .fac-tea-search__file { display: none; }
 
 /* Figma v2: one continuous white surface, 757px tall below the search. */

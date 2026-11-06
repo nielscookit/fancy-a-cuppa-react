@@ -177,3 +177,27 @@ test('Phase 1B quick start sets chosen seconds and starts synchronously inside o
   assert.equal(h.session.start(), true, 'Repeated quick Start works without re-prefetch');
   h.session.destroy();
 });
+
+test('static presentation starts immediately without creating a video controller', () => {
+  const session = createTeaTimerSession({
+    initialSeconds: 60,
+    factories: {
+      audio: () => ({ unlock() {}, reset() {}, destroy() {} }),
+      media: () => assert.fail('Static presentation must not prepare video'),
+    },
+  });
+  try {
+    assert.equal(session.getSnapshot().preload, 'ready');
+    assert.equal(session.start(), true);
+    assert.equal(session.getSnapshot().countdown.running, true);
+    session.toggle();
+    assert.equal(session.getSnapshot().countdown.running, false);
+    session.toggle();
+    assert.equal(session.getSnapshot().countdown.running, true);
+    session.reset();
+    assert.equal(session.getSnapshot().countdown.remaining, 60);
+    assert.equal(session.getSnapshot().countdown.running, false);
+  } finally {
+    session.destroy();
+  }
+});

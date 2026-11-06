@@ -3,13 +3,14 @@
   height:calc(100dvh - 137px);
   max-height:calc(100dvh - 137px);
   border-radius:30px 30px 0 0;
-  background:#fff; overflow:hidden;
+  background:#fff; overflow:visible;
+  width:min(100%, 375px); margin-inline:auto;
   box-shadow:0 -1px 3px rgba(0,0,0,.14);
 }
 .fac-sheet { display:flex; flex-direction:column; min-height:0; height:100%; color:#1B272B; }
 .fac-sheet-top { height:32px; flex:0 0 32px; }
 .fac-sheet-floating-close.MuiIconButton-root {
-  position:fixed; top:80px; right:max(12px, calc((100vw - 375px)/2 + 12px));
+  position:absolute; top:-57px; right:12px;
   z-index:1401; width:48px; height:48px; padding:0; border-radius:50%;
   background:#F3F2F0;
 }
@@ -37,14 +38,13 @@
 .fac-tea-row-icon { flex:0 0 48px; width:48px; height:48px; display:block; }
 .fac-tea-row-content {
   height:72px; min-width:0; display:flex; flex-direction:column; justify-content:center;
-  border-block:1px solid #E8E6E3;
+  border-top:1px solid #E8E6E3;
 }
-.fac-tea-row-arrow {
-  display:flex; align-items:center; justify-content:center;
-  flex:0 0 48px; width:48px; height:48px; border-radius:50%;
-  background:#F3F2F0; color:#1B272B;
+.fac-sheet .fac-tea-catalog__item:last-child .fac-tea-row-content { border-bottom:1px solid #E8E6E3; }
+.fac-tea-row-content .MuiTypography-root {
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.fac-tea-row-arrow .material-symbols-outlined { font-size:24px; }
+.fac-tea-row-arrow { display:block; flex:0 0 48px; }
 .fac-sheet-footer {
   flex:0 0 auto; box-sizing:border-box;
   background:#fff; padding:0 8px max(48px, env(safe-area-inset-bottom));
@@ -69,6 +69,10 @@
 }
 .fac-sheet-scroll--detail .fac-tea-card__actions .fac-tea-card__icon:last-child {
   margin-left:auto;
+}
+.fac-sheet-scroll--detail .fac-tea-card__icon[aria-pressed="true"] {
+  outline:2px solid #1B272B;
+  outline-offset:-2px;
 }
 .fac-sheet-scroll--detail .fac-tea-card__identity {
   position:absolute; left:24px; right:24px; top:64px; padding:0;
@@ -99,7 +103,6 @@
 .fac-sheet-scroll--editor { padding:0 8px max(32px,env(safe-area-inset-bottom)); }
 @media (max-height:600px) {
   .fac-sheet-paper.MuiDrawer-paper { height:calc(100dvh - 105px); max-height:calc(100dvh - 105px); }
-  .fac-sheet-floating-close.MuiIconButton-root { top:48px; }
   .fac-sheet-footer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
 }
 

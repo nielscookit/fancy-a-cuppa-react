@@ -10,7 +10,7 @@ import TeaDetail from './components/TeaDetail.jsx';
 import TeaSearchBar from './components/TeaSearchBar.jsx';
 import { initialDetailMinutes } from './features/teaDetailModel.js';
 import './components/tea-detail.css';
-import HomeScreen from './components/HomeScreen.jsx';
+import HomeScreen, { HOME_IMAGE } from './components/HomeScreen.jsx';
 import QuickTimerView from './components/QuickTimerView.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
 import Snackbar from '@mui/material/Snackbar';
@@ -44,7 +44,6 @@ export default function App() {
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
   const [quickNotice, setQuickNotice] = useState('');
   const [quickTimerOpen, setQuickTimerOpen] = useState(false);
-  const [quickVideoStatus, setQuickVideoStatus] = useState('loading');
   const quickTimerRef = useRef(null);
   const [pinnedIds, setPinnedIds] = useState(() => {
     try { const value = JSON.parse(localStorage.getItem('fac-v3-pinned-teas') || '[]'); return Array.isArray(value) ? value.filter(id => typeof id === 'string') : []; }
@@ -67,18 +66,7 @@ export default function App() {
     setScanError('');
   };
   const openTimerWithSeconds = (seconds) => {
-    if (quickVideoStatus === 'error') {
-      setQuickNotice('Video preparation failed. Retrying…');
-      quickTimerRef.current?.retryPreload();
-      return;
-    }
-    if (quickVideoStatus !== 'ready') {
-      setQuickNotice('Preparing the videos. Please try again shortly.');
-      return;
-    }
-    // Both Home and selected-tea BREW use the same already-mounted session.
-    // iPhone Safari needs the first .play() within the ORIGINAL button tap:
-    // make the overlay visible synchronously, then immediately start it.
+    // Open and start in the originating tap so Safari can unlock timer audio.
     flushSync(() => setQuickTimerOpen(true));
     const started = quickTimerRef.current?.begin(seconds);
     if (!started) {
@@ -88,7 +76,7 @@ export default function App() {
   };
   const startQuickTimer = () => openTimerWithSeconds(quickMinutes * 60);
   const startDetailTimer = () => {
-    if (quickVideoStatus === 'ready') setMode('closed');
+    closeSheet();
     openTimerWithSeconds(detailMinutes * 60);
   };
 
@@ -96,6 +84,7 @@ export default function App() {
     closeSheet();
     setQuickTimerOpen(false);
   };
+  useEffect(() => { saveQuickMinutes(quickMinutes); }, [quickMinutes]);
   const photoRef = useRef(null);
 
   useEffect(() => {
@@ -125,7 +114,6 @@ export default function App() {
     try { localStorage.setItem(RECENTS_KEY, JSON.stringify(ids)); } catch { /* privacy mode */ }
   }
   function openSearch() {
-    setQuery('');
     setMode('search');
     setScanError('');
     setMessage('');
@@ -199,9 +187,8 @@ export default function App() {
         <Typography sx={{ fontSize:16, lineHeight:'24px', fontWeight:700 }}>{tea.rawName}</Typography>
         <Typography sx={{ fontSize:16, lineHeight:'24px', fontWeight:400 }}>{tea.brand}</Typography>
       </Box>
-      <span aria-hidden="true" className="fac-tea-row-arrow">
-        <span className="material-symbols-outlined">arrow_forward</span>
-      </span>
+      <img className="fac-tea-row-arrow"
+        src={import.meta.env.BASE_URL + 'figma/tea-row-open.svg'} width="48" height="48" alt="" />
     </Button>
   );
   return (
@@ -212,20 +199,17 @@ export default function App() {
           minutes={quickMinutes}
           onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous,delta))}
           onBrew={startQuickTimer}
-          brewDisabled={quickVideoStatus === 'loading'}
           onTeaAssistant={showTeaAssistant}
         />
       </Box>
-      {sheetOpen && !quickTimerOpen && (
-        <IconButton onClick={closeSheet} aria-label="Close tea assistant"
-          className="fac-sheet-floating-close">
-          <img src={import.meta.env.BASE_URL + 'figma/tea-close.svg'} alt="" />
-        </IconButton>
-      )}
       <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
         ModalProps={{ keepMounted:true, BackdropProps:{ sx:{backgroundColor:'#fff'} } }}
         PaperProps={{ className:'fac-sheet-paper' }}>
         <Box className="fac-sheet" component="main">
+          <IconButton onClick={closeSheet} aria-label="Close tea assistant"
+            className="fac-sheet-floating-close">
+            <img src={import.meta.env.BASE_URL + 'figma/tea-close.svg'} alt="" />
+          </IconButton>
           <Box className="fac-sheet-top" />
           {(mode === 'search' || mode === 'prep') && (
             <>
@@ -234,7 +218,6 @@ export default function App() {
                   value={isSearch ? query : ''}
                   onChange={value => { setQuery(value); setMode('search'); }}
                   onFocus={() => { if (!isSearch) openSearch(); }}
-                  onScan={() => photoRef.current?.click()}
                   photoRef={photoRef}
                   scanning={scannerBusy}
                   onPhoto={scanPhoto}
@@ -282,7 +265,6 @@ export default function App() {
                 pinned={pinnedIds.includes(selected.id)}
                 onTogglePin={() => togglePin(selected.id)}
                 onBrew={startDetailTimer}
-                brewDisabled={quickVideoStatus !== 'ready'}
               />
             </Box>
           )}
@@ -299,7 +281,7 @@ export default function App() {
         </Box>
       </Drawer>
       <QuickTimerView ref={quickTimerRef} active={quickTimerOpen}
-        onClose={closeQuickTimer} onPreloadChange={setQuickVideoStatus} />
+        onClose={closeQuickTimer} stillImage={HOME_IMAGE} />
       <Snackbar open={Boolean(quickNotice)} autoHideDuration={4200}
         onClose={() => setQuickNotice('')} message={quickNotice}
         anchorOrigin={{vertical:'top',horizontal:'center'}} />

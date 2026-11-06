@@ -25,7 +25,7 @@ function VolumeOption({ value, current, onChange }) {
 /** Node 123:144 — selected tea preparation, mounted in the continuous Home page. */
 export default function TeaDetail({
   tea, volume, onVolumeChange, customMl, onCustomChange,
-  minutes, onMinuteStep, onEdit, onClose, pinned, onTogglePin, onBrew, brewDisabled,
+  minutes, onMinuteStep, onEdit, onClose, pinned, onTogglePin, onBrew,
 }) {
   if (!tea) return null;
   const water = volume === null ? Number(customMl) : volume;
@@ -87,7 +87,7 @@ export default function TeaDetail({
         </div>
         <Button type="button" variant="contained" fullWidth disableRipple disableElevation
           className="fac-tea-result__brew" onClick={onBrew}
-          disabled={brewDisabled}>
+          disabled={!validWater}>
           BREW
         </Button>
       </div>

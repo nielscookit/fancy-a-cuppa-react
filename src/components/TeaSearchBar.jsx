@@ -5,7 +5,7 @@ const asset = import.meta.env.BASE_URL + 'figma/';
 
 /** Figma 03 · Tea Detail 52px search field; results remain the V3 list. */
 export default function TeaSearchBar({
-  value, onChange, onFocus, onScan, scanning, photoRef, onPhoto,
+  value, onChange, onFocus, scanning, photoRef, onPhoto,
 }) {
   return (
     <div className="fac-tea-search">
@@ -19,7 +19,7 @@ export default function TeaSearchBar({
       <IconButton className="fac-tea-search__scanner"
         aria-label="Scan a tea barcode" disabled={scanning}
         onClick={() => photoRef.current?.click()} disableRipple>
-        <img src={asset + 'tea-scanner.svg'} width="24" height="24" alt="" />
+        <img src={asset + 'tea-sheet-scanner.svg'} width="42" height="42" alt="" />
       </IconButton>
       <input type="file" ref={photoRef} accept="image/*" capture="environment"
         onChange={onPhoto} className="fac-tea-search__file" aria-label="Photograph a barcode" />

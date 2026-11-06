@@ -24,16 +24,16 @@ test('Figma static assets are local and each is exactly placed',()=>{
   const detail=fs('src/components/TeaDetail.jsx','utf8');
   const search=fs('src/components/TeaSearchBar.jsx','utf8');
   const css=fs('src/components/tea-detail.css','utf8');
-  for(const item of ['search','scanner','category','close','edit','tune']){
+  for(const item of ['search','sheet-scanner','category','detail-close','detail-pin','edit','tune']){
     const svg=fs('public/figma/tea-'+item+'.svg','utf8');
     assert.match(svg,/<svg/);
     assert.ok(svg.length>100);
   }
-  for(const asset of ['tea-close.svg','tea-edit.svg','tea-category.svg']) assert.ok(card.includes(asset));
+  for(const asset of ['tea-detail-close.svg','tea-detail-pin.svg','tea-edit.svg','tea-category.svg']) assert.ok(card.includes(asset));
   assert.doesNotMatch(card,/tea-photo-square\.jpg|tea\.photoUrl|tea\.imageUrl/);
   assert.match(card,/getCategoryVisual\(uiCategory\)/);
   assert.match(search,/tea-search\.svg/);
-  assert.match(search,/tea-scanner\.svg/);
+  assert.match(search,/tea-sheet-scanner\.svg/);
   assert.match(detail,/tea-tune\.svg/);
   assert.match(detail,/tea-v2-minus\.svg/);
   assert.match(detail,/tea-v2-plus\.svg/);

@@ -34,7 +34,7 @@ export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240 }) {
   useEffect(() => {
     let mounted = true;
     const session = createTeaTimerSession({
-      videos: videoRefs.current,
+      videos: videoRefs?.current,
       assetBase,
       initialSeconds,
       onChange: value => { if (mounted) setSnapshot(value); },

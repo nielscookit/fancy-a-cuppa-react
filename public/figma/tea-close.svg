@@ -1,9 +1,13 @@
-<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-<circle cx="24" cy="24" r="24" fill="#EEEEEC"/>
-<mask id="mask0_76_6590" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="12" y="12" width="24" height="24">
-<rect x="12" y="12" width="24" height="24" fill="#323234"/>
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Close Button">
+<circle id="Ellipse 2" opacity="0.8" cx="24" cy="24" r="24" fill="#E8E6E3"/>
+<g id="close">
+<mask id="mask0_0_15" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="12" y="12" width="24" height="24">
+<rect id="Bounding box" x="12" y="12" width="24" height="24" fill="#1B272B"/>
 </mask>
-<g mask="url(#mask0_76_6590)">
-<path d="M18.4 31L17 29.6L22.6 24L17 18.4L18.4 17L24 22.6L29.6 17L31 18.4L25.4 24L31 29.6L29.6 31L24 25.4L18.4 31Z" fill="#323234"/>
+<g mask="url(#mask0_0_15)">
+<path id="close_2" d="M18.4 31L17 29.6L22.6 24L17 18.4L18.4 17L24 22.6L29.6 17L31 18.4L25.4 24L31 29.6L29.6 31L24 25.4L18.4 31Z" fill="#1B272B"/>
+</g>
+</g>
 </g>
 </svg>

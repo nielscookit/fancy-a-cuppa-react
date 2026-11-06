@@ -3,13 +3,13 @@ import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js'
 import './home.css';
 
 const SVG_BASE = import.meta.env.BASE_URL + 'figma/';
-const HOME_IMAGE = import.meta.env.BASE_URL + 'images/home-tea.png';
+export const HOME_IMAGE = import.meta.env.BASE_URL + 'images/home-tea.png';
 
 /**
  * Approved Figma Home (node 152:151, 375 × 812).
  * UI only: the direct BREW -> Timer flow is deliberately scoped to Phase 1B.
  */
-export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, brewDisabled = false }) {
+export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant }) {
   return (
     <>
       <Box component="section" className="fac-home" aria-label="Home">
@@ -45,8 +45,6 @@ export default function HomeScreen({ minutes, onStep, onBrew, onTeaAssistant, br
           disableRipple
           className="fac-home__action fac-home__action--primary"
           onClick={onBrew}
-          disabled={brewDisabled}
-          aria-label={brewDisabled ? 'Preparing tea timer videos' : 'Fancy a Cuppa'}
         >
           Fancy a Cuppa
         </Button>

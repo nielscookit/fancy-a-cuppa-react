@@ -19,12 +19,13 @@ export function createTeaTimerSession({
   // its teardown. Do not pass React's MUTABLE videoRefs.current array itself.
   // Otherwise media.destroy() -> reset() may dereference null and crash the
   // entire app when the selected tea card is closed.
+  const stillMedia = !videos;
   const mountedVideos = Array.isArray(videos) ? videos.slice() : videos;
   const makeAudio = factories.audio || createAudioController;
   const makeMedia = factories.media || createMediaController;
   const makeTimer = factories.timer || createTimerController;
   let disposed = false;
-  let preload = 'loading';
+  let preload = stillMedia ? 'ready' : 'loading';
   let phase = -1;
   let error = null;
   let countdown = {
@@ -44,7 +45,11 @@ export function createTeaTimerSession({
   let media;
   let timer;
   try {
-    media = makeMedia({
+    const noop = () => {};
+    media = stillMedia ? {
+      start: noop, resume: noop, pause: noop, reset: noop,
+      unlock: noop, milk: noop, finish: noop, destroy: noop, retryMilkPlayback: noop,
+    } : makeMedia({
       videos: mountedVideos, assetBase,
       onError: reportError,
       onPhase: nextPhase => { phase = nextPhase; notify(); },
