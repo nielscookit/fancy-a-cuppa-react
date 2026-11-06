@@ -81,7 +81,9 @@ test('updateTea strips V2 cloud- prefix for the Edge Function', async () => {
   await updateTea({
     id: 'cloud-' + example.id, brand: 'Test brand', name: 'Assam',
     category: 'black', subcategory: 'assam', type: 'loose', unit: 'tsp',
-    qty: 4, base: 500, mins: 5,
+    qty: 4, base: 500, mins: 5, leafStyle: 'other',
+    original: { leafStyle:'other',photoUrl:null,
+      instructions:null,sourceLabel:null,code:null },
   }, {
     fetchImpl: async (_url, options) => {
       payload = JSON.parse(options.body);
