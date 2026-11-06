@@ -17,6 +17,17 @@ import Snackbar from '@mui/material/Snackbar';
 import { flushSync } from 'react-dom';
 import './components/tea-sheet.css';
 
+const SHEET_DURATION = { enter: 225, exit: 195 };
+const SHEET_EASING = {
+  enter: 'cubic-bezier(0, 0, 0.2, 1)',
+  exit: 'cubic-bezier(0.4, 0, 0.6, 1)',
+};
+// These slide curves reach half the distance at 20% and 50% of their duration.
+const SHEET_CLOSE_FADE = {
+  '--close-fade-in': `${SHEET_DURATION.enter * 0.2}ms`,
+  '--close-fade-out': `${SHEET_DURATION.exit * 0.5}ms`,
+};
+
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
 function readRecents() {
   try {
@@ -209,7 +220,13 @@ export default function App() {
       </Box>
       <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
         ModalProps={{ keepMounted:true, BackdropProps:{ sx:{backgroundColor:'#fff'} } }}
-        PaperProps={{ className:'fac-sheet-paper' }}>
+        transitionDuration={SHEET_DURATION}
+        slotProps={{ transition:{ easing:SHEET_EASING } }}
+        PaperProps={{
+          className:'fac-sheet-paper',
+          'data-open':sheetOpen,
+          style:SHEET_CLOSE_FADE,
+        }}>
         <Box className="fac-sheet" component="main">
           <IconButton onClick={closeSheet} aria-label="Close tea assistant"
             className="fac-sheet-floating-close">
