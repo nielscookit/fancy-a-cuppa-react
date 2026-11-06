@@ -6,6 +6,9 @@ import { formatTeaDetailDose, initialDetailMinutes, CATEGORY_ENGLISH } from '../
 test('Figma Tea Detail copy maps Supabase categories and units without changing existing data',()=>{
   assert.equal(CATEGORY_ENGLISH.black,'BLACK TEA');
   assert.equal(CATEGORY_ENGLISH.green,'GREEN TEA');
+  assert.equal(CATEGORY_ENGLISH.fruit,'FRUIT');
+  assert.equal(CATEGORY_ENGLISH.herbal,'HERBAL');
+  assert.equal(CATEGORY_ENGLISH.other,'OTHER');
   assert.equal(formatTeaDetailDose(1.5,'tsp'),'1,5 tsp');
   assert.equal(formatTeaDetailDose(2,'bag'),'2 bags');
   assert.equal(formatTeaDetailDose(3.6,'measure'),'3,6 measures');

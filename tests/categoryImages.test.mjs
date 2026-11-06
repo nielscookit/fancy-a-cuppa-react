@@ -74,7 +74,7 @@ test('Tea Editor no longer includes the product photo field',()=>{
   const editor=readFileSync('src/components/TeaEditor.jsx','utf8');
   assert.doesNotMatch(editor,/Photo URL \(optional\)|label="Photo"|label="Foto"/);
   const detailLabels=readFileSync('src/features/teaDetailModel.js','utf8');
-  assert.match(detailLabels,/FRUIT INFUSIONS/);
-  assert.match(detailLabels,/HERBAL INFUSIONS/);
-  assert.match(detailLabels,/OTHER INFUSIONS/);
+  assert.match(detailLabels,/fruit:'FRUIT'/);
+  assert.match(detailLabels,/herbal:'HERBAL'/);
+  assert.match(detailLabels,/other:'OTHER'/);
 });

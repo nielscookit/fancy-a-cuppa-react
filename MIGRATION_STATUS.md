@@ -471,3 +471,5 @@
   technical categories remain unchanged. No data was rewritten or removed.
 - No changes to category image mappings, timer, media playback, V2, search
   implementation, database, or the approved Figma layout.
+
+- Tea Card visual category labels also now say FRUIT, HERBAL, OTHER, matching the six-choice editor; the underlying Supabase values remain unchanged.
