@@ -30,7 +30,7 @@ test('Figma static assets are local and each is exactly placed',()=>{
     assert.match(svg,/<svg/);
     assert.ok(svg.length>100);
   }
-  for(const asset of ['tea-detail-close.svg','tea-detail-pin.svg','tea-detail-pin-selected.svg','tea-edit.svg','tea-category.svg']) assert.ok(card.includes(asset));
+  for(const asset of ['tea-detail-close.svg','tea-edit.svg']) assert.ok(card.includes(asset));
   assert.doesNotMatch(card,/tea-photo-square\.jpg|tea\.photoUrl|tea\.imageUrl/);
   assert.match(card,/getCategoryVisual\(uiCategory\)/);
   assert.match(search,/tea-search\.svg/);

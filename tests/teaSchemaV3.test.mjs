@@ -176,7 +176,7 @@ test('Tea Card and Edit dropdown use Other for legacy categories but retain raw 
   const card=readFileSync('src/components/TeaCard.jsx','utf8');
   const editor=readFileSync('src/components/TeaEditor.jsx','utf8');
   assert.match(card,/const uiCategory=getUiTeaCategory\(tea.category\)/);
-  assert.match(card,/CATEGORY_ENGLISH\[uiCategory\]/);
+  assert.match(card,/<TeaCategoryIcon category=\{tea.category\}/);
   assert.match(card,/getCategoryVisual\(uiCategory\)/);
   assert.match(editor,/value=\{getUiTeaCategory\(form.category\)\}/);
   assert.match(editor,/const next=initialTeaForm\(tea\)/);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { IconButton, Typography } from '@mui/material';
-import { CATEGORY_ENGLISH } from '../features/teaDetailModel.js';
+import TeaCategoryIcon, { TeaSymbol } from './TeaCategoryIcon.jsx';
 import { getUiTeaCategory } from '../features/teaModel.js';
 import { getCategoryVisual } from '../features/categoryImages.js';
 import './tea-detail.css';
@@ -13,11 +13,6 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
   if (!tea) return null;
 
   const uiCategory=getUiTeaCategory(tea.category);
-  const category=CATEGORY_ENGLISH[uiCategory] || 'OTHER';
-  const variety=tea.subcategory==='other'
-    ? tea.subcategory_other || ''
-    : tea.subcategory || '';
-  const leaf=tea.leafStyle==='bag' ? 'TEA BAG' : tea.leafStyle || '';
   const visual=getCategoryVisual(uiCategory);
   const showImage=Boolean(visual.imageUrl && visual.imageUrl!==failedImageUrl);
 
@@ -28,13 +23,11 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
           <Typography component="h2" className="fac-tea-card__name">
             {tea.rawName || tea.name}
           </Typography>
-          <Typography className="fac-tea-card__brand">{tea.brand}</Typography>
         </div>
         <div className="fac-tea-card__actions">
           <IconButton aria-label={pinned ? "Unpin tea" : "Pin tea"} aria-pressed={pinned}
-            className="fac-tea-card__icon" onClick={onTogglePin} disableRipple>
-            <img src={iconBase + (pinned ? 'tea-detail-pin-selected.svg' : 'tea-detail-pin.svg')}
-              width="48" height="48" alt="" />
+            className="fac-tea-card__icon fac-tea-card__pin" onClick={onTogglePin} disableRipple>
+            <TeaSymbol name="keep" filled={pinned} />
           </IconButton>
           <IconButton aria-label="Edit tea" className="fac-tea-card__icon" onClick={onEdit} disableRipple>
             <img src={iconBase+'tea-edit.svg'} width="48" height="48" alt="" />
@@ -61,18 +54,8 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
             }}
           />
         )}
-        {/* Figma's tea-type pictogram is shown only when real artwork exists.
-            A colour-only category has neither placeholder nor extra symbol. */}
-        {showImage && (
-          <img className="fac-tea-card__type-symbol"
-            src={iconBase+'tea-category.svg'} width="60" height="60"
-            alt="" />
-        )}
-        <div className="fac-tea-card__tags">
-          <span className="fac-tea-card__tag">{category}</span>
-          {variety && <span className="fac-tea-card__tag">{variety.toUpperCase()}</span>}
-          {!variety && leaf && <span className="fac-tea-card__tag">{leaf.toUpperCase().replaceAll('_',' ')}</span>}
-        </div>
+        <span className="fac-tea-card__manufacturer">{tea.brand}</span>
+        <TeaCategoryIcon category={tea.category} className="fac-tea-card__category" />
       </div>
     </article>
   );

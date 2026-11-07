@@ -55,7 +55,7 @@
   font-family:"Roboto Mono",monospace; text-align:left; text-transform:none;
 }
 .fac-sheet .fac-tea-catalog__item.MuiButton-root:hover { background:#fff; }
-.fac-tea-row-icon { flex:0 0 48px; width:48px; height:48px; display:block; }
+.fac-tea-row-icon { flex:0 0 48px; width:48px; height:48px; display:flex; }
 .fac-tea-row-content {
   height:72px; min-width:0; display:flex; flex-direction:column; justify-content:center;
   border-top:1px solid #E8E6E3;
@@ -67,7 +67,7 @@
 .fac-tea-row-arrow { display:block; flex:0 0 48px; }
 .fac-sheet-footer {
   flex:0 0 auto; box-sizing:border-box;
-  background:#fff; padding:16px 8px max(48px, env(safe-area-inset-bottom));
+  background:#fff; padding:16px 8px max(24px, env(safe-area-inset-bottom));
 }
 .fac-sheet-add.MuiButton-root {
   width:100%; height:66px; min-height:66px; border-radius:100px;
@@ -83,10 +83,10 @@
   padding-bottom:max(49px, env(safe-area-inset-bottom));
 }
 .fac-sheet-scroll--detail .fac-tea-card {
-  position:relative; height:326px; border-radius:0; box-shadow:none; overflow:visible;
+  position:relative; height:308px; border-radius:0; box-shadow:none; overflow:visible;
 }
 .fac-sheet-scroll--detail .fac-tea-card__header {
-  position:relative; display:block; height:134px; padding:0; box-sizing:border-box;
+  position:relative; display:block; height:116px; padding:0; box-sizing:border-box;
 }
 .fac-sheet-scroll--detail .fac-tea-card__actions {
   position:absolute; top:0; left:8px; right:8px; display:flex;
@@ -98,14 +98,23 @@
 .fac-sheet-scroll--detail .fac-tea-card__identity {
   position:absolute; left:24px; right:24px; top:64px; padding:0;
 }
-.fac-sheet-scroll--detail .fac-tea-card__name.MuiTypography-root,
-.fac-sheet-scroll--detail .fac-tea-card__brand.MuiTypography-root { color:#1B272B; }
+.fac-sheet-scroll--detail .fac-tea-card__name.MuiTypography-root {
+  color:#202024; font-size:21px; font-weight:700; line-height:28px;
+}
 .fac-sheet-scroll--detail .fac-tea-card__image-area {
   height:192px; border-radius:0 0 30px 30px; overflow:hidden;
+  box-shadow:0 2px 2px rgba(0,0,0,.10);
 }
-.fac-sheet-scroll--detail .fac-tea-card__type-symbol { display:none; }
-.fac-sheet-scroll--detail .fac-tea-card__tags { right:12px; }
-.fac-sheet-scroll--detail .fac-tea-card__tag { background:rgba(27,39,43,.8); color:#fff; }
+.fac-tea-card__manufacturer {
+  position:absolute; left:12px; bottom:12px; height:33px; box-sizing:border-box;
+  display:flex; align-items:center; max-width:calc(100% - 84px); padding:0 16px;
+  border-radius:100px; background:#1B272B; color:#fff;
+  font-family:"Roboto Mono",monospace; font-size:16px; font-weight:400; line-height:21px;
+  text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.fac-tea-card__category { position:absolute; right:12px; bottom:12px; }
+.fac-tea-card__pin.MuiIconButton-root { background:#F3F2F0; color:#1B272B; }
+.fac-tea-card__pin.MuiIconButton-root[aria-pressed="true"] { background:#1B272B; color:#B9FC69; }
 .fac-sheet-scroll--detail .fac-tea-volume { margin-top:48px; background:#F3F2F0; }
 .fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root {
   color:#fff; background:#1B272B;

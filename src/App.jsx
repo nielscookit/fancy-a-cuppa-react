@@ -7,6 +7,7 @@ import {
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
+import TeaCategoryIcon from './components/TeaCategoryIcon.jsx';
 import TeaSearchBar from './components/TeaSearchBar.jsx';
 import TeaSheetHandle from './components/TeaSheetHandle.jsx';
 import { manufacturerOptions, filterTeaGroups } from './features/teaSearchModel.js';
@@ -213,7 +214,7 @@ export default function App() {
   const renderTeaRow = tea => (
     <Button key={tea.id} type="button" fullWidth className="fac-tea-catalog__item"
       onClick={() => chooseTea(tea)}>
-      <img className="fac-tea-row-icon" src={import.meta.env.BASE_URL + 'figma/tea-list-category.svg'} alt="" />
+      <TeaCategoryIcon category={tea.category} className="fac-tea-row-icon" />
       <Box className="fac-tea-row-content" sx={{flex:1}}>
         <Typography sx={{ fontSize:16, lineHeight:'24px', fontWeight:700 }}>{tea.rawName}</Typography>
         <Typography sx={{ fontSize:16, lineHeight:'24px', fontWeight:400 }}>{tea.brand}</Typography>
