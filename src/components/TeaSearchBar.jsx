@@ -12,8 +12,9 @@ export default function TeaSearchBar({
       <img src={asset + 'tea-search.svg'} width="24" height="24" alt="" />
       <InputBase
         fullWidth value={value} onChange={event => onChange(event.target.value)}
+        onInput={event => onChange(event.target.value)}
         onFocus={onFocus} placeholder="" autoComplete="off"
-        inputProps={{ 'aria-label': 'Search tea', type:'search' }}
+        inputProps={{ 'aria-label': 'Search tea', type:'text', inputMode:'search', enterKeyHint:'search' }}
         className="fac-tea-search__input"
       />
       <IconButton className="fac-tea-search__scanner"
