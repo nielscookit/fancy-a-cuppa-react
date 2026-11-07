@@ -175,3 +175,50 @@ test('write API reports Edge Function error without retrying itself', async () =
   } }), /Test server rejected save/);
   assert.equal(calls, 1);
 });
+
+test('UPC-A and zero-prefixed EAN-13 find either stored representation', async () => {
+  for (const scanned of [{type:'upc_a',value:'012345678905'},
+    {type:'ean_13',value:'0012345678905'}]) {
+    for (const stored of [{code_type:'upc_a',code_value:'012345678905'},
+      {code_type:'ean_13',code_value:'0012345678905'}]) {
+      const tea = await lookupTeaByCode(scanned, {
+        fetchImpl:async url => {
+          const params = new URL(url).searchParams;
+          const filter = params.get('or');
+          assert.ok(filter.includes('and(code_type.eq.' + stored.code_type +
+            ',code_value.eq.' + stored.code_value + ')'));
+          assert.equal(params.get('limit'),'2');
+          return response([{...stored,teas:example}]);
+        },
+      });
+      assert.equal(tea.id,'cloud-' + example.id);
+    }
+  }
+});
+
+test('equivalent barcode rows return one tea and reject conflicting tea identities', async () => {
+  const code = {type:'upc_a',value:'012345678905'};
+  const tea = await lookupTeaByCode(code, {
+    fetchImpl:async () => response([{teas:example},{teas:example}]),
+  });
+  assert.equal(tea.id,'cloud-' + example.id);
+  await assert.rejects(lookupTeaByCode(code, {
+    fetchImpl:async () => response([{teas:example},{teas:{...example,id:'another'}}]),
+  }), /multiple teas/);
+});
+
+test('EAN-8, nonzero EAN-13 and QR codes retain exact matching', async () => {
+  for (const code of [{type:'ean_8',value:'01234565'},
+    {type:'ean_13',value:'5012345678900'},
+    {type:'qr',value:'0012345678905'}]) {
+    await lookupTeaByCode(code, {
+      fetchImpl:async url => {
+        const params = new URL(url).searchParams;
+        assert.equal(params.has('or'),false);
+        assert.equal(params.get('code_type'),'eq.' + code.type);
+        assert.equal(params.get('code_value'),'eq.' + code.value);
+        return response([]);
+      },
+    });
+  }
+});

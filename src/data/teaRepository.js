@@ -93,17 +93,33 @@ export async function listTeas({ signal, fetchImpl = fetch } = {}) {
 
 export async function lookupTeaByCode(code, { signal, fetchImpl = fetch } = {}) {
   if (!code?.type || !code?.value) return null;
-  const url = endpoint + '/rest/v1/tea_codes?select=' + encodeURIComponent(codeSelect)
-    + '&code_type=eq.' + encodeURIComponent(code.type)
-    + '&code_value=eq.' + encodeURIComponent(code.value)
-    + '&limit=1';
+  // UPC-A is the same retail identifier as EAN-13 with a leading zero.
+  // Keep both representations for matching existing catalog records.
+  const isUpc = code.type === 'upc_a' && /^\d{12}$/.test(code.value);
+  const isZeroEan = code.type === 'ean_13' && /^0\d{12}$/.test(code.value);
+  const params = new URLSearchParams({ select: codeSelect });
+  if (isUpc || isZeroEan) {
+    const upc = isUpc ? code.value : code.value.slice(1);
+    params.set('or', '(and(code_type.eq.upc_a,code_value.eq.' + upc +
+      '),and(code_type.eq.ean_13,code_value.eq.0' + upc + '))');
+    params.set('limit', '2');
+  } else {
+    params.set('code_type', 'eq.' + code.type);
+    params.set('code_value', 'eq.' + code.value);
+    params.set('limit', '1');
+  }
+  const url = endpoint + '/rest/v1/tea_codes?' + params;
   const response = await fetchImpl(url, {
     headers: { apikey: supabaseConfig.publishableKey },
     signal,
   });
   const rows = await readJson(response, 'Catalog lookup unavailable');
   if (!Array.isArray(rows)) throw new Error('Invalid barcode lookup response.');
-  return normalizeTea(rows[0]?.teas || null);
+  const matches = rows.map(row => normalizeTea(row.teas)).filter(Boolean);
+  if (matches.some(tea => tea.id !== matches[0].id)) {
+    throw new Error('This barcode matches multiple teas. Please search by name.');
+  }
+  return matches[0] || null;
 }
 
 function requireTeaIdentity(data) {
