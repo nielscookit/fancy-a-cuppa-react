@@ -85,9 +85,10 @@ export function teaMatches(tea,query) {
     CATEGORY_LABELS[tea.category],CATEGORY_ALIASES[tea.category],
     getUiTeaCategory(tea.category),UI_CATEGORY_LABELS[getUiTeaCategory(tea.category)],
     tea.code?.value,...(tea.codes||[]).map(c=>c.value),
+    ...(Array.isArray(tea.keywords) ? tea.keywords : [tea.keywords]),
     tea.type==='bag'?'tea bag teebeutel':'loose tea loser tee',
   ].join(' ')).split(' ');
-  return words.every(word => indexed.some(keyword => keyword.startsWith(word)));
+  return words.every(word => indexed.some(keyword => keyword.includes(word)));
 }
 export function calculateDose(tea,waterMl) {
   if(!tea||!(waterMl>0)||!(tea.base>0))return null;

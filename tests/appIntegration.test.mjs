@@ -19,13 +19,13 @@ test('one sheet: search to detail to search; full close to Home',()=>{
   assert.match(app,/setMode\('search'\)/);
   assert.match(app,/setMode\('closed'\)/);
   assert.match(app,/onClose=\{openSearch\}/);
-  assert.match(app,/onClick=\{closeSheet\}/);
+  assert.match(app,/<TeaSheetHandle onClose=\{closeSheet\}/);
 });
 test('pinned teas stored locally and removed from duplicate results',()=>{
   const app=readFileSync('src/App.jsx','utf8');
   const card=readFileSync('src/components/TeaCard.jsx','utf8');
   assert.match(app,/fac-v3-pinned-teas/);
-  assert.match(app,/recentIds.filter\(id => !pinnedIds.includes\(id\)\)/);
+  assert.match(app,/filterTeaGroups/);
   assert.match(app,/Last Search/);
   assert.match(app,/Pinned Teas/);
   assert.match(card,/onTogglePin/);

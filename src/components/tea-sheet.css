@@ -1,33 +1,40 @@
-/* Figma 152:339 and 158:614. One MUI Drawer shared by both states. */
+/* Figma 184:427 and 158:614. One MUI Drawer shared by both states. */
 .fac-sheet-paper.MuiDrawer-paper {
-  --close-top:max(24px, env(safe-area-inset-top));
-  --close-offset:57px;
-  height:calc(100dvh - var(--close-top) - var(--close-offset));
-  max-height:calc(100dvh - var(--close-top) - var(--close-offset));
+  height:calc(var(--sheet-viewport-height, 100dvh) - 48px);
+  max-height:calc(var(--sheet-viewport-height, 100dvh) - 48px);
+  bottom:var(--sheet-bottom, 0px);
   border-radius:30px 30px 0 0;
-  background:#fff; overflow:visible;
+  background:#fff; overflow:hidden;
   width:min(100%, 375px); margin-inline:auto;
   box-shadow:0 -1px 3px rgba(0,0,0,.14);
 }
 .fac-sheet { display:flex; flex-direction:column; min-height:0; height:100%; color:#1B272B; }
-.fac-sheet-top { height:32px; flex:0 0 32px; }
-.fac-sheet-floating-close.MuiIconButton-root {
-  position:absolute; top:calc(-1 * var(--close-offset)); right:12px;
-  z-index:1401; width:48px; height:48px; padding:0; border-radius:50%;
-  background:#F3F2F0;
-  opacity:0;
-  transition:opacity var(--close-fade-out) ease-out;
+.fac-sheet-handle {
+  display:block; position:relative; flex:0 0 32px; width:100%; height:32px;
+  border:0; padding:0; background:transparent; cursor:grab;
+  touch-action:none; user-select:none; -webkit-user-select:none;
 }
-.fac-sheet-paper[data-open="true"] .fac-sheet-floating-close.MuiIconButton-root {
-  opacity:1;
-  transition-duration:var(--close-fade-in);
+.fac-sheet-handle::before {
+  content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  width:32px; height:4px; border-radius:100px; background:#1B272B;
 }
-@media (prefers-reduced-motion:reduce) {
-  .fac-sheet-paper .fac-sheet-floating-close.MuiIconButton-root {
-    transition:none;
-  }
+.fac-sheet-handle:active { cursor:grabbing; }
+.fac-sheet-handle:focus-visible { outline:2px solid #1B272B; outline-offset:-4px; }
+.fac-manufacturers {
+  display:flex; flex:0 0 auto; gap:8px; padding:16px 8px 16px;
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:none;
+  overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch;
 }
-.fac-sheet-floating-close.MuiIconButton-root img { width:48px; height:48px; display:block; }
+.fac-manufacturers::-webkit-scrollbar { display:none; }
+.fac-manufacturer.MuiButton-root {
+  flex:0 0 auto; min-width:0; height:33px; min-height:33px; padding:0 16px;
+  border-radius:100px; background:#F3F2F0; color:#1B272B;
+  font-family:"Roboto Mono",monospace; font-size:15px; line-height:19px;
+  font-weight:600; text-transform:uppercase; white-space:nowrap;
+}
+.fac-manufacturer.MuiButton-root:hover { background:#F3F2F0; }
+.fac-manufacturer.MuiButton-root[aria-pressed="true"],
+.fac-manufacturer.MuiButton-root[aria-pressed="true"]:hover { background:#1B272B; color:#fff; }
 .fac-sheet-search { flex:0 0 auto; }
 .fac-sheet-search .fac-tea-search { margin:0 8px 8px; background:#F3F2F0; }
 .fac-sheet-search--detail .fac-tea-search { margin-bottom:24px; }
@@ -60,7 +67,7 @@
 .fac-tea-row-arrow { display:block; flex:0 0 48px; }
 .fac-sheet-footer {
   flex:0 0 auto; box-sizing:border-box;
-  background:#fff; padding:0 8px 8px;
+  background:#fff; padding:16px 8px max(48px, env(safe-area-inset-bottom));
 }
 .fac-sheet-add.MuiButton-root {
   width:100%; height:66px; min-height:66px; border-radius:100px;
@@ -124,4 +131,4 @@
   background:#E8E6E3; color:#1B272B;
 }
 
-/* Visual reference: approved Figma 152:339 and 158:614. */
+/* Visual reference: approved Figma 184:427 and 158:614. */

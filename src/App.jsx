@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, Drawer, IconButton, Typography } from '@mui/material';
+import { Box, Button, Drawer, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
-  normalizeQuery, teaMatches, recentTeaIds,
+  normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
 import TeaSearchBar from './components/TeaSearchBar.jsx';
+import TeaSheetHandle from './components/TeaSheetHandle.jsx';
+import { manufacturerOptions, filterTeaGroups } from './features/teaSearchModel.js';
 import { initialDetailMinutes } from './features/teaDetailModel.js';
 import './components/tea-detail.css';
 import HomeScreen from './components/HomeScreen.jsx';
@@ -20,12 +22,6 @@ const SHEET_EASING = {
   enter: 'cubic-bezier(0, 0, 0.2, 1)',
   exit: 'cubic-bezier(0.4, 0, 0.6, 1)',
 };
-// These slide curves reach half the distance at 20% and 50% of their duration.
-const SHEET_CLOSE_FADE = {
-  '--close-fade-in': `${SHEET_DURATION.enter * 0.2}ms`,
-  '--close-fade-out': `${SHEET_DURATION.exit * 0.5}ms`,
-};
-
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
 function readRecents() {
   try {
@@ -40,8 +36,12 @@ function readRecents() {
 export default function App() {
   const [catalog, setCatalog] = useState({ status:'loading', teas:[], error:'' });
   const [mode, setMode] = useState('closed'); // closed | search | prep | edit | add
+  const [closing, setClosing] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
+  const [drag, setDrag] = useState({ offset:0, active:false });
+  const paperRef = useRef(null);
   const [recentIds, setRecentIds] = useState(readRecents);
   const [volume, setVolume] = useState(250);
   const [customMl, setCustomMl] = useState('900');
@@ -65,12 +65,13 @@ export default function App() {
   const showTeaAssistant = () => {
     setMode('search');
     setQuery('');
+    setManufacturer('');
+    setDrag({ offset:0, active:false });
     setScanError('');
     setMessage('');
   };
   const closeSheet = () => {
-    setMode('closed');
-    setSelectedId(null);
+    setClosing(true);
     setScanError('');
   };
   const startDetailTimer = () => {
@@ -95,13 +96,12 @@ export default function App() {
   const teas = catalog.teas;
   const selected = teas.find(tea => tea.id === selectedId) || null;
   const hasSearch = Boolean(normalizeQuery(query));
-  const results = useMemo(
-    () => hasSearch ? teas.filter(tea => teaMatches(tea, query)) : [],
-    [teas, query, hasSearch],
+  const hasFilter = hasSearch || Boolean(manufacturer);
+  const manufacturers = useMemo(() => manufacturerOptions(teas), [teas]);
+  const { pinned, results, recent } = useMemo(
+    () => filterTeaGroups(teas, { query, manufacturer, pinnedIds, recentIds }),
+    [teas, query, manufacturer, pinnedIds, recentIds],
   );
-  const pinned = pinnedIds.map(id => teas.find(tea => tea.id === id)).filter(Boolean);
-  const recent = recentIds.filter(id => !pinnedIds.includes(id))
-    .map(id => teas.find(tea => tea.id === id)).filter(Boolean).slice(0, 3);
   function chooseTea(tea) {
     setSelectedId(tea.id);
     setVolume(250);
@@ -177,8 +177,31 @@ export default function App() {
     setMessage('');
     setMode(selected ? 'prep' : 'search');
   };
-  const sheetOpen = mode !== 'closed';
+  const sheetOpen = mode !== 'closed' && !closing;
   const isSearch = mode === 'search';
+  useEffect(() => {
+    if (!sheetOpen) return;
+    // Safari's keyboard can resize the visual viewport without changing 100dvh.
+    const viewport = window.visualViewport;
+    const update = () => {
+      const paper = paperRef.current;
+      if (!paper) return;
+      const height = viewport?.height ?? window.innerHeight;
+      const bottom = Math.max(0, window.innerHeight - height - (viewport?.offsetTop ?? 0));
+      paper.style.setProperty('--sheet-viewport-height', `${height}px`);
+      paper.style.setProperty('--sheet-bottom', `${bottom}px`);
+    };
+    update();
+    viewport?.addEventListener('resize', update);
+    viewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      viewport?.removeEventListener('resize', update);
+      viewport?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [sheetOpen]);
+
   const renderTeaRow = tea => (
     <Button key={tea.id} type="button" fullWidth className="fac-tea-catalog__item"
       onClick={() => chooseTea(tea)}>
@@ -205,18 +228,23 @@ export default function App() {
       <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
         ModalProps={{ keepMounted:true, BackdropProps:{ sx:{backgroundColor:'#fff'} } }}
         transitionDuration={SHEET_DURATION}
-        slotProps={{ transition:{ easing:SHEET_EASING } }}
+        slotProps={{ transition:{ easing:SHEET_EASING, onExited:() => {
+          setMode('closed');
+          setSelectedId(null);
+          setClosing(false);
+          setDrag({offset:0, active:false});
+        } } }}
         PaperProps={{
           className:'fac-sheet-paper',
-          'data-open':sheetOpen,
-          style:SHEET_CLOSE_FADE,
+          ref:paperRef,
+          style:{
+            translate:`0 ${drag.offset}px`,
+            transition:drag.active ? 'none'
+              : `translate 195ms ease-out, transform ${sheetOpen ? SHEET_DURATION.enter : SHEET_DURATION.exit}ms ${sheetOpen ? SHEET_EASING.enter : SHEET_EASING.exit}`,
+          },
         }}>
         <Box className="fac-sheet" component="main">
-          <IconButton onClick={closeSheet} aria-label="Close tea assistant"
-            className="fac-sheet-floating-close">
-            <img src={import.meta.env.BASE_URL + 'figma/tea-close.svg'} alt="" />
-          </IconButton>
-          <Box className="fac-sheet-top" />
+          <TeaSheetHandle onClose={closeSheet} onDragChange={setDrag} />
           {(mode === 'search' || mode === 'prep') && (
             <>
               <Box className={mode === "prep" ? "fac-sheet-search fac-sheet-search--detail" : "fac-sheet-search"}>
@@ -235,25 +263,32 @@ export default function App() {
           )}
           {isSearch && (
             <>
-              <Box className="fac-sheet-scroll" key="search">
+              <Box className="fac-manufacturers" role="group" aria-label="Filter by manufacturer">
+                {manufacturers.map(brand => (
+                  <Button key={brand} className="fac-manufacturer" aria-label={brand} aria-pressed={manufacturer === brand}
+                    onClick={() => setManufacturer(previous => previous === brand ? '' : brand)}>
+                    {brand.replace(/ß/g, 'ẞ')}
+                  </Button>
+                ))}
+              </Box>
+              <Box className="fac-sheet-scroll" key="search" tabIndex={0} aria-label="Tea results">
                 <Box className="fac-tea-catalog">
                   {message && <Typography role="status">{message}</Typography>}
                   {catalog.status === 'loading' && <Typography>Loading tea catalogue…</Typography>}
                   {catalog.status === 'error' && <Typography role="alert" color="error">{catalog.error}</Typography>}
-                  {catalog.status === 'ready' && (hasSearch ? (
-                    <>
-                      <Typography component="h2" className="fac-tea-catalog__title">Search Results</Typography>
-                      {results.length === 0 && <Typography>No matching tea found.</Typography>}
-                      <Box className="fac-tea-catalog__list">{results.map(renderTeaRow)}</Box>
-                    </>
-                  ) : (
+                  {catalog.status === 'ready' && (
                     <>
                       <Typography component="h2" className="fac-tea-catalog__title">Pinned Teas</Typography>
                       <Box className="fac-tea-catalog__list">{pinned.map(renderTeaRow)}</Box>
-                      <Typography component="h2" className="fac-tea-catalog__title">Last Search</Typography>
-                      <Box className="fac-tea-catalog__list">{recent.map(renderTeaRow)}</Box>
+                      <Typography component="h2" className="fac-tea-catalog__title">
+                        {hasFilter ? 'Search Results' : 'Last Search Results'}
+                      </Typography>
+                      <Box className="fac-tea-catalog__list">{(hasFilter ? results : recent).map(renderTeaRow)}</Box>
+                      {hasFilter && !pinned.length && !results.length && (
+                        <Typography role="status" sx={{px:1.5}}>No matching tea found.</Typography>
+                      )}
                     </>
-                  ))}
+                  )}
                 </Box>
               </Box>
               <Box className="fac-sheet-footer">
