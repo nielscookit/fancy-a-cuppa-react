@@ -17,7 +17,7 @@ import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features
 import Snackbar from '@mui/material/Snackbar';
 import './components/tea-sheet.css';
 
-const SHEET_DURATION = { enter: 225, exit: 195 };
+const SHEET_DURATION = { enter: 360, exit: 260 };
 const SHEET_EASING = {
   enter: 'cubic-bezier(0, 0, 0.2, 1)',
   exit: 'cubic-bezier(0.4, 0, 0.6, 1)',
@@ -245,10 +245,10 @@ export default function App() {
         PaperProps={{
           className:'fac-sheet-paper',
           ref:paperRef,
+          'data-dragging':drag.active,
+          'data-open':sheetOpen,
           style:{
             translate:`0 ${drag.offset}px`,
-            transition:drag.active ? 'none'
-              : `translate 195ms ease-out, transform ${sheetOpen ? SHEET_DURATION.enter : SHEET_DURATION.exit}ms ${sheetOpen ? SHEET_EASING.enter : SHEET_EASING.exit}`,
           },
         }}>
         <Box className="fac-sheet" component="main">

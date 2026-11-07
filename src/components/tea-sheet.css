@@ -136,3 +136,7 @@
 /* Reserve the reduced visual viewport for live results while the iPhone
    keyboard is open. Restore the fixed Add action when the keyboard closes. */
 .fac-sheet-paper[data-keyboard-open="true"] .fac-sheet-footer { display:none; }
+
+/* MUI Slide owns transform and timing; dragging only adds a separate translation. */
+.fac-sheet-paper.MuiDrawer-paper[data-open="true"] { transition-property:transform, translate !important; }
+.fac-sheet-paper.MuiDrawer-paper[data-dragging="true"] { transition:none !important; }
