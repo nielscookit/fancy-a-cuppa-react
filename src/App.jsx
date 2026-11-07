@@ -190,15 +190,23 @@ export default function App() {
       const bottom = Math.max(0, window.innerHeight - height - (viewport?.offsetTop ?? 0));
       paper.style.setProperty('--sheet-viewport-height', `${height}px`);
       paper.style.setProperty('--sheet-bottom', `${bottom}px`);
+      const editing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+      const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+      paper.dataset.keyboardOpen = String(layoutHeight - height > 150
+        && (editing || paper.dataset.keyboardOpen === 'true'));
     };
     update();
     viewport?.addEventListener('resize', update);
     viewport?.addEventListener('scroll', update);
     window.addEventListener('resize', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', update);
     return () => {
       viewport?.removeEventListener('resize', update);
       viewport?.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', update);
     };
   }, [sheetOpen]);
 
@@ -278,8 +286,12 @@ export default function App() {
                   {catalog.status === 'error' && <Typography role="alert" color="error">{catalog.error}</Typography>}
                   {catalog.status === 'ready' && (
                     <>
-                      <Typography component="h2" className="fac-tea-catalog__title">Pinned Teas</Typography>
-                      <Box className="fac-tea-catalog__list">{pinned.map(renderTeaRow)}</Box>
+                      {(pinned.length > 0 || !hasFilter) && (
+                        <>
+                          <Typography component="h2" className="fac-tea-catalog__title">Pinned Teas</Typography>
+                          <Box className="fac-tea-catalog__list">{pinned.map(renderTeaRow)}</Box>
+                        </>
+                      )}
                       <Typography component="h2" className="fac-tea-catalog__title">
                         {hasFilter ? 'Search Results' : 'Last Search Results'}
                       </Typography>

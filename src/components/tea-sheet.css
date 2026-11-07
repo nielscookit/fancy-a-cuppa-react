@@ -132,3 +132,7 @@
 }
 
 /* Visual reference: approved Figma 184:427 and 158:614. */
+
+/* Reserve the reduced visual viewport for live results while the iPhone
+   keyboard is open. Restore the fixed Add action when the keyboard closes. */
+.fac-sheet-paper[data-keyboard-open="true"] .fac-sheet-footer { display:none; }
