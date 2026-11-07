@@ -33,7 +33,8 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
         <div className="fac-tea-card__actions">
           <IconButton aria-label={pinned ? "Unpin tea" : "Pin tea"} aria-pressed={pinned}
             className="fac-tea-card__icon" onClick={onTogglePin} disableRipple>
-            <img src={iconBase+'tea-detail-pin.svg'} width="48" height="48" alt="" />
+            <img src={iconBase + (pinned ? 'tea-detail-pin-selected.svg' : 'tea-detail-pin.svg')}
+              width="48" height="48" alt="" />
           </IconButton>
           <IconButton aria-label="Edit tea" className="fac-tea-card__icon" onClick={onEdit} disableRipple>
             <img src={iconBase+'tea-edit.svg'} width="48" height="48" alt="" />

@@ -88,10 +88,6 @@
 .fac-sheet-scroll--detail .fac-tea-card__actions .fac-tea-card__icon:last-child {
   margin-left:auto;
 }
-.fac-sheet-scroll--detail .fac-tea-card__icon[aria-pressed="true"] {
-  outline:2px solid #1B272B;
-  outline-offset:-2px;
-}
 .fac-sheet-scroll--detail .fac-tea-card__identity {
   position:absolute; left:24px; right:24px; top:64px; padding:0;
 }
