@@ -114,10 +114,11 @@
 }
 .fac-tea-card__category { position:absolute; right:12px; bottom:12px; }
 .fac-tea-card__pin.MuiIconButton-root { background:#F3F2F0; color:#1B272B; }
-.fac-tea-card__pin.MuiIconButton-root[aria-pressed="true"] { background:#1B272B; color:#B9FC69; }
+.fac-tea-card__pin.MuiIconButton-root[aria-pressed="true"] { background:#1B272B; color:#fff; }
 .fac-sheet-scroll--detail .fac-tea-volume { margin-top:48px; background:#F3F2F0; }
-.fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root {
-  color:#fff; background:#1B272B;
+.fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root,
+.fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root:hover {
+  color:#fff; background:transparent;
 }
 .fac-sheet-scroll--detail .fac-tea-volume__option.MuiButton-root {
   color:#1B272B;

@@ -125,11 +125,13 @@
 
 /* 52px Figma segmented water selector, 250 / 500 / 1l / tune. */
 .fac-tea-volume {
+  position:relative;
   height: 52px; margin: 48px 8px 0;
   display: grid; grid-template-columns: repeat(4, 1fr);
   border-radius: 100px; background: #eeeeec; overflow: hidden;
 }
 .fac-tea-volume__option.MuiButton-root {
+  position:relative; z-index:1;
   min-height: 52px; height: 52px; min-width: 0; padding: 0;
   border-radius: 100px; background: transparent;
   font-family: "Roboto Mono", monospace; font-weight: 700;
@@ -140,7 +142,7 @@
 }
 .fac-tea-volume__option.is-selected.MuiButton-root,
 .fac-tea-volume__option.is-selected.MuiButton-root:hover {
-  background: #323234; color: #fff;
+  background: transparent; color: #fff;
 }
 .fac-tea-volume__number { font-size: 16px; letter-spacing: .02em; }
 .fac-tea-volume__unit {
@@ -229,3 +231,14 @@
   background: #fff;
 }
 .fac-tea-catalog__item.MuiButton-root:hover { background: #eeeeec; }
+
+.fac-tea-volume__indicator {
+  position:absolute; top:0; bottom:0; left:0; width:25%; border-radius:100px;
+  background:#1B272B; pointer-events:none;
+  transform:translateX(calc(var(--volume-index, 0) * 100%));
+  transition:transform 240ms cubic-bezier(.2, 0, 0, 1);
+}
+.fac-tea-volume__custom.is-selected img { filter:brightness(0) invert(1); }
+@media (prefers-reduced-motion:reduce) {
+  .fac-tea-volume__indicator { transition:none; }
+}

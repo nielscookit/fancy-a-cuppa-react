@@ -35,7 +35,9 @@ export default function TeaDetail({
     <section className="fac-tea-detail fac-sheet-scroll fac-sheet-scroll--detail" aria-label="Tea preparation">
       <TeaCard tea={tea} onEdit={onEdit} onClose={onClose} pinned={pinned} onTogglePin={onTogglePin} />
 
-      <div className="fac-tea-volume" role="group" aria-label="Water quantity">
+      <div className="fac-tea-volume" role="group" aria-label="Water quantity"
+        style={{'--volume-index':volume === null ? 3 : Math.max(0, VOLUME_OPTIONS.indexOf(volume))}}>
+        <span className="fac-tea-volume__indicator" aria-hidden="true" />
         {VOLUME_OPTIONS.map(value => (
           <VolumeOption key={value} value={value}
             current={volume} onChange={onVolumeChange} />
