@@ -6,12 +6,13 @@ import {
   getCategoryVisual,
 } from '../src/features/categoryImages.js';
 
-test('category images are the four approved PNGs with exact Vite asset paths',()=>{
+test('category images are the five supplied PNGs with exact Vite asset paths',()=>{
   const expected={
-    black:'black-tea.png',
-    green:'green-tea.png',
-    fruit:'fruit-tea.png',
-    herbal:'herbal-tea.png',
+    black:'black-tea-new.png',
+    green:'green-tea-new.png',
+    fruit:'fruit-inusion-new.png',
+    herbal:'herbal-infusion-new.png',
+    rooibos:'rooibos-tea-new.png',
   };
   assert.deepEqual(Object.keys(CATEGORY_IMAGE_CONFIG).sort(),Object.keys(expected).sort());
   for(const [category,filename] of Object.entries(expected)){
@@ -27,7 +28,7 @@ test('category images are the four approved PNGs with exact Vite asset paths',()
 });
 
 test('all remaining Supabase categories use Soft Lime, no image or symbol',()=>{
-  const noPicture=['white','oolong','rooibos','other',
+  const noPicture=['white','oolong','other',
     'yellow','dark','pu_erh','mate'];
   assert.equal(CATEGORY_BACKGROUND,'#E8FBCB');
   assert.equal(SUPPORTED_TEA_CATEGORIES.length,12);

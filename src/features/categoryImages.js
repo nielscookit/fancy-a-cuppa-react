@@ -1,7 +1,7 @@
 /**
  * Fancy a Cuppa V3 — category artwork.
  *
- * Edit the four independent entries below when the final Figma positions
+ * Edit the independent entries below when the final Figma positions
  * arrive. The cropped area is controlled by objectFit + positionX/positionY
  * + scale within the fixed 192px image viewport. Nothing in TeaCard needs
  * to change for these adjustments.
@@ -10,10 +10,11 @@
  * Product-specific photo_url is intentionally never used for rendering.
  */
 export const CATEGORY_IMAGE_CONFIG = Object.freeze({
-  black:  Object.freeze({ filename:'black-tea.png',  objectFit:'cover', scale:1, positionX:50, positionY:50 }),
-  green:  Object.freeze({ filename:'green-tea.png',  objectFit:'cover', scale:1, positionX:50, positionY:50 }),
-  fruit:  Object.freeze({ filename:'fruit-tea.png',  objectFit:'cover', scale:1, positionX:50, positionY:50 }),
-  herbal: Object.freeze({ filename:'herbal-tea.png', objectFit:'cover', scale:1, positionX:50, positionY:50 }),
+  black:  Object.freeze({ filename:'black-tea-new.png',  objectFit:'cover', scale:1, positionX:50, positionY:50 }),
+  green:  Object.freeze({ filename:'green-tea-new.png',  objectFit:'cover', scale:1, positionX:50, positionY:50 }),
+  fruit:  Object.freeze({ filename:'fruit-inusion-new.png',  objectFit:'cover', scale:1, positionX:50, positionY:50 }),
+  rooibos:Object.freeze({ filename:'rooibos-tea-new.png', objectFit:'cover', scale:1, positionX:50, positionY:50 }),
+  herbal: Object.freeze({ filename:'herbal-infusion-new.png', objectFit:'cover', scale:1, positionX:50, positionY:50 }),
 });
 
 export const CATEGORY_BACKGROUND = '#E8FBCB';
