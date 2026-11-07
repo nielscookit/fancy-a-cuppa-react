@@ -242,3 +242,10 @@
 @media (prefers-reduced-motion:reduce) {
   .fac-tea-volume__indicator { transition:none; }
 }
+
+.fac-tea-search__clear.MuiIconButton-root {
+  flex:0 0 32px; width:32px; min-width:32px; height:42px; padding:0;
+  color:#747D7D; background:transparent;
+}
+.fac-tea-search__clear .MuiSvgIcon-root { width:24px; height:24px; }
+.fac-tea-search__scanner.MuiIconButton-root { flex:0 0 42px; }
