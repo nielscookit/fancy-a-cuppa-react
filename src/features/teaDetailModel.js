@@ -17,7 +17,8 @@ export function formatTeaDetailDose(quantity, unit) {
   const value = new Intl.NumberFormat('de-DE',{
     maximumFractionDigits:digits,
   }).format(quantity);
-  return value + ' ' + (UNIT_ENGLISH[unit] || unit || '');
+  const label = unit === 'bag' && quantity === 1 ? 'bag' : (UNIT_ENGLISH[unit] || unit || '');
+  return value + ' ' + label;
 }
 
 export function initialDetailMinutes(tea) {

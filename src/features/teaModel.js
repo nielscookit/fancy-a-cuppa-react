@@ -91,6 +91,7 @@ export function teaMatches(tea,query) {
 }
 export function calculateDose(tea,waterMl) {
   if(!tea||!(waterMl>0)||!(tea.base>0))return null;
+  if (tea.unit === 'bag') return Math.ceil(waterMl / 250);
   return tea.qty*waterMl/tea.base;
 }
 export function formatDose(quantity,unit) {

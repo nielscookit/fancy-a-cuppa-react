@@ -54,3 +54,10 @@ test('search matches typed prefixes at the beginning of keywords', () => {
   assert.ok(!teaMatches(tea, 'rahma'));
   assert.ok(!teaMatches(tea, 'rba'));
 });
+
+test('tea bags use a 250ml cup and round custom amounts up to whole bags', () => {
+  const bag = {qty:1, base:200, unit:'bag'};
+  for (const [water, count] of [[250,1],[500,2],[1000,4],[900,4],[300,2]]) {
+    assert.equal(calculateDose(bag,water),count);
+  }
+});
