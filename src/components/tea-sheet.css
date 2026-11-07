@@ -16,7 +16,7 @@
 }
 .fac-sheet-handle::before {
   content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%);
-  width:32px; height:4px; border-radius:100px; background:#1B272B;
+  width:32px; height:3px; border-radius:100px; background:#1B272B;
 }
 .fac-sheet-handle:active { cursor:grabbing; }
 .fac-sheet-handle:focus-visible { outline:2px solid #1B272B; outline-offset:-4px; }
