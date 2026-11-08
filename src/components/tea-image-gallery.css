@@ -14,7 +14,7 @@
 }
 .fac-product-zoom .MuiDialogContent-root { padding:0; min-height:0; overflow:auto; }
 .fac-product-zoom .fac-product-zoom__close.MuiIconButton-root {
-  position:absolute; top:16px; left:16px; z-index:2; padding:0;
+  position:absolute; top:16px; right:16px; z-index:2; padding:0;
   width:48px; height:48px; background:#F3F2F0;
 }
 .fac-product-zoom__source { display:block; width:100%; }
