@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { IconButton, Typography } from '@mui/material';
+import TeaImageGallery from './TeaImageGallery.jsx';
 import TeaCategoryIcon, { TeaSymbol } from './TeaCategoryIcon.jsx';
 import { getUiTeaCategory } from '../features/teaModel.js';
 import { getCategoryVisual } from '../features/categoryImages.js';
@@ -41,6 +42,7 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
 
       <div className="fac-tea-card__image-area"
         style={{backgroundColor:visual.backgroundColor}}>
+        <TeaImageGallery key={tea.id} tea={tea}>
         {showImage && (
           <img
             key={visual.imageUrl}
@@ -55,6 +57,7 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
             }}
           />
         )}
+        </TeaImageGallery>
         <TeaCategoryIcon category={tea.category} className="fac-tea-card__category" />
       </div>
     </article>
