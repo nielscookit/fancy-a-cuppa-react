@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogTitle, IconButton, Button } from '@mui/material';
+import { Dialog, DialogContent, IconButton } from '@mui/material';
 import { getTeaProductImage } from '../data/teaProductImages.js';
 import './tea-image-gallery.css';
 
@@ -19,6 +19,7 @@ export default function TeaImageGallery({tea,children}) {
     return ()=>clearTimeout(timer);
   },[image,ready]);
   function fail(){setReady(false);setPage(0);setZoom(false);setImage(null);}
+  const zoomImage=zoom&&image&&<img src={image.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" onError={fail} />;
   return <>
     <div className="fac-image-gallery" onPointerDown={e=>{
       if(!e.isPrimary){gesture.current=null;suppress.current=true;return;}
@@ -47,11 +48,17 @@ export default function TeaImageGallery({tea,children}) {
       {['Category image','Product image'].map((label,index)=><button key={label} type="button" aria-label={label} aria-pressed={page===index}
         onClick={()=>setPage(index)}><span /></button>)}
     </div>}
-    <Dialog open={zoom&&ready} onClose={()=>setZoom(false)} fullWidth maxWidth="md" className="fac-product-zoom">
-      <DialogTitle>{tea.rawName}<IconButton aria-label="Close product image" onClick={()=>setZoom(false)}>×</IconButton></DialogTitle>
+    <Dialog open={zoom&&ready} onClose={()=>setZoom(false)} fullWidth maxWidth="md"
+      aria-label={'Product image: '+tea.rawName} className="fac-product-zoom">
+      <IconButton className="fac-tea-card__icon fac-product-zoom__close"
+        aria-label="Close product image" onClick={()=>setZoom(false)} disableRipple>
+        <img src={import.meta.env.BASE_URL+'figma/tea-detail-close.svg'} width="48" height="48" alt="" />
+      </IconButton>
       <DialogContent>
-        {zoom&&image&&<img src={image.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" onError={fail} />}
-        {image?.sourcePage&&<Button component="a" href={image.sourcePage} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Quelle öffnen</Button>}
+        {image?.sourcePage
+          ? <a className="fac-product-zoom__source" href={image.sourcePage} target="_blank" rel="noopener noreferrer"
+              referrerPolicy="no-referrer" aria-label="Open product source">{zoomImage}</a>
+          : zoomImage}
       </DialogContent>
     </Dialog>
   </>;
