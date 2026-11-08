@@ -252,11 +252,11 @@ export default function App() {
             translate:`0 ${drag.offset}px`,
           },
         }}>
-        <Box className="fac-sheet" component="main">
+        <Box className={mode === 'prep' ? 'fac-sheet fac-sheet--detail' : 'fac-sheet'} component="main">
           <TeaSheetHandle onClose={closeSheet} onDragChange={setDrag} />
-          {(mode === 'search' || mode === 'prep') && (
+          {isSearch && (
             <>
-              <Box className={mode === "prep" ? "fac-sheet-search fac-sheet-search--detail" : "fac-sheet-search"}>
+              <Box className="fac-sheet-search">
                 <TeaSearchBar
                   value={isSearch ? query : ''}
                   onChange={value => { setQuery(value); setMode('search'); }}

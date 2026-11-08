@@ -80,23 +80,23 @@
   min-height:0; border-radius:0; box-shadow:none; overflow-y:auto;
 }
 .fac-sheet-scroll--detail .fac-tea-result {
-  padding-bottom:max(49px, env(safe-area-inset-bottom));
+  padding-bottom:max(32px, env(safe-area-inset-bottom));
 }
 .fac-sheet-scroll--detail .fac-tea-card {
-  position:relative; height:308px; border-radius:0; box-shadow:none; overflow:visible;
+  position:relative; height:302px; border-radius:0; box-shadow:none; overflow:visible;
 }
 .fac-sheet-scroll--detail .fac-tea-card__header {
-  position:relative; display:block; height:116px; padding:0; box-sizing:border-box;
+  position:relative; display:block; height:110px; padding:0; box-sizing:border-box;
 }
 .fac-sheet-scroll--detail .fac-tea-card__actions {
-  position:absolute; top:0; left:8px; right:8px; display:flex;
+  position:absolute; top:0; left:14px; right:14px; display:flex;
   justify-content:flex-start; align-items:center; gap:12px;
 }
 .fac-sheet-scroll--detail .fac-tea-card__actions .fac-tea-card__icon:last-child {
   margin-left:auto;
 }
 .fac-sheet-scroll--detail .fac-tea-card__identity {
-  position:absolute; left:24px; right:24px; top:64px; padding:0;
+  position:absolute; left:24px; right:24px; top:66px; padding:0; overflow:visible; z-index:2;
 }
 .fac-sheet-scroll--detail .fac-tea-card__name.MuiTypography-root {
   color:#202024; font-size:21px; font-weight:700; line-height:28px;
@@ -106,13 +106,13 @@
   box-shadow:0 2px 2px rgba(0,0,0,.10);
 }
 .fac-tea-card__manufacturer {
-  position:absolute; left:12px; bottom:12px; height:33px; box-sizing:border-box;
-  display:flex; align-items:center; max-width:calc(100% - 84px); padding:0 16px;
+  position:relative; height:33px; box-sizing:border-box; margin-top:8px; width:fit-content;
+  display:flex; align-items:center; max-width:100%; padding:0 16px;
   border-radius:100px; background:#1B272B; color:#fff;
   font-family:"Roboto Mono",monospace; font-size:16px; font-weight:400; line-height:21px;
   text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.fac-tea-card__category { position:absolute; right:12px; bottom:12px; }
+.fac-tea-card__category { position:absolute; right:14px; bottom:14px; }
 .fac-tea-card__pin.MuiIconButton-root { background:#F3F2F0; color:#1B272B; }
 .fac-tea-card__pin.MuiIconButton-root[aria-pressed="true"] { background:#1B272B; color:#fff; }
 .fac-sheet-scroll--detail .fac-tea-volume { margin-top:48px; background:#F3F2F0; }
@@ -125,7 +125,7 @@
 }
 .fac-sheet-scroll--detail .fac-tea-volume__option.is-selected.MuiButton-root { color:#fff; }
 .fac-sheet-scroll--detail .fac-tea-result__minutes.MuiTypography-root {
-  color:#1B272B; font-weight:400;
+  color:#1B272B; font-weight:400; line-height:46px;
 }
 .fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root,
 .fac-sheet-scroll--detail .fac-tea-result__brew.MuiButton-root:hover {
@@ -141,7 +141,7 @@
   background:#E8E6E3; color:#1B272B;
 }
 
-/* Visual reference: approved Figma 184:427 and 158:614. */
+/* Visual reference: approved Figma 184:427 and 221:78. */
 
 /* Reserve the reduced visual viewport for live results while the iPhone
    keyboard is open. Restore the fixed Add action when the keyboard closes. */
@@ -150,3 +150,12 @@
 /* MUI Slide owns transform and timing; dragging only adds a separate translation. */
 .fac-sheet-paper.MuiDrawer-paper[data-open="true"] { transition-property:transform, translate !important; }
 .fac-sheet-paper.MuiDrawer-paper[data-dragging="true"] { transition:none !important; }
+
+/* Detail 221:78: actions begin at y=62, leaving the centered handle above. */
+.fac-sheet--detail .fac-sheet-handle {
+  flex-basis:14px; height:14px; width:64px; align-self:center;
+}
+.fac-sheet--detail .fac-sheet-handle::before { height:4px; }
+.fac-sheet--detail .fac-sheet-handle::after {
+  content:""; position:absolute; inset:0 0 -18px;
+}
