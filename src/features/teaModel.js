@@ -106,7 +106,7 @@ export function initialTeaForm(tea) {
     id:tea?.id||null,
     name:tea?.rawName||'',
     brand:tea?.brand||'',
-    category:tea?.category||'black',
+    category:tea?.category||'',
     subcategory:tea?.subcategory||'',
     subcategory_other:tea?.subcategory_other||'',
     type:tea?.type||'loose',
@@ -116,10 +116,10 @@ export function initialTeaForm(tea) {
     sourceLabel:tea?.sourceLabel||'',
     codeType:tea?.code?.type||'',
     codeValue:tea?.code?.value||'',
-    unit:tea?.unit||'tsp',
-    qty:String(tea?.qty??1),
-    base:String(tea?.base??250),
-    mins:String(tea?.brewSeconds?tea.brewSeconds/60:4),
+    unit:tea?.unit||'g',
+    qty:String(tea?.qty??''),
+    base:String(tea?.base??''),
+    mins:String(tea?.brewSeconds?tea.brewSeconds/60:''),
     temperature:tea?.temperature==null?'':String(tea.temperature),
   };
 }

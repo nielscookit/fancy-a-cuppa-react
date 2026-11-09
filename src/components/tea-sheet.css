@@ -136,11 +136,11 @@
 .fac-sheet-editor {
   display:flex; flex:1 1 auto; flex-direction:column; min-height:0;
 }
-.fac-sheet-scroll--editor { padding:16px 8px 8px; }
+.fac-sheet-scroll--editor { padding:0 8px max(16px, env(safe-area-inset-bottom)); }
 .fac-sheet-editor-actions { display:grid; gap:16px; margin-top:16px; }
 .fac-sheet-editor-cancel.MuiButton-root,
 .fac-sheet-editor-cancel.MuiButton-root:hover {
-  background:#E8E6E3; color:#1B272B;
+  background:#F3F2F0; color:#1B272B;
 }
 
 /* Visual reference: approved Figma 184:427 and 221:78. */

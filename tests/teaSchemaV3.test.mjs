@@ -107,7 +107,7 @@ test('write API accepts optional subtypes and preserves leaf style when editing'
 });
 
 test('write API creates a tea without a subtype and rejects changes to hidden metadata', async () => {
-  const form = validateTeaForm({...initialTeaForm(), name:'Test', brand:'Test', leafStyle:'powder'});
+  const form = validateTeaForm({...initialTeaForm(), name:'Test', brand:'Test', category:'black', qty:'1', base:'250', mins:'4', leafStyle:'powder'});
   const fetchImpl = async (_url, request) => {
     const body = JSON.parse(request.body);
     assert.equal(body.action, 'create');
@@ -125,7 +125,7 @@ test('editor exposes the ten approved fields and retains the guarded write path'
   const ui=readFileSync('src/components/TeaEditor.jsx','utf8');
   assert.deepEqual([...ui.matchAll(/<Field label="([^"]+)"/g)].map(match=>match[1]), [
     'Tea name','Manufacturer','Category','Tea subtype (optional)','Leaf style (optional)',
-    'Reference quantity','Dosage unit','Reference water (ml)','Brewing time (minutes)',
+    'Reference quantity','Reference water (ml)','Brewing time (minutes)',
     'Temperature (°C, optional)',
   ]);
   assert.match(ui,/initialTeaForm\(tea\)/);
@@ -148,7 +148,7 @@ test('tea editor offers exactly the six approved categories',()=>{
   assert.equal(Object.keys(CATEGORY_LABELS).length,12,
     'Retain the twelve Supabase enum keys for backwards-compatible reading');
   const editor=readFileSync('src/components/TeaEditor.jsx','utf8');
-  assert.match(editor,/const cats=options\(UI_CATEGORY_LABELS\)/);
+  assert.match(editor,/options\(UI_CATEGORY_LABELS\)/);
   assert.doesNotMatch(editor,/const cats=options\(CATEGORY_LABELS\)/);
   for(const legacy of ['white','oolong','yellow','dark','pu_erh','mate']){
     assert.ok(!(legacy in UI_CATEGORY_LABELS),
@@ -178,7 +178,18 @@ test('Tea Card and Edit dropdown use Other for legacy categories but retain raw 
   assert.match(card,/const uiCategory=getUiTeaCategory\(tea.category\)/);
   assert.match(card,/<TeaCategoryIcon category=\{tea.category\}/);
   assert.match(card,/getCategoryVisual\(uiCategory\)/);
-  assert.match(editor,/value=\{getUiTeaCategory\(form.category\)\}/);
+  assert.match(editor,/getUiTeaCategory\(form.category\)/);
   assert.match(editor,/const next=initialTeaForm\(tea\)/);
   assert.doesNotMatch(editor,/form.category=getUiTeaCategory/);
+});
+
+test('new form is blank while edit preserves saved preparation',()=>{
+ const form=initialTeaForm();
+ for(const key of ['name','brand','category','qty','base','mins','temperature']) assert.equal(form[key],'');
+ assert.throws(()=>validateTeaForm(form));
+ const tea=normalizeTea(cloudRow());
+ const edited=validateTeaForm(initialTeaForm(tea));
+ assert.equal(edited.qty,3);
+ assert.equal(edited.base,250);
+ assert.equal(edited.mins,4);
 });

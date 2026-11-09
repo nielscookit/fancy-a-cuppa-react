@@ -176,7 +176,7 @@ export default function App() {
   const previousView = () => {
     setScannedCode(null);
     setMessage('');
-    setMode(selected ? 'prep' : 'search');
+    setMode(mode === 'edit' && selected ? 'prep' : 'search');
   };
   const sheetOpen = mode !== 'closed' && !closing;
   const isSearch = mode === 'search';
