@@ -88,6 +88,7 @@
 }
 .fac-tea-card__name-text { display:inline-block; white-space:nowrap; }
 .fac-tea-card__name[data-running="true"] { text-overflow:clip; }
+.fac-tea-card__name[data-replayable="true"] { cursor:pointer; }
 .fac-tea-card__actions {
   display: flex; gap: 12px; flex-shrink: 0;
 }

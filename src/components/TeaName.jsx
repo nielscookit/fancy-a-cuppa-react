@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Typography } from '@mui/material';
 
-/** One reading pass per opened tea, only when its title actually overflows. */
+/** One automatic reading pass; an overflowing title can be replayed by tapping. */
 export default function TeaName({ name }) {
   const viewport = useRef(null), text = useRef(null);
+  const replay = useRef(() => {});
   const [running, setRunning] = useState(false);
+  const [replayable, setReplayable] = useState(false);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -13,10 +15,9 @@ export default function TeaName({ name }) {
       animation?.cancel();
       if (!disposed) setRunning(false);
     }
-    function measure() {
-      if (disposed || !fontsReady) return;
+    function play(automatic = false) {
+      if (disposed || !fontsReady || animation?.playState === 'running') return;
       const distance = Math.ceil(text.current.getBoundingClientRect().width - viewport.current.clientWidth);
-      if (started) return;
       if (distance <= 1 || motion.matches) return;
       started = true;
       const travel = Math.max(1200, distance / 24 * 1000);
@@ -27,30 +28,45 @@ export default function TeaName({ name }) {
         { transform: `translateX(-${distance}px)`, offset: travel / duration },
         { transform: `translateX(-${distance}px)`, offset: (travel + 900) / duration, easing: 'ease-in-out' },
         { transform: 'translateX(0)', offset: 1 },
-      ], { delay: 1200, duration, iterations: 1 });
+      ], { delay: automatic ? 1200 : 0, duration, iterations: 1 });
       animation.finished.then(() => { if (!disposed) setRunning(false); }).catch(() => {});
     }
+    replay.current = () => play();
+    function measure() {
+      if (disposed || !fontsReady) return;
+      const overflows = text.current.getBoundingClientRect().width > viewport.current.clientWidth + 1;
+      setReplayable(overflows && !motion.matches);
+      if (!started) play(true);
+    }
+    function motionChanged() { stop(); measure(); }
     let width = viewport.current.clientWidth;
     const observer = new ResizeObserver(() => {
       const nextWidth = viewport.current.clientWidth;
       if (nextWidth === width) return;
       width = nextWidth;
       if (started) stop();
-      else measure();
+      measure();
     });
     observer.observe(viewport.current);
     document.fonts.ready.then(() => { fontsReady = true; measure(); });
-    motion.addEventListener('change', stop);
+    motion.addEventListener('change', motionChanged);
     return () => {
       disposed = true;
       observer.disconnect();
-      motion.removeEventListener('change', stop);
+      replay.current = () => {};
+      motion.removeEventListener('change', motionChanged);
       animation?.cancel();
     };
   }, [name]);
 
   return <Typography ref={viewport} component="h2" className="fac-tea-card__name"
-    title={name} data-running={running}>
-    <span ref={text} className="fac-tea-card__name-text">{name}</span>
+    title={name} data-running={running} data-replayable={replayable} onClick={() => replay.current()}>
+    <span ref={text} className="fac-tea-card__name-text" role={replayable ? 'button' : undefined}
+      tabIndex={replayable ? 0 : undefined} onKeyDown={event => {
+        if (replayable && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          replay.current();
+        }
+      }}>{name}</span>
   </Typography>;
 }
