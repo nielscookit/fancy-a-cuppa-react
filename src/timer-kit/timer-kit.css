@@ -1,3 +1,26 @@
 @import './media-stage.css';
 
 html,body,#root{margin:0;min-height:100%;background:#fff}
+
+/* Radial ring experiment lives only in /timer-lab/, outside the masked video. */
+.timer-kit-ring-stage{
+  width:min(375px,100%);
+  aspect-ratio:1;
+  margin:20px auto 0;
+  position:relative;
+  isolation:isolate;
+}
+.timer-kit-ring-stage .timer-kit-stage{
+  width:100%;
+  height:100%;
+  margin:0;
+}
+.timer-kit-radial{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  overflow:visible;
+  pointer-events:none;
+  z-index:5;
+}
