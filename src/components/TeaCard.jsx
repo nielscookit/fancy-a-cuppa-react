@@ -24,7 +24,6 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
           <Typography component="h2" className="fac-tea-card__name" title={tea.rawName || tea.name}>
             {tea.rawName || tea.name}
           </Typography>
-          <span className="fac-tea-card__manufacturer" title={tea.brand}>{tea.brand}</span>
         </div>
         <div className="fac-tea-card__actions">
           <IconButton aria-label={pinned ? "Unpin tea" : "Pin tea"} aria-pressed={pinned}
@@ -58,6 +57,7 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
           />
         )}
         </TeaImageGallery>
+        <span className="fac-tea-card__manufacturer" title={tea.brand}>{tea.brand}</span>
         <TeaCategoryIcon category={tea.category} className="fac-tea-card__category" />
       </div>
     </article>

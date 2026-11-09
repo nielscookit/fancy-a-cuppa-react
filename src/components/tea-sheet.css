@@ -80,6 +80,7 @@
   min-height:0; border-radius:0; box-shadow:none; overflow-y:auto;
 }
 .fac-sheet-scroll--detail .fac-tea-result {
+  margin-top:24px;
   padding-bottom:max(32px, env(safe-area-inset-bottom));
 }
 .fac-sheet-scroll--detail .fac-tea-card {
@@ -106,13 +107,14 @@
   box-shadow:0 2px 2px rgba(0,0,0,.10);
 }
 .fac-tea-card__manufacturer {
-  position:relative; height:33px; box-sizing:border-box; margin-top:8px; width:fit-content;
-  display:flex; align-items:center; max-width:100%; padding:0 16px;
-  border-radius:100px; background:#1B272B; color:#fff;
+  position:absolute; left:14px; bottom:20px; z-index:2;
+  height:33px; box-sizing:border-box; width:fit-content;
+  display:block; max-width:calc(100% - 90px); padding:6px 16px;
+  border-radius:100px; background:rgba(27,39,43,.9); color:#fff;
   font-family:"Roboto Mono",monospace; font-size:16px; font-weight:400; line-height:21px;
   text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.fac-tea-card__category { position:absolute; right:14px; bottom:14px; }
+.fac-tea-card__category { position:absolute; right:14px; bottom:20px; }
 .fac-tea-card__pin.MuiIconButton-root { background:#F3F2F0; color:#1B272B; }
 .fac-tea-card__pin.MuiIconButton-root[aria-pressed="true"] { background:#1B272B; color:#fff; }
 .fac-sheet-scroll--detail .fac-tea-volume { margin-top:48px; background:#F3F2F0; }
