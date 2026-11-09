@@ -4,6 +4,7 @@ import { createMediaController } from './mediaController.js';
 import { createAudioController } from '../timer/audioController.js';
 import { createTimerController } from '../timer/timerController.js';
 import { formatCountdown } from '../timer/formatCountdown.js';
+import TimerRadialRing from './TimerRadialRing.jsx';
 
 const NAMES = ['Fill', 'Brew', 'Steep', 'Milk'];
 const DURATIONS = [20, 40, 60, 120, 240];
@@ -100,9 +101,13 @@ export default function TimerKitLab() {
     <Box component="main" sx={{maxWidth: 520, mx:'auto', px:2, pb:8, pt:2, bgcolor:'#fff'}}>
       <Typography component="h1" variant="h5">Timer Kit / Video Lab</Typography>
       <Typography sx={{fontSize:12, my:1}}>Isolated test · New 750×750 videos · Original V3 timer unchanged</Typography>
-      <Box className="timer-kit-stage" aria-label="375 by 375 video stage">
-        {NAMES.map((name,i) => <video key={name} ref={element => { videos.current[i] = element; }}
-          className="timer-kit-video" muted playsInline preload="auto" loop={i===2} aria-label={name} />)}
+      <Box className="timer-kit-ring-stage">
+        <Box className="timer-kit-stage" aria-label="375 by 375 video stage">
+          {NAMES.map((name,i) => <video key={name} ref={element => { videos.current[i] = element; }}
+            className="timer-kit-video" muted playsInline preload="auto" loop={i===2} aria-label={name} />)}
+        </Box>
+        <TimerRadialRing total={time.total} remaining={time.remaining}
+          running={time.running} preparing={time.preparing} finished={time.finished} />
       </Box>
       <Typography component="output" role="timer" sx={{display:'block',fontSize:48,textAlign:'center',fontVariantNumeric:'tabular-nums'}}>
         {formatCountdown(time.remaining)}
