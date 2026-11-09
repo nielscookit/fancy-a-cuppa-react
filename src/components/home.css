@@ -164,13 +164,13 @@ body {
 .fac-home__time-button img {
   filter: none;
 }
-.fac-home__action--primary.MuiButton-root { bottom:98px; color:#1B272B; background:#A3E153; }
-.fac-home__action--primary.MuiButton-root:hover { background:#A3E153; }
+.fac-home__action--primary.MuiButton-root { bottom:98px; color:#1B272B; background:#B9FC69; }
+.fac-home__action--primary.MuiButton-root:hover { background:#B9FC69; }
 .fac-home__action--secondary.MuiButton-root,
 .fac-home__action--secondary.MuiButton-root:hover { background:#1B272B; color:#fff; }
 .fac-home__assistant-slot { margin:-82px auto 16px; }
 .fac-home__action--primary.MuiButton-root.Mui-disabled {
-  background:#A3E153; color:#1B272B; opacity:.65;
+  background:#B9FC69; color:#1B272B; opacity:.65;
 }
 .fac-home__action--primary.MuiButton-root[data-timer-control="reset"] {
   background:#B9FC69; color:#1B272B;
