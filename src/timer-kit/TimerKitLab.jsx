@@ -5,6 +5,7 @@ import { createAudioController } from '../timer/audioController.js';
 import { createTimerController } from '../timer/timerController.js';
 import { formatCountdown } from '../timer/formatCountdown.js';
 import TimerRadialRing from './TimerRadialRing.jsx';
+import TimerReferenceRing from './TimerReferenceRing.jsx';
 
 const NAMES = ['Fill', 'Brew', 'Steep', 'Milk'];
 const DURATIONS = [20, 40, 60, 120, 240];
@@ -21,6 +22,7 @@ export default function TimerKitLab() {
   const [events, setEvents] = useState([]);
   const [runs, setRuns] = useState(0);
   const [status, setStatus] = useState('Idle');
+  const [ringVariant, setRingVariant] = useState('reference');
   const push = (message) => {
     setEvents(previous => [new Date().toLocaleTimeString() + '  ' + message, ...previous].slice(0, 35));
   };
@@ -106,9 +108,18 @@ export default function TimerKitLab() {
           {NAMES.map((name,i) => <video key={name} ref={element => { videos.current[i] = element; }}
             className="timer-kit-video" muted playsInline preload="auto" loop={i===2} aria-label={name} />)}
         </Box>
-        <TimerRadialRing running={time.running}
-          idle={!time.running && !time.preparing && !time.finished && time.remaining >= time.total} />
+        {ringVariant === 'reference'
+          ? <TimerReferenceRing running={time.running}
+              idle={!time.running && !time.preparing && !time.finished && time.remaining >= time.total} />
+          : <TimerRadialRing running={time.running}
+              idle={!time.running && !time.preparing && !time.finished && time.remaining >= time.total} />}
       </Box>
+      <Stack direction="row" gap={1} sx={{justifyContent:'center', mt:1}}>
+        <Button size="small" variant={ringVariant === 'reference' ? 'contained' : 'outlined'}
+          onClick={() => setRingVariant('reference')}>GIF Reference</Button>
+        <Button size="small" variant={ringVariant === 'fisheye' ? 'contained' : 'outlined'}
+          onClick={() => setRingVariant('fisheye')}>Fisheye 1s</Button>
+      </Stack>
       <Typography component="output" role="timer" sx={{display:'block',fontSize:48,textAlign:'center',fontVariantNumeric:'tabular-nums'}}>
         {formatCountdown(time.remaining)}
       </Typography>
