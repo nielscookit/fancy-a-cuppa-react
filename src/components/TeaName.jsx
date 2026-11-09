@@ -20,7 +20,7 @@ export default function TeaName({ name }) {
       const distance = Math.ceil(text.current.getBoundingClientRect().width - viewport.current.clientWidth);
       if (distance <= 1 || motion.matches) return;
       started = true;
-      const travel = Math.max(800, distance / 36 * 1000);
+      const travel = Math.max(800, distance / 48 * 1000);
       const duration = travel + 1500;
       setRunning(true);
       animation = text.current.animate([
