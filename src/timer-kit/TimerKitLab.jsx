@@ -106,8 +106,8 @@ export default function TimerKitLab() {
           {NAMES.map((name,i) => <video key={name} ref={element => { videos.current[i] = element; }}
             className="timer-kit-video" muted playsInline preload="auto" loop={i===2} aria-label={name} />)}
         </Box>
-        <TimerRadialRing total={time.total} remaining={time.remaining}
-          running={time.running} preparing={time.preparing} finished={time.finished} />
+        <TimerRadialRing running={time.running}
+          idle={!time.running && !time.preparing && !time.finished && time.remaining >= time.total} />
       </Box>
       <Typography component="output" role="timer" sx={{display:'block',fontSize:48,textAlign:'center',fontVariantNumeric:'tabular-nums'}}>
         {formatCountdown(time.remaining)}
