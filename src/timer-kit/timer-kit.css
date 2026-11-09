@@ -24,3 +24,17 @@ html,body,#root{margin:0;min-height:100%;background:#fff}
   pointer-events:none;
   z-index:5;
 }
+
+/* Reference dial: only the dot breathes subtly; tick marks stay still, as in the GIF. */
+.timer-kit-reference-dot--running{
+  transform-box:fill-box;
+  transform-origin:center;
+  animation:timer-kit-reference-breathe 2.4s ease-in-out infinite;
+}
+@keyframes timer-kit-reference-breathe {
+  0%,100%{transform:scale(1);opacity:.85}
+  50%{transform:scale(1.25);opacity:1}
+}
+@media (prefers-reduced-motion:reduce){
+  .timer-kit-reference-dot--running{animation:none}
+}
