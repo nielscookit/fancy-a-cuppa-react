@@ -86,6 +86,8 @@
   font-size: 16px; font-weight: 400; line-height: 21px; margin-top: 4px;
   color: #202024; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.fac-tea-card__name-text { display:inline-block; white-space:nowrap; }
+.fac-tea-card__name[data-running="true"] { text-overflow:clip; }
 .fac-tea-card__actions {
   display: flex; gap: 12px; flex-shrink: 0;
 }

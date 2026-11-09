@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { IconButton, Typography } from '@mui/material';
+import { IconButton } from '@mui/material';
+import TeaName from './TeaName.jsx';
 import TeaImageGallery from './TeaImageGallery.jsx';
 import TeaCategoryIcon, { TeaSymbol } from './TeaCategoryIcon.jsx';
 import { getUiTeaCategory } from '../features/teaModel.js';
@@ -21,9 +22,7 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
     <article className="fac-tea-card" aria-label={tea.rawName || tea.name}>
       <div className="fac-tea-card__header">
         <div className="fac-tea-card__identity">
-          <Typography component="h2" className="fac-tea-card__name" title={tea.rawName || tea.name}>
-            {tea.rawName || tea.name}
-          </Typography>
+          <TeaName key={tea.id + ':' + (tea.rawName || tea.name)} name={tea.rawName || tea.name} />
         </div>
         <div className="fac-tea-card__actions">
           <IconButton aria-label={pinned ? "Unpin tea" : "Pin tea"} aria-pressed={pinned}
