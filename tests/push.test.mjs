@@ -7,19 +7,19 @@ import { createPushController } from '../src/push/pushController.js';
 import { validateCommand, validateSubscription } from '../supabase/functions/tea-push/protocol.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-function harness({ saved, permission = 'granted', handler, storage: givenStorage } = {}) {
+function harness({ saved, permission = 'granted', handler, storage: givenStorage, serviceWorkerReady, active, setupTimeoutMs, permissionResult = 'granted' } = {}) {
   let clock = 100_000;
   const values = new Map(saved ? [['fac-v3-push', JSON.stringify(saved)]] : []);
   const storage = givenStorage || { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
   const calls = [];
   let permissionCalls = 0, unsubscribed = 0;
   const subscription = { toJSON: () => ({ endpoint: 'subscription' }), unsubscribe: async () => { unsubscribed++; } };
-  const registration = { pushManager: { getSubscription: async () => subscription, subscribe: async () => subscription } };
-  const notification = { permission, requestPermission() { permissionCalls++; return Promise.resolve(notification.permission); } };
+  const registration = { active, pushManager: { getSubscription: async () => subscription, subscribe: async () => subscription } };
+  const notification = { permission, requestPermission() { permissionCalls++; notification.permission = permissionResult; return Promise.resolve(permissionResult); } };
   const controller = createPushController({
     endpoint: '/push', baseUrl: '/fancy-a-cuppa-react/', storage, cryptoRef: webcrypto,
-    now: () => clock, notificationRef: notification,
-    navigatorRef: { serviceWorker: { register: async () => registration, ready: Promise.resolve(registration) } },
+    now: () => clock, notificationRef: notification, setupTimeoutMs,
+    navigatorRef: { serviceWorker: { register: async () => registration, ready: serviceWorkerReady || Promise.resolve(registration) } },
     windowRef: { PushManager: function () {}, matchMedia: () => ({ matches: true }) },
     fetchRef: async (_url, options = {}) => {
       if (!options.body) return { ok: true, json: async () => ({ publicKey: 'AAAA' }) };
@@ -33,8 +33,8 @@ function harness({ saved, permission = 'granted', handler, storage: givenStorage
 const running = deadline => ({ running: true, preparing: false, finished: false, deadline });
 const paused = { running: false, preparing: false, finished: false, deadline: null };
 
-test('permission is requested only by a direct Enable action', async () => {
-  const h = harness();
+test('permission is requested only by the direct start gesture, never on mount', async () => {
+  const h = harness({ permission: 'default' });
   await h.controller.prepare(); assert.equal(h.permissionCalls, 0);
   const enabled = h.controller.enable(); assert.equal(h.permissionCalls, 1);
   await enabled; assert.equal(h.controller.snapshot().enabled, true);
@@ -158,4 +158,63 @@ test('worker displays a visible notification and reopens only the V3 home scope'
   await work; assert.equal(shown[0][0], 'Your tea is ready'); assert.equal(shown[0][1].tag, 'fac-tea-ready');
   listeners.notificationclick({ notification: { close: () => { closed++; } }, waitUntil: p => { work = p; } });
   await work; assert.equal(closed, 1); assert.equal(focused, 0); assert.deepEqual(opened, [scope]);
+});
+
+test('first Start prompts synchronously even while worker readiness is stuck; setup times out', async () => {
+  const h = harness({ permission: 'default', serviceWorkerReady: new Promise(() => {}), setupTimeoutMs: 10 });
+  const preparing = h.controller.prepare();
+  await settle();
+  const enabling = h.controller.enable();
+  assert.equal(h.permissionCalls, 1);
+  assert.equal(await enabling, false);
+  await preparing;
+  assert.equal(h.controller.snapshot().busy, false);
+  assert.equal(h.controller.snapshot().ready, false);
+  assert.equal(h.calls.length, 0);
+  h.controller.destroy();
+});
+
+test('an already activated worker does not wait for the global ready promise', async () => {
+  const h = harness({ active: { state: 'activated' }, serviceWorkerReady: new Promise(() => {}), setupTimeoutMs: 10 });
+  await h.controller.prepare();
+  assert.equal(h.controller.snapshot().ready, true);
+  assert.equal(await h.controller.enable(), true);
+  assert.equal(h.permissionCalls, 0);
+  h.controller.destroy();
+});
+
+test('repeated Start after consent never prompts again; denied permission is respected', async () => {
+  const h = harness({ permission: 'default' });
+  await h.controller.enable();
+  await h.controller.enable(); await h.controller.enable();
+  assert.equal(h.permissionCalls, 1);
+  h.controller.destroy();
+  const denied = harness({ permission: 'denied' });
+  assert.equal(await denied.controller.enable(), false);
+  assert.equal(denied.permissionCalls, 0);
+  denied.controller.destroy();
+});
+
+test('dismissed system prompt is not repeated at each brew or after reload', async () => {
+  const values = new Map();
+  const storage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
+  const first = harness({ permission: 'default', permissionResult: 'default', storage });
+  await first.controller.enable(); await first.controller.enable();
+  assert.equal(first.permissionCalls, 1); first.controller.destroy();
+  const second = harness({ permission: 'default', storage });
+  await second.controller.enable();
+  assert.equal(second.permissionCalls, 0); second.controller.destroy();
+});
+
+test('Reset during enrollment prevents an obsolete start from being scheduled', async () => {
+  let activate;
+  const ready = new Promise(resolve => { activate = resolve; });
+  const h = harness({ permission: 'default', serviceWorkerReady: ready });
+  h.controller.syncTimer(running(160_000));
+  const enabling = h.controller.enable(); await settle();
+  h.controller.syncTimer(paused);
+  activate({ pushManager: { getSubscription: async () => null, subscribe: async () => ({ toJSON: () => ({endpoint: 'subscription'}) }) } });
+  assert.equal(await enabling, true);
+  assert.equal(h.calls.filter(c => c.action === 'sync' && c.remainingMs !== null).length, 0);
+  h.controller.destroy();
 });

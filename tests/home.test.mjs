@@ -48,7 +48,7 @@ test('one MUI bottom drawer replaces previous scroll navigation',()=>{
 });
 test('validated timer start remains synchronous in original tap',()=>{
   const home=readFileSync('src/components/HomeScreen.jsx','utf8');
-  assert.match(home,/actions\.setSeconds\(seconds\);\s*return actions\.start\(\)/);
+  assert.match(home,/actions\.setSeconds\(seconds\);\s*const started = actions\.start\(\);\s*if \(started\) void push\.enable\(\);\s*return started/);
   assert.match(home,/onClick=\{handlePrimary\}/);
 });
 test('Figma 66px minus/plus assets are local',()=>{

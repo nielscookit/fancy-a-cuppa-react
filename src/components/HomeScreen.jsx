@@ -32,7 +32,9 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const begin = seconds => {
     if (preload !== 'ready' || inSession) return false;
     actions.setSeconds(seconds);
-    return actions.start();
+    const started = actions.start();
+    if (started) void push.enable();
+    return started;
   };
   useImperativeHandle(ref, () => ({ begin }));
   useEffect(() => {

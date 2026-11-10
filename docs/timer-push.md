@@ -1,10 +1,11 @@
 # V3 timer notifications
 
-Current UI status: the unapproved notification controls below the Home timer
-were removed at the user’s request. New enrollment has no UI entry point until
-the permission flow is agreed with UX. Existing enrolled devices retain their
-controller behavior. No real device enrollment was present during diagnosis;
-the exact client-side failure is still unconfirmed.
+Current UI status: enrollment is triggered directly by the existing Home Start
+or detail BREW gesture. There are no added controls or layout changes. The native
+permission prompt is independent of network/worker readiness and is not repeated
+after consent, denial, or dismissal. Setup has bounded waits; an already active
+worker is used directly. The earlier client-side failure on the user's iPhone
+was not confirmed; stalled readiness was reproduced in a controlled test.
 
 The installed web app can opt in to a Web Push notification when the Home timer
 finishes. The timer and media controllers remain independent of React and push.
@@ -12,7 +13,7 @@ V2 and all existing tea tables/functions are unchanged.
 
 ## Flow
 
-- `Enable notifications` is a deliberate user gesture. Merely opening the app
+- The existing Start/BREW tap is the deliberate user gesture. Merely opening the app
   never opens the operating system's permission prompt.
 - The actual timer start (after Fill begins) submits the remaining duration to
   Supabase. Only a server acknowledgement shows `Ready notification scheduled`.

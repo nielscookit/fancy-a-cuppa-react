@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'fac-v3-push';
+const PROMPT_KEY = 'fac-v3-push-permission-asked';
 
 function read(storage) {
   try {
@@ -23,12 +24,22 @@ export function createPushController({
   fetchRef = globalThis.fetch,
   now = () => Date.now(),
   onChange = () => {},
+  setupTimeoutMs = 10000,
 }) {
   let saved = read(storage);
   let registration;
   let publicKey;
   let disposed = false;
   let initializing;
+  let enabling;
+  let permissionAsked = false;
+  try { permissionAsked = storage?.getItem(PROMPT_KEY) === '1'; } catch { /* unavailable */ }
+  function bounded(promise) {
+    let timeout;
+    return Promise.race([promise, new Promise((_, reject) => {
+      timeout = globalThis.setTimeout(() => reject(new Error('Notification setup timed out.')), setupTimeoutMs);
+    })]).finally(() => globalThis.clearTimeout(timeout));
+  }
   let inFlight = false;
   let lastTimer;
   let retryTimer;
@@ -141,13 +152,15 @@ export function createPushController({
     update({ busy: true, error: '', permission: notificationRef.permission });
     initializing = (async () => {
       try {
-        const response = await fetchRef(endpoint, { signal: AbortSignal.timeout(10_000) });
+        const response = await bounded(fetchRef(endpoint, { signal: AbortSignal.timeout(setupTimeoutMs) }));
         if (!response.ok) throw new Error();
-        publicKey = (await response.json()).publicKey;
+        publicKey = (await bounded(response.json())).publicKey;
         if (typeof publicKey !== 'string') throw new Error();
-        registration = await navigatorRef.serviceWorker.register(baseUrl + 'sw.js', { scope: baseUrl, updateViaCache: 'none' });
+        registration = await bounded(navigatorRef.serviceWorker.register(baseUrl + 'sw.js', { scope: baseUrl, updateViaCache: 'none' }));
         // ready resolves only after activation; registration alone is insufficient on first install.
-        registration = await navigatorRef.serviceWorker.ready;
+        if (registration.active?.state !== 'activated') {
+          registration = await bounded(navigatorRef.serviceWorker.ready);
+        }
         if (disposed) return;
         update({ ready: true });
         if (saved?.enabled) {
@@ -173,18 +186,37 @@ export function createPushController({
     return initializing;
   }
 
-  // Called directly from the Enable tap so iOS sees a user permission gesture.
+  // Called synchronously from the existing Start/BREW tap, before any await.
+  // Permission must not depend on a slow/unavailable service worker or network.
   function enable() {
-    if (!state.ready || state.busy || disposed) return Promise.resolve(false);
+    if (!state.available || disposed) return Promise.resolve(false);
+    if (enabling) return enabling;
+    const permission = notificationRef.permission;
+    if (permission === 'denied' || (permission === 'default' && permissionAsked)) return Promise.resolve(false);
+    if (state.enabled && saved?.enabled && permission === 'granted') return Promise.resolve(retry());
     let permissionPromise;
-    try { permissionPromise = notificationRef.requestPermission(); }
-    catch { update({ error: 'Notifications could not be enabled. Please try again.' }); return Promise.resolve(false); }
+    try {
+      if (permission === 'default') {
+        permissionAsked = true;
+        try { storage?.setItem(PROMPT_KEY, '1'); } catch { /* per-session guard still applies */ }
+        permissionPromise = notificationRef.requestPermission();
+      } else permissionPromise = Promise.resolve(permission);
+    }
+    catch {
+      permissionAsked = false;
+      try { storage?.setItem(PROMPT_KEY, '0'); } catch { /* unavailable */ }
+      update({ error: 'Notifications could not be enabled. Please try again.' });
+      return Promise.resolve(false);
+    }
     update({ busy: true, error: '' });
-    return (async () => {
+    enabling = (async () => {
       try {
         const permission = await permissionPromise;
         update({ permission });
         if (permission !== 'granted') { update({ enabled: false }); return false; }
+        if (!state.ready || initializing) await prepare();
+        if (disposed) return false;
+        if (!state.ready) throw new Error('Notification setup unavailable.');
         const newIdentity = !saved;
         if (newIdentity) {
           const bytes = cryptoRef.getRandomValues(new Uint8Array(32));
@@ -207,8 +239,9 @@ export function createPushController({
         failedAction = 'enable';
         update({ error: 'Notifications could not be enabled. Check your connection and retry.' });
         return false;
-      } finally { update({ busy: false }); }
+      } finally { enabling = null; update({ busy: false }); }
     })();
+    return enabling;
   }
 
   async function disable() {
