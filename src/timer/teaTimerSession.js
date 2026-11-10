@@ -1,3 +1,4 @@
+import { readTimerSession, persistTimerSession } from './timerPersistence.js';
 import { createAudioController } from './audioController.js';
 import { createMediaController } from './mediaController.js';
 import { createTimerController } from './timerController.js';
@@ -13,6 +14,8 @@ export function createTeaTimerSession({
   initialSeconds = 240,
   onChange = () => {},
   factories = {},
+  storageKey,
+  storage,
 }) {
   // React callback refs are set to null during unmount (close tea / switch
   // tea). The media controller must retain the original four DOM nodes for
@@ -24,6 +27,8 @@ export function createTeaTimerSession({
   const makeAudio = factories.audio || createAudioController;
   const makeMedia = factories.media || createMediaController;
   const makeTimer = factories.timer || createTimerController;
+  const saved = storageKey ? readTimerSession(storage, storageKey) : null;
+  let recoveryPending = Boolean(saved);
   let disposed = false;
   let preload = stillMedia ? 'ready' : 'loading';
   let phase = -1;
@@ -56,6 +61,7 @@ export function createTeaTimerSession({
     });
     timer = makeTimer({
       media, audio, initialSeconds,
+      onPersist: state => { if (!disposed && !recoveryPending && storageKey) persistTimerSession(storage, storageKey, state); },
       onError: reportError,
       onUpdate: next => { countdown = next; notify(); },
     });
@@ -76,6 +82,7 @@ export function createTeaTimerSession({
     return media.preloadAll().then(() => {
       if (disposed) return false;
       preload = 'ready';
+      if (recoveryPending) { recoveryPending = false; timer.restore(saved); }
       notify();
       return true;
     }).catch(failure => {

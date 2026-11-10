@@ -456,11 +456,50 @@ export function createMediaController({
     void show(3);
   }
 
+  // Reload recovery seeks to the current phase without replaying old sounds.
+  function restore(state) {
+    reset();
+    active = state.running;
+    const fillDuration = Number.isFinite(videos[0].duration) ? videos[0].duration : 5.041667;
+    const brewDuration = Number.isFinite(videos[1].duration) ? videos[1].duration : 15.041667;
+    let index, time;
+    if (state.finished || state.remaining <= 5) {
+      index = 3;
+      time = state.finished ? Infinity : 5 - state.remaining;
+      milkStarted = true;
+      milkSoundTriggered = true;
+    } else if (state.elapsed < fillDuration) { index = 0; time = state.elapsed; }
+    else if (state.elapsed < fillDuration + brewDuration) { index = 1; time = state.elapsed - fillDuration; }
+    else { index = 2; time = state.elapsed - fillDuration - brewDuration; }
+    phase = index;
+    onPhase(index);
+    const ownSession = session;
+    const video = videos[index];
+    videos.forEach((item, i) => item.classList.toggle('visible', i === index));
+    function seek() {
+      if (destroyed || ownSession !== session) return;
+      const duration = Number(video.duration);
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      const target = time === Infinity ? Math.max(0,duration - 0.05)
+        : index === 2 ? time % duration : Math.min(time,Math.max(0,duration - 0.05));
+      try { video.currentTime = target; } catch (error) { onError(error); }
+      if (active) video.play()?.catch(() => {
+        onError(new Error('Tap the countdown to pause, then tap again to resume video and sound.'));
+      });
+    }
+    if (video.readyState >= 1) seek();
+    else {
+      const loaded = () => { video.removeEventListener('loadedmetadata', loaded); seek(); };
+      listen(video, 'loadedmetadata', loaded);
+    }
+  }
+
   return {
     ready: () => videos.every(ready),
     prepare: () => Promise.all(videos.map(waitReady)),
     preloadFill,
     preloadAll,
+    restore,
     unlock,
     reset,
     start: () => { active = true; void show(0); },

@@ -9,6 +9,7 @@ export function createTimerController({
   onUpdate = () => {},
   onError = () => {},
   initialSeconds = 120,
+  onPersist = () => {},
   now = () => Date.now(),
   // Bind calls to globalThis: passing native Window timer methods as
   // object properties and invoking them as methods throws "Illegal invocation".
@@ -36,7 +37,7 @@ export function createTimerController({
   function state() {
     return { total, remaining, running, preparing, finished, warnedThirty };
   }
-  function notify() { if (!destroyed) onUpdate(state()); }
+  function notify() { if (!destroyed) { onPersist({...state(), deadline}); onUpdate(state()); } }
   function clearTicker() {
     if (ticker !== null) {
       scheduler.clearInterval(ticker);
@@ -153,6 +154,24 @@ export function createTimerController({
     stop();
     notify();
   }
+  function syncMedia() {
+    media.restore?.({...state(), elapsed:total - remaining});
+  }
+  function restore(saved) {
+    if (!saved || destroyed) return;
+    stop();
+    total = saved.total;
+    remaining = saved.status === 'running'
+      ? Math.min(total, Math.max(0, (saved.deadline - now()) / 1000)) : saved.remaining;
+    finished = saved.status === 'finished' || remaining === 0;
+    if (finished) remaining = 0;
+    warnedThirty = Boolean(saved.warnedThirty) || remaining <= 30;
+    running = saved.status === 'running' && !finished;
+    deadline = running ? saved.deadline : 0;
+    syncMedia();
+    notify();
+    if (running) { ticker = scheduler.setInterval(tick, 100); void requestWakeLock(); }
+  }
   function toggle() { if (running || preparing) pause(); else start(); }
   function visibilityChange() {
     if (!documentRef?.hidden && running) {
@@ -164,6 +183,8 @@ export function createTimerController({
   notify();
   return {
     state,
+    restore,
+    syncMedia,
     start,
     pause,
     toggle,

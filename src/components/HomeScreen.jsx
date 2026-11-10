@@ -16,6 +16,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const videoRefs = useRef([]);
   const { snapshot, actions } = useTeaTimer({
     videoRefs,
+    storageKey: 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
     mediaFactory: createMediaController,
   });
@@ -58,8 +59,12 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
         </Box>
         <Box className="fac-home__time-control" aria-label="Brewing time">
           {inSession ? (
-            <Typography component="output" role="timer" className="fac-home__countdown"
-              aria-label="Brewing countdown">{timeLabel}</Typography>
+            <Button onClick={actions.toggle} disabled={finished || preload !== 'ready'}
+              aria-label={running ? 'Pause timer' : 'Resume timer'}
+              sx={{borderRadius:0,padding:0,minWidth:194,minHeight:49,height:49}}>
+              <Typography component="output" role="timer" className="fac-home__countdown"
+                aria-label="Brewing countdown">{timeLabel}</Typography>
+            </Button>
           ) : (
             <>
               <IconButton

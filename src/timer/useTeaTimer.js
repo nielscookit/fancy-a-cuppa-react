@@ -27,13 +27,16 @@ function initialState(seconds) {
  * before the effect runs. Keep the exact same media CSS from /timer-test/
  * until the approved final layout is supplied.
  */
-export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaFactory }) {
+export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaFactory, storageKey }) {
   const sessionRef = useRef(null);
   const [snapshot, setSnapshot] = useState(() => initialState(initialSeconds));
 
   useEffect(() => {
     let mounted = true;
+    let storage;
+    try { storage = globalThis.localStorage; } catch { /* unavailable */ }
     const session = createTeaTimerSession({
+      storageKey, storage,
       videos: videoRefs?.current,
       assetBase,
       initialSeconds,
@@ -47,7 +50,7 @@ export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaF
       if (sessionRef.current === session) sessionRef.current = null;
       session.destroy();
     };
-  }, [videoRefs, assetBase, initialSeconds, mediaFactory]);
+  }, [videoRefs, assetBase, initialSeconds, mediaFactory, storageKey]);
 
   const start = useCallback(() => sessionRef.current?.start() ?? false, []);
   const toggle = useCallback(() => sessionRef.current?.toggle() ?? false, []);
