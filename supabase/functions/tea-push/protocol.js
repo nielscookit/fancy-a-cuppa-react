@@ -53,3 +53,13 @@ export function validateCommand(value) {
 export function notificationPayload() {
   return JSON.stringify({ version: 1, type: 'tea-ready', title: 'Your tea is ready', body: 'Time for a cuppa.' });
 }
+
+// Only known provider error codes may enter logs, never raw responses or URLs.
+export function pushFailureReason(body) {
+  const allowed = new Set(['BadRequest', 'BadTtl', 'BadTTL', 'BadUrgency', 'BadTopic',
+    'BadWebPushTopic', 'BadJwtToken', 'VapidPkHashMismatch', 'BadAuthorizationHeader',
+    'BadCryptoKey', 'BadEncoding', 'BadContentEncoding', 'BadPayload', 'PayloadEmpty',
+    'PayloadTooLarge', 'BadDeviceToken', 'Unregistered', 'ExpiredToken', 'TooManyRequests']);
+  try { const reason = JSON.parse(body).reason; return allowed.has(reason) ? reason : 'UnclassifiedProviderError'; }
+  catch { return 'UnclassifiedProviderError'; }
+}

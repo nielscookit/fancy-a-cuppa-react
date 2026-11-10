@@ -4,7 +4,15 @@ import { webcrypto, createECDH, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createPushController } from '../src/push/pushController.js';
-import { validateCommand, validateSubscription } from '../supabase/functions/tea-push/protocol.js';
+import { validateCommand, validateSubscription, pushFailureReason } from '../supabase/functions/tea-push/protocol.js';
+
+test('provider diagnostics allow known error codes without logging arbitrary response data', () => {
+  assert.equal(pushFailureReason('{"reason":"BadJwtToken"}'), 'BadJwtToken');
+  assert.equal(pushFailureReason('{"reason":"VapidPkHashMismatch"}'), 'VapidPkHashMismatch');
+  for (const body of ['private endpoint', '{"reason":"secret-value"}', 'null', '{}']) {
+    assert.equal(pushFailureReason(body), 'UnclassifiedProviderError');
+  }
+});
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness({ saved, permission = 'granted', handler, storage: givenStorage, serviceWorkerReady, active, setupTimeoutMs, permissionResult = 'granted' } = {}) {

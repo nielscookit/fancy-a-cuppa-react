@@ -2,7 +2,7 @@ import postgres from 'postgres';
 import * as webpush from 'web-push';
 import { timingSafeEqual, createHash, createHmac } from 'node:crypto';
 import { Buffer } from 'node:buffer';
-import { APP_ORIGIN, APP_URL, RequestError, validateCommand, notificationPayload } from './protocol.js';
+import { APP_ORIGIN, APP_URL, RequestError, validateCommand, notificationPayload, pushFailureReason } from './protocol.js';
 
 // This credential is supplied by Supabase to the Edge runtime, never to Vite.
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL'), {
@@ -109,7 +109,10 @@ async function dispatch(settings) {
         redirect: 'error', signal: AbortSignal.timeout(5000),
       });
       httpStatus = response.status;
-      await response.body?.cancel();
+      if (!response.ok) {
+        const reason = pushFailureReason(await response.text());
+        console.error('tea-push provider rejected', httpStatus, reason);
+      } else await response.body?.cancel();
     } catch { /* Retry bounded transport failures; never log subscriptions or secrets. */ }
     const sent = httpStatus >= 200 && httpStatus < 300;
     const gone = httpStatus === 404 || httpStatus === 410;
