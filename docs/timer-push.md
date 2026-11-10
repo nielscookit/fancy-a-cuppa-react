@@ -1,5 +1,11 @@
 # V3 timer notifications
 
+Current UI status: the unapproved notification controls below the Home timer
+were removed at the user’s request. New enrollment has no UI entry point until
+the permission flow is agreed with UX. Existing enrolled devices retain their
+controller behavior. No real device enrollment was present during diagnosis;
+the exact client-side failure is still unconfirmed.
+
 The installed web app can opt in to a Web Push notification when the Home timer
 finishes. The timer and media controllers remain independent of React and push.
 V2 and all existing tea tables/functions are unchanged.

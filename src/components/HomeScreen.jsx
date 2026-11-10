@@ -5,7 +5,6 @@ import { useTeaTimer } from '../timer/useTeaTimer.js';
 import { createMediaController } from '../timer-kit/mediaController.js';
 import { MEDIA_ASSETS } from '../timer-kit/mediaManifest.js';
 import { usePushNotifications } from '../push/usePushNotifications.js';
-import TimerNotifications from './TimerNotifications.jsx';
 import '../timer-kit/media-stage.css';
 import './home.css';
 
@@ -120,7 +119,6 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
           How do you take it?
         </Button>
       </Box>
-      <TimerNotifications push={push} />
     </>
   );
 }
