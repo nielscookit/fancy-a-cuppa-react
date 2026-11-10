@@ -1,0 +1,5 @@
+# Client calls use per-installation random capabilities, verified in the handler.
+# Cron dispatch uses a separate server-only secret. No user login is required.
+[functions.tea-push]
+verify_jwt = false
+entrypoint = "./functions/tea-push/index.js"

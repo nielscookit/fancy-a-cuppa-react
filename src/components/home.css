@@ -178,6 +178,14 @@ body {
 .fac-home__action--secondary.MuiButton-root.Mui-disabled {
   background:#F3F2F0; color:#E8E6E3;
 }
+.fac-home__notifications {
+  width: 100%;
+  max-width: 375px;
+  margin: 16px auto 24px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: #1B272B;
+}
 @media (max-height:760px) {
   .fac-home__canvas { --image-size: min(100vw, 375px, calc(max(100svh, 560px) - 340px)); }
   .fac-home__tea-stage.timer-kit-stage { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }

@@ -16,6 +16,7 @@ export function createTeaTimerSession({
   factories = {},
   storageKey,
   storage,
+  onPersist = () => {},
 }) {
   // React callback refs are set to null during unmount (close tea / switch
   // tea). The media controller must retain the original four DOM nodes for
@@ -61,7 +62,11 @@ export function createTeaTimerSession({
     });
     timer = makeTimer({
       media, audio, initialSeconds,
-      onPersist: state => { if (!disposed && !recoveryPending && storageKey) persistTimerSession(storage, storageKey, state); },
+      onPersist: state => {
+        if (disposed || recoveryPending) return;
+        if (storageKey) persistTimerSession(storage, storageKey, state);
+        onPersist(state);
+      },
       onError: reportError,
       onUpdate: next => { countdown = next; notify(); },
     });

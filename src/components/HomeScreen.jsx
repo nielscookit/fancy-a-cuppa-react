@@ -4,6 +4,8 @@ import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js'
 import { useTeaTimer } from '../timer/useTeaTimer.js';
 import { createMediaController } from '../timer-kit/mediaController.js';
 import { MEDIA_ASSETS } from '../timer-kit/mediaManifest.js';
+import { usePushNotifications } from '../push/usePushNotifications.js';
+import TimerNotifications from './TimerNotifications.jsx';
 import '../timer-kit/media-stage.css';
 import './home.css';
 
@@ -14,11 +16,13 @@ const FILL_POSTER = MEDIA_BASE + MEDIA_ASSETS.fill.poster;
 
 export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTimerError }) {
   const videoRefs = useRef([]);
+  const push = usePushNotifications();
   const { snapshot, actions } = useTeaTimer({
     videoRefs,
     storageKey: 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
     mediaFactory: createMediaController,
+    onPersist: push.syncTimer,
   });
   const { countdown, preload, error } = snapshot;
   const { running, preparing, finished, total, remaining } = countdown;
@@ -116,6 +120,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
           How do you take it?
         </Button>
       </Box>
+      <TimerNotifications push={push} />
     </>
   );
 }
