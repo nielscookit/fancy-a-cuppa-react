@@ -54,7 +54,7 @@ The daily cleanup limits only this feature's own cron history to one day.
 
 ## Rollout and checks
 
-1. Apply `supabase/migrations/20261110164333_tea_timer_push.sql` to the existing
+1. Apply `supabase/migrations/20261110165850_tea_timer_push.sql` to the existing
    project. This enables `pg_cron` and `pg_net` without changing catalog tables.
 2. Deploy `tea-push` with `index.js`, `protocol.js`, and `deno.json` from its folder.
    The imports pin the Web Push and Postgres libraries; the accompanying npm
@@ -71,6 +71,16 @@ The daily cleanup limits only this feature's own cron history to one day.
 Automated checks: `npm test`, `npm run check:safety`, `npm run build`,
 `npm run verify:pages`; backend syntax/crypto checked with Deno and the pinned
 dependencies. Local browser emulation is not proof of locked-iPhone delivery.
+
+Verified on 2026-11-10: 129 automated tests pass; build, safety, Pages routes,
+and the live 167-tea read pass. The deployed Edge Function's configuration,
+registration, scheduling, cancellation, old-revision rejection, invalid device
+token/origin and dispatcher authorization were tested against the real database.
+Cron successfully dispatched a synthetic nonexistent Apple endpoint (expected
+HTTP 400); that test installation was subsequently disabled. This validates the
+dispatch path, not receipt on an iPhone. Locked-iPhone delivery remains a device
+acceptance test. Security advisors report only the intentional deny-all/no-policy
+RLS information for these private tables, with no public read or execute grants.
 
 ## Practical limits
 
