@@ -102,7 +102,9 @@ async function dispatch(settings) {
       if (!current || current.status !== 'sending' || current.revision !== job.revision) return;
       const details = webpush.generateRequestDetails(job.subscription, notificationPayload(), {
         vapidDetails: { subject: APP_URL, publicKey: settings.publicKey, privateKey: settings.privateKey },
-        TTL: 120, urgency: 'high', topic: 'fac-tea-ready', contentEncoding: 'aes128gcm',
+        // Apple rejected the optional Topic header with BadWebPushTopic.
+        // Notification replacement remains handled by the service worker's tag.
+        TTL: 120, urgency: 'high', contentEncoding: 'aes128gcm',
       });
       const response = await fetch(details.endpoint, {
         method: details.method, headers: details.headers, body: details.body,
