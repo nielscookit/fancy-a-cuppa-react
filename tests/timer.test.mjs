@@ -19,16 +19,50 @@ function timerHarness(seconds = 40) {
   );
   audio.playFinished = () => { events.push('audio:finished'); return Promise.resolve(); };
   const scheduler = { setInterval: fn => { scheduler.tick = fn; return 1; }, clearInterval: () => {} };
-  const doc = { hidden: false, addEventListener: () => {}, removeEventListener: () => {} };
+  let visibility;
+  const doc = { hidden: false, addEventListener: (_, fn) => { visibility = fn; }, removeEventListener: () => {} };
   const timer = createTimerController({
     media, audio, initialSeconds: seconds, now: () => milliseconds,
     scheduler, documentRef: doc, navigatorRef: {},
   });
-  return { timer, events, advance(secondsFromStart) {
+  return { timer, events,
+    hide() { doc.hidden = true; visibility(); },
+    returnAt(seconds) { milliseconds = seconds * 1000; doc.hidden = false; visibility(); },
+    advance(secondsFromStart) {
     milliseconds = secondsFromStart * 1000;
     timer.tick();
   }};
 }
+
+test('return after suspended timer expiry updates state without replaying the old alarm', () => {
+  const h = timerHarness(60);
+  h.timer.start(); h.hide(); h.returnAt(70);
+  assert.equal(h.timer.state().finished, true);
+  assert.equal(h.timer.state().remaining, 0);
+  assert.equal(h.events.includes('audio:finished'), false);
+  assert.equal(h.events.includes('audio:playAlmost'), false);
+  h.timer.destroy();
+});
+
+test('background ticks do not play cues, and returning does not replay them', () => {
+  const h = timerHarness(60);
+  h.timer.start(); h.hide(); h.advance(31); h.advance(60); h.returnAt(65);
+  assert.equal(h.timer.state().finished, true);
+  assert.equal(h.events.includes('audio:finished'), false);
+  assert.equal(h.events.includes('audio:playAlmost'), false);
+  h.timer.destroy();
+});
+
+test('return before expiry skips an overdue warning but still sounds at the foreground deadline', () => {
+  const h = timerHarness(60);
+  h.timer.start(); h.hide(); h.returnAt(40); h.advance(41);
+  assert.equal(h.events.includes('audio:playAlmost'), false);
+  h.advance(60);
+  assert.equal(h.events.filter(x => x === 'audio:finished').length, 1);
+  h.timer.reset(); h.timer.start(); h.advance(90);
+  assert.equal(h.events.filter(x => x === 'audio:playAlmost').length, 1);
+  h.timer.destroy();
+});
 
 test('deadline-based timer triggers exactly one 30s cue, milk at 5s, finish at zero', async () => {
   const t = timerHarness(40);

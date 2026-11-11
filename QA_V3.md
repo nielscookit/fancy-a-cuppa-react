@@ -1,5 +1,28 @@
 # Fancy a Cuppa V3 – Funktionstest
 
+## Aktueller Abgleich · 11.11.2026
+
+Die darunterstehende Liste vom 04.11. ist historisch, keine aktuelle Liste fehlender Implementierungen.
+
+| Bereich | Aktueller Nachweis |
+|---|---|
+| Push nach Timerende auf gesperrtem iPhone | Vom Nutzer bestätigt am 10.11.; Apple-Ablehnung `BadWebPushTopic` durch Entfernen des optionalen Topic-Headers behoben |
+| Almost-Time- und Abschlusston bei offener App | Beide vom Nutzer bestätigt |
+| Eigene Sounds auf dem Sperrbildschirm | Bewusst spätere native App-Ausbaustufe; Web Push verwendet den Systemton |
+| App-Icon | Eigenes Artwork im Repository; kein C-Platzhalter mehr |
+| Rückkehr nach Ablauf im Hintergrund | Clock-Catch-up spielt keine verpassten Tonhinweise nach; automatisiert geprüft. Erneuter iPhone-Test der vorherigen Medienfehlermeldung noch offen |
+| Reset vor Ablauf / mehrere Timer / Neuladen | Automatische Tests vorhanden; eindeutige, diesen Fällen zugeordnete Gerätebestätigung hier noch nicht dokumentiert |
+| Anlegen/Bearbeiten und Scanner | Bestehende Implementierung erhalten; frühere unspezifische Bestätigungen nicht nachträglich einzelnen Testfällen zugeordnet. Keine neuen Datenbank-Schreibtests in dieser Prüfung |
+
+Nächster Gerätetest: 1-Minuten-Timer starten, iPhone sperren, Push abwarten,
+App öffnen. Erwartet: abgelaufener Timer, kein nachgeholter Ton und keine
+Medienfehlermeldung. Danach Reset und einen vollständigen Durchlauf bei offener
+App prüfen (beide Sounds). Falls die Meldung erneut erscheint, bleibt die
+Video-/Medienursache gesondert zu untersuchen; der Screenshot allein benennt
+die konkret blockierte Medienoperation nicht.
+
+## Historischer Prüfstand
+
 **Stand:** 2026-11-04
 **Getestete Umgebung:** iPhone Safari, V3 Haupt-App
 **Referenz:** `freeze/v3-2026-11-04-functional`

@@ -33,6 +33,7 @@ export function createTimerController({
   let wakeLock = null;
   let requestId = 0;
   let destroyed = false;
+  let wasHidden = Boolean(documentRef?.hidden);
 
   function state() {
     return { total, remaining, running, preparing, finished, warnedThirty };
@@ -69,6 +70,11 @@ export function createTimerController({
   }
   function tick() {
     if (!running || destroyed) return;
+    // iOS may suspend ticks while locked. Catch up the clock on return, but
+    // never replay cues crossed in the background (push owns that reminder).
+    const hidden = Boolean(documentRef?.hidden);
+    const playCues = !hidden && !wasHidden;
+    wasHidden = hidden;
     remaining = Math.max(0, (deadline - now()) / 1000);
     if (remaining <= 0) {
       clearTicker();
@@ -78,13 +84,13 @@ export function createTimerController({
       releaseWakeLock();
       media.finish();
       notify();
-      audio.playFinished().catch(onError);
+      if (playCues) audio.playFinished().catch(onError);
       return;
     }
     if (remaining <= 5) media.milk();
     if (!warnedThirty && remaining <= 30) {
       warnedThirty = true;
-      audio.playAlmost();
+      if (playCues) audio.playAlmost();
     }
     notify();
   }
@@ -100,6 +106,7 @@ export function createTimerController({
   }
   function start() {
     if (destroyed || running || preparing) return;
+    wasHidden = Boolean(documentRef?.hidden);
     if (finished) {
       media.reset();
       audio.reset();
@@ -174,6 +181,7 @@ export function createTimerController({
   }
   function toggle() { if (running || preparing) pause(); else start(); }
   function visibilityChange() {
+    if (documentRef?.hidden) wasHidden = true;
     if (!documentRef?.hidden && running) {
       tick();
       void requestWakeLock();

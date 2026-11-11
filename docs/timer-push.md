@@ -89,6 +89,19 @@ dispatch path, not receipt on an iPhone. Locked-iPhone delivery remains a device
 acceptance test. Security advisors report only the intentional deny-all/no-policy
 RLS information for these private tables, with no public read or execute grants.
 
+## Device acceptance update · 2026-11-11
+
+The user confirmed locked-iPhone delivery and both foreground audio cues.
+Apple's real endpoint had rejected the optional Topic header with
+`400 BadWebPushTopic`; the deployed sender now omits it. The service worker
+still uses its notification tag. There are no extra Home notification controls:
+permission is requested once from the existing Start/BREW gesture.
+
+On foreground recovery, the timer updates its deadline-based state without
+replaying cues crossed while hidden. This is covered by automated tests;
+verification that the reported media error no longer appears on the actual
+iPhone is pending. See QA_V3.md for the current device acceptance status.
+
 ## Practical limits
 
 Internet is required to confirm schedule changes and deliver push. The scheduler
