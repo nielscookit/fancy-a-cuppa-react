@@ -27,7 +27,7 @@ function initialState(seconds) {
  * before the effect runs. Keep the exact same media CSS from /timer-test/
  * until the approved final layout is supplied.
  */
-export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaFactory, storageKey, onPersist }) {
+export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaFactory, audioFactory, storageKey, onPersist }) {
   const sessionRef = useRef(null);
   const [snapshot, setSnapshot] = useState(() => initialState(initialSeconds));
 
@@ -40,7 +40,7 @@ export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaF
       videos: videoRefs?.current,
       assetBase,
       initialSeconds,
-      factories: { media: mediaFactory },
+      factories: { media: mediaFactory, audio: audioFactory },
       onChange: value => { if (mounted) setSnapshot(value); },
     });
     sessionRef.current = session;
@@ -50,7 +50,7 @@ export function useTeaTimer({ videoRefs, assetBase, initialSeconds = 240, mediaF
       if (sessionRef.current === session) sessionRef.current = null;
       session.destroy();
     };
-  }, [videoRefs, assetBase, initialSeconds, mediaFactory, storageKey, onPersist]);
+  }, [videoRefs, assetBase, initialSeconds, mediaFactory, audioFactory, storageKey, onPersist]);
 
   const start = useCallback(() => sessionRef.current?.start() ?? false, []);
   const toggle = useCallback(() => sessionRef.current?.toggle() ?? false, []);

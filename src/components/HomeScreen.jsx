@@ -5,6 +5,7 @@ import { useTeaTimer } from '../timer/useTeaTimer.js';
 import { createMediaController } from '../timer-kit/mediaController.js';
 import { MEDIA_ASSETS } from '../timer-kit/mediaManifest.js';
 import { usePushNotifications } from '../push/usePushNotifications.js';
+import { createHomeAudioController } from '../timer/homeSoundProfile.js';
 import '../timer-kit/media-stage.css';
 import './home.css';
 
@@ -21,6 +22,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
     storageKey: 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
     mediaFactory: createMediaController,
+    audioFactory: createHomeAudioController,
     onPersist: push.syncTimer,
   });
   const { countdown, preload, error } = snapshot;

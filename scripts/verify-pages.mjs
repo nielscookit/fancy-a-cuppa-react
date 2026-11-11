@@ -6,6 +6,9 @@ import { MEDIA_ASSETS as TIMER_KIT_ASSETS } from '../src/timer-kit/mediaManifest
 for (const file of ['index.html', 'lab/index.html', 'timer-test/index.html', 'timer-lab/index.html']) {
   assert.ok(existsSync('dist/' + file), 'Missing GitHub Pages entry: ' + file);
 }
+for (const file of ['Memo.mp3', 'Ready.mp3']) {
+  assert.ok(existsSync('dist/audio/' + file), 'Missing custom Home sound: ' + file);
+}
 for (const { file } of Object.values(MEDIA_ASSETS)) {
   assert.ok(existsSync('dist/media/' + file), 'Missing verified V2 media: ' + file);
 }

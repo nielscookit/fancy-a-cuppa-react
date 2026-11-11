@@ -9,7 +9,8 @@ Die darunterstehende Liste vom 04.11. ist historisch, keine aktuelle Liste fehle
 | Bereich | Aktueller Nachweis |
 |---|---|
 | Push nach Timerende auf gesperrtem iPhone | Vom Nutzer bestätigt am 10.11.; Apple-Ablehnung `BadWebPushTopic` durch Entfernen des optionalen Topic-Headers behoben |
-| Almost-Time- und Abschlusston bei offener App | Beide vom Nutzer bestätigt |
+| Bisherige Almost-Time- und Abschlusstöne bei offener App | Beide vom Nutzer bestätigt; Originaldateien bleiben erhalten |
+| Neue Home-Sounds Memo/Ready · 11.11. | Memo einmal bei 30 s; Ready wiederholt im Vordergrund bis Reset. Verlassen der App stoppt den Ton ohne Neustart bei Rückkehr. MP3-Dateien vollständig dekodiert, automatisierte Tests für Profile/Reset/Verlassen vorhanden; neue Aufnahmen noch nicht auf dem echten iPhone abgehört |
 | Eigene Sounds auf dem Sperrbildschirm | Bewusst spätere native App-Ausbaustufe; Web Push verwendet den Systemton |
 | App-Icon | Eigenes Artwork im Repository; kein C-Platzhalter mehr |
 | Rückkehr nach Ablauf im Hintergrund | Änderung veröffentlicht; Nutzer bestätigt „Passt“. Medienfehlermeldung im getesteten Ablauf nicht mehr aufgetreten |
@@ -17,7 +18,8 @@ Die darunterstehende Liste vom 04.11. ist historisch, keine aktuelle Liste fehle
 | Anlegen/Bearbeiten | Bestehende Implementierung und Backend-Vertrag vorhanden. DB_HANDOFF_V3.md dokumentiert bereits reale RPC-Prüfungen mit zurückgerolltem Testdatensatz. Kein aktuell belegter offener Schreibrechtefehler; bei diesem Dokumentationsabgleich keine neuen Schreibtests |
 | Scanner | Bestehende Implementierung erhalten. Der alte Eintrag „Zu prüfen“ ist allein kein aktueller Fehlernachweis; die Timer-Abnahme wird nicht auf Scanner-Tests ausgeweitet |
 
-Aktuell kein weiterer Timer-Gerätetest ausstehend. Letzte Codeprüfung: 138 Tests,
+Kein erneuter allgemeiner Timer-Testlauf ausstehend. Die gezielte Prüfung neu
+geänderter Sounds ist davon getrennt. Letzte Codeprüfung: 143 Tests,
 Build, Sicherheitsprüfung und Pages-Ausgaben erfolgreich; Timer-Korrektur
 erfolgreich veröffentlicht. Dieser Dokumentationsabgleich ändert keine App-Funktion.
 
