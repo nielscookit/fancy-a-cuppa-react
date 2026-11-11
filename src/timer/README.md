@@ -10,7 +10,14 @@ isolated `/timer-test/` plays correctly, including:
 **Do not modify the working `/timer-test/` or the three underlying controllers
 without a regression test and an explicit need.** V2 is still untouched.
 
-## Migration preparation
+## Current integration · 2026-11-11
+
+Home integration and user acceptance are complete; see `../../QA_V3.md`.
+Production Home uses the Timer Kit for media and the shared timer/audio/session
+logic. The migration notes below record the earlier integration preparation;
+they are not pending implementation or repeat-test requests.
+
+## Migration preparation (historical)
 
 - `teaTimerSession.js`: framework-neutral wiring that creates all three
   controllers, preloads 4 videos and exposes Start/Pause/Reset/SetSeconds.

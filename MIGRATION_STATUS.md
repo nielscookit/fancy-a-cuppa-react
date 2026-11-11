@@ -1,5 +1,15 @@
 # Fancy a Cuppa V3 — migration status
 
+## Current status · 2026-11-11
+
+The entries below are chronological migration history, not an active backlog.
+Home timer integration, iPhone playback, locked-device push and return-to-app
+behavior have been accepted by the user. The current Home offers Start/Reset;
+old Pause/Resume or separate-timer-screen requirements are historical.
+See [QA_V3.md](QA_V3.md) for the reconciled acceptance record and
+[native iPhone concept](docs/native-iphone-concept.md) for the proposed next stage.
+No native implementation is authorized by the concept document itself.
+
 ## Complete
 - V2 main reference 203782e33b4d52184091c171008bccdbb6437057; V2 unchanged.
 - React, Vite, MUI 7, Roboto Mono, pinned npm lockfile, independent GitHub Pages.

@@ -1,5 +1,9 @@
 # V3 Phase 1B – Quick Timer acceptance on iPhone
 
+Historical test plan, superseded by [QA_V3.md](QA_V3.md). The current timer lives
+on Home, has no separate timer screen or Pause button, and its device acceptance
+is complete. Do not reuse the following list as pending user tests.
+
 1. Open Home. While the four clips are downloading, FANCY A CUPPA? is temporarily disabled.
 2. Set 2 MIN → 3 MIN using + and tap FANCY A CUPPA?.
 3. A separate timer view appears immediately. Countdown must begin when the first Fill video actually plays.

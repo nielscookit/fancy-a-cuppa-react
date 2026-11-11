@@ -16,14 +16,16 @@ V2 and all existing tea tables/functions are unchanged.
 - The existing Start/BREW tap is the deliberate user gesture. Merely opening the app
   never opens the operating system's permission prompt.
 - The actual timer start (after Fill begins) submits the remaining duration to
-  Supabase. Only a server acknowledgement shows `Ready notification scheduled`.
+  Supabase. A server acknowledgement updates the internal scheduled state.
+  There is no added scheduling-status label beneath the timer.
 - Pause and Reset submit a cancellation. Resume schedules the remaining time.
 - Each change has an increasing revision. Older or retried requests cannot
   replace a newer schedule/cancellation. A reload retains the deadline and revision.
 - Completion and React unmount never cancel a scheduled notification.
 - Failed changes remain in local storage and retry on connection/foreground
-  recovery. An unconfirmed cancellation explicitly warns that the old message
-  may still arrive. An expired offline start does not create a new late message.
+  recovery. Failure is represented in the controller state; the removed Home
+  controls do not display it. An unconfirmed cancellation can leave the previous
+  reminder scheduled. An expired offline start does not create a new late message.
 - The service worker displays a visible notification, with a fixed replacement
   tag, and opens/focuses only the V3 home URL. It does not cache or intercept pages.
 
@@ -99,8 +101,10 @@ permission is requested once from the existing Start/BREW gesture.
 
 On foreground recovery, the timer updates its deadline-based state without
 replaying cues crossed while hidden. This is covered by automated tests;
-verification that the reported media error no longer appears on the actual
-iPhone is pending. See QA_V3.md for the current device acceptance status.
+the user confirmed the return-to-app behavior and subsequently confirmed the
+timer tests as completed. There is no pending repeat of those acceptance tests.
+See QA_V3.md for the current device acceptance status. Earlier rollout notes
+describe historical checks, not today's outstanding work.
 
 ## Practical limits
 

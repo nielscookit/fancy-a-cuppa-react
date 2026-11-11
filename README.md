@@ -14,20 +14,28 @@ Vite HTML entry. It previews real MUI TextField/Select/Autocomplete/Button with
 local variant/height/radius/color/state controls. Lab state does not touch the
 global theme, App, timer or Supabase.
 
-## Isolated timer migration
+## Current status and next stage
+
+Timer and push acceptance on the user's iPhone is complete. See
+[QA_V3.md](QA_V3.md) for the current record; old migration plans are historical.
+The [native iPhone app concept](docs/native-iphone-concept.md) describes a proposed
+separate iOS client, reliable local alerts and distribution to friends. It is a
+concept only, not a built or released native app.
+
+## Timer and media
 
 The framework-independent controllers in `src/timer/` mirror the V2 deadline,
 30-second reminder, 5-second milk animation, finishing sound and established
-four-video sequence. The UI is intentionally only a diagnostic test page.
+four-video sequence. The production timer lives on Home; the diagnostic pages
+remain separate. Current Home playback uses the Timer Kit media controller.
 
 Video and audio assets are downloaded from a **pinned V2 commit**, checked by
 Git blob SHA-1 and included in the separate V3 build. The live V3 page
 does not load media from V2 URLs. No binary files are committed, and V2 is
 never modified.
 
-**Required acceptance gate:** repeat video/sound on a real iPhone Safari, test
-pause/resume, finishing cues, screen lock, going background/foreground. CI JS
-tests cannot prove mobile Safari media autoplay rules.
+Real iPhone acceptance is complete. Relevant future timer changes require
+targeted regression checks; CI alone cannot prove iPhone media behavior.
 
 ## Development
 
@@ -44,7 +52,7 @@ npm run dev
 
 ## Database
 
-Main V3 test app connects to the existing Supabase project using a public
-publishable key and RLS-protected REST queries. Writes from future forms
-will go through the pre-existing community-tea Edge Function. No database
+The V3 app connects to the existing Supabase project using a public
+publishable key and RLS-protected REST queries. Existing Add/Edit forms
+write through the pre-existing community-tea Edge Function. No database
 connection or write functions are used in /lab/ or /timer-test/.
