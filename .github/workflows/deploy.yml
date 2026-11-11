@@ -43,8 +43,17 @@ jobs:
         run: node scripts/inspect-media-duration.mjs
       - name: Generate app icon sizes
         run: |
-          convert public/icons/icon-cuppa-dark-192.png -resize 180x180 public/icons/icon-cuppa-dark-180.png
-          convert public/icons/icon-cuppa-dark-192.png -resize 512x512 public/icons/icon-cuppa-dark-512.png
+          python3 -m venv /tmp/fac-icon-venv
+          /tmp/fac-icon-venv/bin/pip install --quiet Pillow
+          /tmp/fac-icon-venv/bin/python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          source = Image.open("public/icons/icon-cuppa-dark-192.png").convert("RGB")
+          for size in (180, 512):
+              source.resize((size, size), Image.Resampling.LANCZOS).save(
+                  Path(f"public/icons/icon-cuppa-dark-{size}.png"), optimize=True
+              )
+          PY
       - name: Build
         run: npm run build
       - name: Verify independent Pages routes and media
