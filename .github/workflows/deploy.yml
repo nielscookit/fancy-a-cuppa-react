@@ -41,6 +41,10 @@ jobs:
         run: npm run sync:media
       - name: Inspect exact milk-video duration
         run: node scripts/inspect-media-duration.mjs
+      - name: Generate app icon sizes
+        run: |
+          convert public/icons/icon-cuppa-dark-192.png -resize 180x180 public/icons/icon-cuppa-dark-180.png
+          convert public/icons/icon-cuppa-dark-192.png -resize 512x512 public/icons/icon-cuppa-dark-512.png
       - name: Build
         run: npm run build
       - name: Verify independent Pages routes and media

@@ -8,7 +8,7 @@ self.addEventListener('push', event => {
   const valid = payload?.version === 1 && payload.type === 'tea-ready';
   event.waitUntil(self.registration.showNotification(valid ? payload.title : 'Fancy a Cuppa', {
     body: valid ? payload.body : 'Your tea is ready.',
-    icon: new URL('icons/icon-cuppa-192.png', self.registration.scope).href,
+    icon: new URL('icons/icon-cuppa-dark-192.png', self.registration.scope).href,
     tag: 'fac-tea-ready',
     data: { url: self.registration.scope },
   }));
