@@ -30,6 +30,41 @@ export function createAudioController({
   let disposed = false;
   let generation = 0;
   const activeSources = new Set();
+  let keepAliveSource = null;
+  let keepAliveGain = null;
+
+  // iOS can shut down an idle audio device and refuse to restart it at 0:00.
+  // Keep the unlocked Web Audio output active during a foreground run.
+  function armAudioOutput() {
+    if (disposed || !context || context.state !== 'running' ||
+        keepAliveSource || !context.createBuffer || !context.createGain) return;
+    const sampleRate = context.sampleRate || 44100;
+    const buffer = context.createBuffer(1, Math.max(1, Math.floor(sampleRate / 10)), sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.sin(i * 2 * Math.PI * 220 / sampleRate) * 0.000001;
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = 0.01;
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain);
+    gain.connect(context.destination);
+    source.onended = () => { activeSources.delete(source); source.disconnect(); };
+    source.start();
+    activeSources.add(source);
+    keepAliveSource = source;
+    keepAliveGain = gain;
+  }
+  function stopAudioOutput() {
+    if (keepAliveSource) {
+      try { keepAliveSource.stop(); } catch { /* already stopped */ }
+      try { keepAliveSource.disconnect(); } catch { /* already disconnected */ }
+      activeSources.delete(keepAliveSource);
+      keepAliveSource = null;
+    }
+    try { keepAliveGain?.disconnect(); } catch { /* already disconnected */ }
+    keepAliveGain = null;
+  }
 
   try { context = contextFactory(); }
   catch (error) { onError(error); }
@@ -64,7 +99,13 @@ export function createAudioController({
   }
   function unlock() {
     if (disposed) return;
-    if (context && context.state !== 'running') context.resume().catch(onError);
+    if (context) {
+      // Called directly from Start, not at the end of the timer.
+      if (context.state === 'running') armAudioOutput();
+      else Promise.resolve(context.resume()).then(armAudioOutput).catch(() => {
+        // Playback handles a possible temporary iOS audio interruption.
+      });
+    }
     if (almost.readyState === 0) almost.load();
     if (finished.readyState === 0) finished.load();
   }
@@ -93,35 +134,49 @@ export function createAudioController({
     try { fallback.currentTime = 0; } catch { /* metadata */ }
     fallback.play().catch(onError);
   }
-  function playFinished() {
-    if (disposed || (loopFinished && documentRef?.hidden)) return Promise.resolve();
-    const current = generation;
-    // Use the AudioContext unlocked by Start, just like the 30-second cue.
-    // A separate HTMLAudioElement.play() at expiry can be denied by iOS.
-    if (context) {
-      return finishBufferReady.then(async buffer => {
-        if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
-        if (!buffer) throw new Error('Abschlusston konnte nicht geladen werden. Bitte die App neu laden.');
-        if (context.state !== 'running') await context.resume();
-        if (!disposed && current === generation && !(loopFinished && documentRef?.hidden)) {
-          bufferPlay(buffer, loopFinished);
-        }
-      });
-    }
+  function playHtmlFinished(current) {
+    if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return Promise.resolve();
     finished.pause();
     try { finished.currentTime = 0; } catch { /* metadata */ }
     finished.muted = false;
     finished.volume = 1;
     finished.loop = loopFinished;
-    try { return Promise.resolve(finished.play()).catch(error => {
-      // Reset/teardown can intentionally abort a pending browser play request.
-      if (!disposed && current === generation) throw error;
-    }); }
-    catch (error) { return Promise.reject(error); }
+    try {
+      return Promise.resolve(finished.play()).catch(error => {
+        if (!disposed && current === generation) throw error;
+      });
+    } catch (error) { return Promise.reject(error); }
+  }
+  function playFinished() {
+    if (disposed || (loopFinished && documentRef?.hidden)) return Promise.resolve();
+    const current = generation;
+    if (!context) return playHtmlFinished(current);
+    return Promise.resolve(finishBufferReady).then(async buffer => {
+      if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
+      if (!buffer) throw new Error('Ready.mp3 konnte nicht geladen werden.');
+      try {
+        // Normally running since Start; resume only after an iOS interruption.
+        if (context.state !== 'running') await context.resume();
+        if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
+        bufferPlay(buffer, loopFinished);
+        stopAudioOutput();
+      } catch (webAudioError) {
+        if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
+        // Last resort if the Web Audio output was interrupted.
+        // Surface one error only if both audio paths fail.
+        try { await playHtmlFinished(current); }
+        catch {
+          if (!disposed && current === generation) {
+            throw new Error('Ready-Ton konnte nicht gestartet werden. Bitte Safari bzw. die Homescreen-App neu öffnen.');
+          }
+        }
+      }
+    });
   }
   function reset() {
     generation++;
     finished.loop = false;
+    stopAudioOutput();
     for (const source of activeSources) {
       try { source.stop(); } catch { /* already ended */ }
       source.disconnect();

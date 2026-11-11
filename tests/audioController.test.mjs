@@ -116,3 +116,54 @@ test('Ready uses unlocked Web Audio when HTML audio is blocked, loops and stops 
   assert.equal(sources.length, 2);
   h.controller.destroy();
 });
+
+test('Start keeps foreground audio output active so Ready does not restart the device at expiry', async () => {
+  const sources = [];
+  let resumes = 0;
+  const context = { state: 'running', sampleRate: 44100, destination: {},
+    decodeAudioData: async () => ({}), close: async () => {},
+    resume: async () => { resumes++; },
+    createBuffer: (_channels, length) => ({ getChannelData: () => new Float32Array(length) }),
+    createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+    createBufferSource() {
+      const source = { loop: false, stopped: false, connect() {}, disconnect() {},
+        start() {}, stop() { this.stopped = true; } };
+      sources.push(source); return source;
+    },
+  };
+  const h = harness({ context, play: () => Promise.reject(new DOMException('Blocked', 'NotAllowedError')) });
+  await new Promise(resolve => setImmediate(resolve));
+  h.controller.unlock();
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].loop, true);
+  await h.controller.playFinished();
+  assert.equal(sources.length, 2);
+  assert.equal(sources[0].stopped, true);
+  assert.equal(sources[1].loop, true);
+  assert.equal(resumes, 0);
+  assert.equal(h.finished.plays, 0);
+  h.controller.reset();
+  assert.equal(sources[1].stopped, true);
+  h.controller.destroy();
+});
+
+test('Ready recovers via HTML fallback when iOS Web Audio output cannot resume', async () => {
+  const context = { state: 'suspended', destination: {},
+    decodeAudioData: async () => ({}), close: async () => {},
+    resume: () => Promise.reject(new Error('Failed to start the audio device')),
+  };
+  const h = harness({ context });
+  await h.controller.playFinished();
+  assert.equal(h.finished.plays, 1);
+  h.controller.destroy();
+});
+
+test('Ready reports one useful error if both playback APIs are denied', async () => {
+  const context = { state: 'suspended', destination: {},
+    decodeAudioData: async () => ({}), close: async () => {},
+    resume: () => Promise.reject(new Error('Failed to start the audio device')),
+  };
+  const h = harness({ context, play: () => Promise.reject(new DOMException('Blocked', 'NotAllowedError')) });
+  await assert.rejects(h.controller.playFinished(), /Ready-Ton konnte nicht gestartet werden/);
+  h.controller.destroy();
+});
