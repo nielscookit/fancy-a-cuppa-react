@@ -26,6 +26,7 @@ export function createAudioController({
   let context = null;
   let clickBuffer = null;
   let almostBuffer = null;
+  let finishBufferReady = null;
   let disposed = false;
   let generation = 0;
   const activeSources = new Set();
@@ -37,23 +38,25 @@ export function createAudioController({
     fallback.preload = 'auto';
   } else {
     function loadBuffer(name, callback) {
-      fetchImpl(path(name))
+      return fetchImpl(path(name))
         .then(response => {
           if (!response.ok) throw new Error('Audio file not available: ' + name);
           return response.arrayBuffer();
         })
         .then(bytes => context.decodeAudioData(bytes))
-        .then(buffer => { if (!disposed) callback(buffer); })
+        .then(buffer => { if (!disposed) callback(buffer); return buffer; })
         .catch(onError);
     }
     loadBuffer('clickSound', buffer => { clickBuffer = buffer; });
     loadBuffer('almostSound', buffer => { almostBuffer = buffer; });
+    finishBufferReady = loadBuffer('finishSound', () => {});
   }
 
-  function bufferPlay(buffer) {
+  function bufferPlay(buffer, loop = false) {
     if (disposed) return;
     const source = context.createBufferSource();
     source.buffer = buffer;
+    source.loop = loop;
     source.connect(context.destination);
     activeSources.add(source);
     source.onended = () => { activeSources.delete(source); source.disconnect(); };
@@ -93,6 +96,18 @@ export function createAudioController({
   function playFinished() {
     if (disposed || (loopFinished && documentRef?.hidden)) return Promise.resolve();
     const current = generation;
+    // Use the AudioContext unlocked by Start, just like the 30-second cue.
+    // A separate HTMLAudioElement.play() at expiry can be denied by iOS.
+    if (context) {
+      return finishBufferReady.then(async buffer => {
+        if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
+        if (!buffer) throw new Error('Abschlusston konnte nicht geladen werden. Bitte die App neu laden.');
+        if (context.state !== 'running') await context.resume();
+        if (!disposed && current === generation && !(loopFinished && documentRef?.hidden)) {
+          bufferPlay(buffer, loopFinished);
+        }
+      });
+    }
     finished.pause();
     try { finished.currentTime = 0; } catch { /* metadata */ }
     finished.muted = false;

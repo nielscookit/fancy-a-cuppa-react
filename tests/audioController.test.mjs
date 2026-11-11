@@ -93,3 +93,26 @@ test('Reset stops decoded Memo audio and cancels a pending AudioContext resume',
   assert.equal(sources.length, 1);
   h.controller.destroy();
 });
+
+
+test('Ready uses unlocked Web Audio when HTML audio is blocked, loops and stops on hide/reset', async () => {
+  const sources = [];
+  const context = { state: 'running', destination: {},
+    decodeAudioData: async () => ({}), close: async () => {}, resume: async () => {},
+    createBufferSource() {
+      const source = { stopped: false, connect() {}, disconnect() {}, start() {}, stop() { this.stopped = true; } };
+      sources.push(source); return source;
+    },
+  };
+  const h = harness({ context, play: () => Promise.reject(new DOMException('Blocked', 'NotAllowedError')) });
+  await h.controller.playFinished();
+  assert.equal(h.finished.plays, 0);
+  assert.equal(sources.length, 1); assert.equal(sources[0].loop, true);
+  h.hide(); assert.equal(sources[0].stopped, true);
+  h.show(); assert.equal(sources.length, 1);
+  await h.controller.playFinished(); h.controller.reset();
+  assert.equal(sources[1].stopped, true);
+  const pending = h.controller.playFinished(); h.controller.reset(); await pending;
+  assert.equal(sources.length, 2);
+  h.controller.destroy();
+});
