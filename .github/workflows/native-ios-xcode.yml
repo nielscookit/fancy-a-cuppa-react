@@ -79,7 +79,19 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "chore(native): bundle custom Ready sound for iOS"
-            git push origin HEAD:feature/native-ios
+            # Other native-branch commits may arrive while Xcode is compiling.
+            # Rebase only this generated commit; never force-push or touch main.
+            for attempt in 1 2 3; do
+              git fetch origin feature/native-ios
+              git rebase origin/feature/native-ios
+              if git push origin HEAD:feature/native-ios; then
+                echo "Generated Ready.caf saved to feature/native-ios."
+                exit 0
+              fi
+              echo "Native branch advanced again; retrying ($attempt/3)."
+            done
+            echo "Could not safely publish generated iOS asset after 3 attempts." >&2
+            exit 1
           fi
       - name: Confirm build product
         run: echo "Unsigned iOS Simulator App.app built with Ready.caf verified in root bundle; no iPhone installation, signing or deployment performed."
