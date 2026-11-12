@@ -1,0 +1,5 @@
+{
+  "appId": "com.fancyacuppa.app",
+  "appName": "Fancy a Cuppa",
+  "webDir": "dist-native"
+}
