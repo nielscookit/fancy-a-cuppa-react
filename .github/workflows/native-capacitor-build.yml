@@ -9,6 +9,9 @@ on:
       - capacitor.config.json
       - vite.native.config.js
       - .github/workflows/native-capacitor-build.yml
+      - src/push/nativeNotificationController.js
+      - src/push/nativeNotificationController.test.js
+      - src/push/usePushNotifications.js
 
 permissions:
   contents: write # Only to commit the generated lockfile on feature/native-ios.
