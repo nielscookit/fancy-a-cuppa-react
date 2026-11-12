@@ -11,6 +11,9 @@ on:
       - .github/workflows/native-capacitor-build.yml
       - src/push/nativeNotificationController.js
       - src/push/nativeNotificationController.test.js
+      - src/push/nativeReadySound.test.js
+      - scripts/prepare-ios-ready-sound.sh
+      - ios/App/App.xcodeproj/project.pbxproj
       - src/push/usePushNotifications.js
 
 permissions:
