@@ -16,7 +16,10 @@ Source branch: `feature/native-ios`. The React Web/PWA remains the baseline. Do 
 - Native controller receives the *existing* absolute deadline via `onPersist` from the timer. It uses a fixed notification ID, replacing the previous schedule on resume and cancelling on pause/reset/finish.
 - It checks permissions without a prompt at mount and requests them only through the existing Start/BREW gesture.
 - Native operation calls are serialized, so a stale schedule cannot remain after a later cancellation.
-- Local notification sound is the **system tone only** in phase 1. A bundled custom Ready sound (CAF/WAV) is **not yet implemented or tested**. No new audio background-mode entitlement is requested.
+- Native notifications now request `Ready.caf` (IMA4/CAF) instead of the iOS system tone. The original `public/audio/Ready.mp3` remains unchanged for foreground playback and the PWA.
+- `scripts/prepare-ios-ready-sound.sh` uses macOS `afconvert` and `afinfo` to produce a compliant file from the original MP3; conversion fails if duration cannot be verified or is >=30 seconds. No trimming or playback changes.
+- The Xcode project explicitly includes `ios/App/App/Ready.caf` as a resource at the **main `.app` bundle root**, not just in Capacitor's WebView assets. `.github/workflows/native-ios-xcode.yml` checks the built product contains the exact generated CAF and commits the native binary only after a successful build.
+- No audio background-mode entitlement is requested. iOS notification presentation is still suppressed in the foreground via `LocalNotifications.presentationOptions: []`.
 - Actual delivery, foreground suppression, permission prompts, lock screen and iOS interruption cases require physical iPhone testing.
 
 ## Verification
@@ -31,5 +34,11 @@ Source branch: `feature/native-ios`. The React Web/PWA remains the baseline. Do 
 1. Run unit tests and Web/native WebView builds after plugin installation.
 2. Run `npx cap sync ios` and unsigned Xcode Simulator build; review generated iOS project changes.
 3. Test on iPhone with Start, Pause, Resume, Reset, app open/locked/reopened, and permission denied/granted.
-4. Design and add a short valid native Ready sound asset with correct iOS bundle inclusion; verify actual delivery and suppression on physical iPhone.
+4. Confirm the macOS runner converted and included Ready.caf in the final Xcode bundle, then verify actual delivery and suppression on a physical iPhone.
 5. Review desired notification behavior when the app is installed both as PWA and native app (separate installations may still each have pending notifications).
+
+## Ready sound validation boundaries
+
+- The custom sound has been referenced in the notification adapter and Xcode project. Actual `Ready.caf` conversion and inclusion are **only verified after** the updated macOS Actions job completes successfully; no green build is assumed merely from workflow creation.
+- Apple's local-notification sound limit is less than 30 seconds, and iOS system settings (Silent Mode, Focus, notification permissions) may suppress playback. A native local notification cannot loop until RESET.
+- Never alter the existing React foreground `Ready.mp3` or PWA server-based Web Push as part of native sound preparation.
