@@ -28,7 +28,7 @@ import sys
 sound = sys.argv[1]
 details = subprocess.check_output(["afinfo", sound], text=True)
 print(details)
-match = re.search(r"estimated duration:\\s*([0-9]+(?:\\.[0-9]+)?)\\s*sec", details, re.IGNORECASE)
+match = re.search(r"estimated duration:\s*([0-9]+(?:\.[0-9]+)?)\s*sec", details, re.IGNORECASE)
 if not match:
     raise SystemExit("Cannot verify Ready.caf duration: refusing to package an unchecked sound.")
 seconds = float(match.group(1))
