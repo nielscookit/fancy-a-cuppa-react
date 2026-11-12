@@ -1,26 +1,35 @@
-# Fancy a Cuppa V3 – native iOS preparation
+# Fancy a Cuppa V3 – native iOS integration
 
-Status: **Scaffold only** on `feature/native-ios`. No iOS/Xcode project has been generated, compiled, signed or installed.
+Source branch: `feature/native-ios`. The React Web/PWA remains the baseline. Do not change V2, main, Pages deployment, UX, or Supabase.
 
-## Scope and invariants
+## Current native setup
 
-- React/MUI, timer, media, Supabase and the approved Figma UI remain the source of truth.
-- The existing `npm run build` and GitHub Pages workflow stay unchanged.
-- The native WebView bundle uses `vite.native.config.js`: relative asset base (`./`), app entry only, output `dist-native/`.
-- `capacitor.config.json` points to `dist-native/`. Bundle identifier `com.fancyacuppa.app` is **provisional** and must be confirmed before signing/distribution.
-- Never use `server.url` to ship the public website inside the native app.
-- Do not enable native local notifications alongside web push until deduplication and lifecycle have been implemented.
+- Capacitor Core/iOS/CLI 8.6.0 and Local Notifications 8.3.1 are pinned in package.json and lockfile.
+- `vite.native.config.js` produces `dist-native/` with relative URLs. The existing Pages build is separate.
+- The generated Xcode project is in `ios/App/`. A successful unsigned simulator build is not an iPhone device test.
+- `capacitor.config.json` uses `LocalNotifications.presentationOptions: []` to suppress notification UI/sound **while the native app is in the foreground**. Foreground playback remains the original React/Web Audio controller.
 
-## Next steps (not yet executed)
+## Phase 1: native completion notification
 
-1. On a checkout of `feature/native-ios` with network access, run `bash scripts/setup-native-capacitor.sh`. It pins `@capacitor/core`, `@capacitor/ios`, and `@capacitor/cli` to version `8.6.0`, regenerates `package-lock.json` using npm, runs checks/builds, and does **not** commit or deploy. Review and commit both manifests together. Never hand-edit dependency integrity hashes.
-2. Verify `npm ci`, `npm test`, `npm run build`, and `npm run build:native` pass. These commands are included in the setup script; inspect its output and validate relative CSS/JS/media references in `dist-native/`.
-3. The existing project excludes generated media from Git. Run the established `npm run sync:media` step before a complete native bundle build.
-4. On a supported macOS/Xcode environment, run `npx cap add ios`, then `npx cap sync ios`, inspect/check in the generated `ios/` project on this branch.
-5. Compile with Xcode or a dedicated GitHub macOS build workflow, **without triggering the existing Pages deployment**.
-6. Test on a physical iPhone: offline/static assets, Supabase, video autoplay/unlock, pause/resume/restore, and notification permissions.
-7. Implement native notification scheduling/cancellation, custom sound asset, and one-notification-per-finish policy. Review iOS background/foreground behavior.
+- `src/push/usePushNotifications.js` selects exactly one implementation: the existing Supabase Web Push for browsers/PWA, or `src/push/nativeNotificationController.js` for native Capacitor.
+- React HomeScreen, timer controller, videos, Memo and Ready MP3 playback are unchanged.
+- Native controller receives the *existing* absolute deadline via `onPersist` from the timer. It uses a fixed notification ID, replacing the previous schedule on resume and cancelling on pause/reset/finish.
+- It checks permissions without a prompt at mount and requests them only through the existing Start/BREW gesture.
+- Native operation calls are serialized, so a stale schedule cannot remain after a later cancellation.
+- Local notification sound is the **system tone only** in phase 1. A bundled custom Ready sound (CAF/WAV) is **not yet implemented or tested**. No new audio background-mode entitlement is requested.
+- Actual delivery, foreground suppression, permission prompts, lock screen and iOS interruption cases require physical iPhone testing.
 
-## Known validation boundary
+## Verification
 
-At this point the exact package versions have been chosen and the reproducible setup script committed, but the current source tree still lacks the actual Capacitor npm dependencies and updated lockfile: the current execution environment cannot reach npm or GitHub via shell, and the existing GitHub Actions queue is blocked. The script has not run. Do not claim installation or build success. The native iOS project is not yet generated. Successful native compilation and iPhone behavior are **not claimed**.
+- `node --test` covers scheduling, fixed-ID deduplication, pause/resume, reset, permissions and overlapping async actions.
+- The isolated workflow `.github/workflows/native-capacitor-build.yml` can regenerate lockfile and test both Web/PWA and native WebView builds without deploying.
+- `.github/workflows/native-ios-xcode.yml` validates an unsigned Simulator Xcode compilation on a macOS runner, **not** a signed device build.
+- Do not describe a workflow configuration commit as build success until its run concludes successfully.
+
+## Next work
+
+1. Run unit tests and Web/native WebView builds after plugin installation.
+2. Run `npx cap sync ios` and unsigned Xcode Simulator build; review generated iOS project changes.
+3. Test on iPhone with Start, Pause, Resume, Reset, app open/locked/reopened, and permission denied/granted.
+4. Design and add a short valid native Ready sound asset with correct iOS bundle inclusion; verify actual delivery and suppression on physical iPhone.
+5. Review desired notification behavior when the app is installed both as PWA and native app (separate installations may still each have pending notifications).
