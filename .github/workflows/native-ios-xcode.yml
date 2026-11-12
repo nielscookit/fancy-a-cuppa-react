@@ -5,6 +5,11 @@ on:
     branches: [feature/native-ios]
     paths:
       - .github/workflows/native-ios-xcode.yml
+      - ios/App/App.xcodeproj/project.pbxproj
+      - scripts/prepare-ios-ready-sound.sh
+      - src/push/nativeNotificationController.js
+      - src/push/nativeNotificationController.test.js
+      - public/audio/Ready.mp3
 
 permissions:
   contents: write # Only commit native ios/ source files after successful build
@@ -33,6 +38,12 @@ jobs:
           test -f ios/App/CapApp-SPM/Package.swift
       - name: Install exact JavaScript dependencies
         run: npm ci --no-audit --no-fund
+      - name: Run unit tests and safety checks
+        run: |
+          npm run check:safety
+          npm test
+      - name: Convert and validate bundled custom Ready sound
+        run: bash scripts/prepare-ios-ready-sound.sh
       - name: Restore checked V2 media and build native assets
         run: |
           npm run sync:media
@@ -55,14 +66,20 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
           test -d "$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Verify Ready.caf is in the app's main bundle
+        run: |
+          APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+          test -s "$APP/Ready.caf"
+          cmp "$APP/Ready.caf" ios/App/App/Ready.caf
+          echo "Validated Ready.caf in App.app root (not just the WebView)."
       - name: Commit Capacitor-synced iOS source files
         run: |
           git add ios/
           if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore(native): sync iOS local-notifications plugin"
+            git commit -m "chore(native): bundle custom Ready sound for iOS"
             git push origin HEAD:feature/native-ios
           fi
       - name: Confirm build product
-        run: echo "Unsigned iOS Simulator App.app built. No iPhone installation, signing or deployment performed."
+        run: echo "Unsigned iOS Simulator App.app built with Ready.caf verified in root bundle; no iPhone installation, signing or deployment performed."
