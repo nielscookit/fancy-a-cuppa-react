@@ -1,0 +1,62 @@
+name: Validate Capacitor iOS preparation
+
+on:
+  push:
+    branches: [feature/native-ios]
+    paths:
+      - package.json
+      - package-lock.json
+      - capacitor.config.json
+      - vite.native.config.js
+      - .github/workflows/native-capacitor-build.yml
+
+permissions:
+  contents: write # Only to commit the generated lockfile on feature/native-ios.
+
+jobs:
+  validate-capacitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out native feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Generate reproducible Capacitor lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Clean dependency installation
+        run: npm ci --no-audit --no-fund
+      - name: Verify Capacitor versions
+        run: |
+          npx cap --version
+          npm ls @capacitor/core @capacitor/cli @capacitor/ios --depth=0
+      - name: Safety checks
+        run: npm run check:safety
+      - name: Unit tests
+        run: npm test
+      - name: Verify and copy pinned V2 media
+        run: npm run sync:media
+      - name: Build existing web app (not deployed)
+        run: npm run build
+      - name: Verify web build
+        run: |
+          test -f dist/index.html
+          npm run verify:pages
+      - name: Build native WebView assets (not an Xcode build)
+        run: npm run build:native
+      - name: Verify native WebView bundle
+        run: test -f dist-native/index.html
+      - name: Commit generated lockfile to native branch
+        run: |
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore(native): lock Capacitor 8.6.0 dependencies"
+            git push origin HEAD:feature/native-ios
+          fi
