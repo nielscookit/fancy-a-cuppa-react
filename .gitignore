@@ -8,3 +8,4 @@ dist/
 coverage/
 public/media/
 supabase/.temp/
+dist-native/
