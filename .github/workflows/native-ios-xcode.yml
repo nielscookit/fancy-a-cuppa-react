@@ -1,58 +1,50 @@
-name: Build native iOS Xcode project (unsigned)
+name: Verify unsigned iOS Simulator build
 
 on:
   push:
     branches: [feature/native-ios]
     paths:
       - .github/workflows/native-ios-xcode.yml
-  workflow_dispatch:
 
 permissions:
-  contents: write # Only commit generated ios/ files to feature/native-ios.
-
-concurrency:
-  group: native-ios-xcode-${{ github.ref }}
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  ios-project:
+  ios-simulator-build:
     if: github.ref == 'refs/heads/feature/native-ios'
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
-      - name: Check out native feature branch
+      - name: Checkout native branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: true
-      - name: Set up Node.js 22
+      - name: Set up Node 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           cache: npm
-      - name: Inspect Xcode and build tools
+      - name: Show Apple toolchain
         run: |
           sw_vers
           xcodebuild -version
-          node --version
-      - name: Install exact dependencies from lockfile
+          xcode-select -p
+      - name: Check native iOS project exists
+        run: |
+          test -f ios/App/App.xcodeproj/project.pbxproj
+          test -f ios/App/CapApp-SPM/Package.swift
+      - name: Install exact JavaScript dependencies
         run: npm ci --no-audit --no-fund
-      - name: Synchronize existing V2 media
-        run: npm run sync:media
-      - name: Produce native WebView bundle
+      - name: Restore checked V2 media and build native assets
         run: |
+          npm run sync:media
           npm run build:native
-          test -f dist-native/index.html
-      - name: Create and synchronize iOS project
+          test -s dist-native/index.html
+      - name: Sync Capacitor iOS project
         run: |
-          if [[ -d ios/App/App.xcodeproj ]]; then
-            echo "Existing iOS project detected; synchronizing."
-          else
-            npx cap add ios
-          fi
           npx cap sync ios
-          test -d ios/App/App.xcodeproj
-      - name: Compile iOS Simulator app without signing
+          test -s ios/App/App/public/index.html
+      - name: Compile unsigned iOS Simulator app
         run: |
+          set -o pipefail
           xcodebuild \
             -project ios/App/App.xcodeproj \
             -scheme App \
@@ -63,12 +55,5 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
           test -d "$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
-      - name: Commit generated iOS project to native branch only
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ios/
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(native): generate and verify unsigned Capacitor iOS project"
-            git push origin HEAD:feature/native-ios
-          fi
+      - name: Confirm build product
+        run: echo "Unsigned iOS Simulator App.app built. No iPhone installation, signing or deployment performed."
