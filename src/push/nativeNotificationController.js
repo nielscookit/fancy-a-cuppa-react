@@ -1,6 +1,8 @@
 // Capacitor-only adapter. Deliberately has no React, browser-push or UI dependency.
 // A stable ID prevents multiple pending reminders for the same brewing timer.
 export const TEA_READY_NOTIFICATION_ID = 731001;
+// Bundled at the iOS app root (not the WebView public directory).
+export const NATIVE_READY_SOUND_FILE = 'Ready.caf';
 
 export function createNativeNotificationController({
   notifications,
@@ -49,8 +51,8 @@ export function createNativeNotificationController({
           title: 'Fancy a Cuppa',
           body: 'Your tea is ready.',
           schedule: { at: new Date(deadline) },
-          // Phase 1 uses iOS system tone; custom asset follows separately.
-          sound: 'default',
+          // This short CAF file is copied into the app's main bundle by Xcode.
+          sound: NATIVE_READY_SOUND_FILE,
         }] });
         if (!disposed && desiredDeadline === deadline) update({ status: 'scheduled', error: '' });
       } else if (!disposed) {
