@@ -11,7 +11,8 @@
     "verify:catalog": "node scripts/check-supabase.mjs",
     "sync:media": "node scripts/sync-v2-media.mjs",
     "verify:pages": "node scripts/verify-pages.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "build:native": "vite build --config vite.native.config.js"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -24,5 +25,7 @@
     "@vitejs/plugin-react": "6.1.2",
     "vite": "8.3.5"
   },
-  "engines": { "node": ">=22.12.0" }
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }
