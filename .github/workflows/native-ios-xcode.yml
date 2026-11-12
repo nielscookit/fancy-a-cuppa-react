@@ -1,0 +1,74 @@
+name: Build native iOS Xcode project (unsigned)
+
+on:
+  push:
+    branches: [feature/native-ios]
+    paths:
+      - .github/workflows/native-ios-xcode.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write # Only commit generated ios/ files to feature/native-ios.
+
+concurrency:
+  group: native-ios-xcode-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ios-project:
+    if: github.ref == 'refs/heads/feature/native-ios'
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out native feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: true
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Inspect Xcode and build tools
+        run: |
+          sw_vers
+          xcodebuild -version
+          node --version
+      - name: Install exact dependencies from lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Synchronize existing V2 media
+        run: npm run sync:media
+      - name: Produce native WebView bundle
+        run: |
+          npm run build:native
+          test -f dist-native/index.html
+      - name: Create and synchronize iOS project
+        run: |
+          if [[ -d ios/App/App.xcodeproj ]]; then
+            echo "Existing iOS project detected; synchronizing."
+          else
+            npx cap add ios
+          fi
+          npx cap sync ios
+          test -d ios/App/App.xcodeproj
+      - name: Compile iOS Simulator app without signing
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
+            -derivedDataPath "$RUNNER_TEMP/fancy-ios-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          test -d "$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Commit generated iOS project to native branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ios/
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(native): generate and verify unsigned Capacitor iOS project"
+            git push origin HEAD:feature/native-ios
+          fi
