@@ -1,5 +1,10 @@
 {
   "appId": "com.fancyacuppa.app",
   "appName": "Fancy a Cuppa",
-  "webDir": "dist-native"
+  "webDir": "dist-native",
+  "plugins": {
+    "LocalNotifications": {
+      "presentationOptions": []
+    }
+  }
 }
