@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createNativeNotificationController, TEA_READY_NOTIFICATION_ID } from './nativeNotificationController.js';
+import { createNativeNotificationController, TEA_READY_NOTIFICATION_ID, NATIVE_READY_SOUND_FILE } from './nativeNotificationController.js';
 const wait = () => new Promise(resolve => setImmediate(resolve));
 function rig(permission = 'granted') {
   const actions = [];
@@ -23,6 +23,8 @@ test('start and resume schedule one stable notification; ticks do not duplicate'
   await wait();
   assert.deepEqual(actions.map(x => x.kind), ['cancel', 'schedule']);
   assert.equal(actions[1].id, TEA_READY_NOTIFICATION_ID);
+  assert.equal(NATIVE_READY_SOUND_FILE, 'Ready.caf');
+  assert.equal(actions[1].sound, NATIVE_READY_SOUND_FILE);
   assert.equal(actions[1].schedule.at.getTime(), 61_000);
   c.syncTimer({ running: false, deadline: 61_000 });
   await wait();
