@@ -1,0 +1,22 @@
+name: Native iOS runner smoke test
+
+on:
+  push:
+    branches:
+      - feature/native-ios
+    paths:
+      - .github/workflows/native-runner-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm runner is available
+        run: |
+          echo "GitHub Actions runner started."
+          echo "Branch: ${GITHUB_REF_NAME}"
+          echo "No build, deployment, or repository changes performed."
