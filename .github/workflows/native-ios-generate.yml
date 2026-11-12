@@ -1,0 +1,72 @@
+name: Generate Capacitor iOS project (Ubuntu)
+
+on:
+  push:
+    branches: [feature/native-ios]
+    paths:
+      - .github/workflows/native-ios-generate.yml
+
+permissions:
+  contents: write # Commit ios/ only, to the native feature branch.
+
+concurrency:
+  group: native-ios-generate
+  cancel-in-progress: false
+
+jobs:
+  generate-ios-project:
+    if: github.ref == 'refs/heads/feature/native-ios'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out feature/native-ios
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: true
+      - name: Setup Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact packages
+        run: npm ci --no-audit --no-fund
+      - name: Verify source and restore pinned V2 media
+        run: |
+          npm run check:safety
+          npm test
+          npm run sync:media
+      - name: Build native WebView assets
+        run: |
+          npm run build:native
+          test -s dist-native/index.html
+      - name: Generate native iOS project without Xcode
+        run: |
+          if [[ -d ios/App/App.xcodeproj ]]; then
+            echo "Capacitor iOS project already exists; keeping existing project."
+          else
+            npx cap add ios
+          fi
+          npx cap sync ios
+          test -f ios/App/App.xcodeproj/project.pbxproj
+          test -f ios/App/App/Info.plist
+          test -s ios/App/App/public/index.html
+          echo "iOS project structure and synchronized web bundle verified."
+      - name: Stage only iOS project sources
+        run: |
+          git add ios/
+          if git diff --cached --name-only | grep -E '^ios/App/App/public/|^ios/App/Pods/|^ios/App/build/'; then
+            echo "Error: generated binary/web assets must not be committed" >&2
+            exit 1
+          fi
+          echo "Files staged:"
+          git diff --cached --stat
+      - name: Commit generated iOS project to native branch
+        run: |
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(native): generate Capacitor iOS project on Ubuntu"
+          git push origin HEAD:feature/native-ios
