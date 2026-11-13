@@ -8,6 +8,8 @@
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
         <string>Fancy a Cuppa</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Fancy a Cuppa uses the camera to scan barcodes on tea packages.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
