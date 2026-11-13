@@ -101,17 +101,21 @@ export function createMediaController({
       fillBlocked = false;
     }
     if (!destroyed) onFillEvent(getFillStatus());
-    if (event === 'playing' && active && fillStartHandler) {
-      const handler = fillStartHandler;
-      fillStartHandler = null;
-      handler.onPlaying();
-    }
+    if (event === 'playing') fillStarted();
   }
-  function fillFailed(error) {
-    if (!fillStartHandler) return;
+  function takeFillStartHandler() {
     const handler = fillStartHandler;
     fillStartHandler = null;
-    handler.onFailure(error);
+    if (handler?.timeout != null) clearSchedule(handler.timeout);
+    return handler;
+  }
+
+  function fillStarted() {
+    if (active) takeFillStartHandler()?.onPlaying();
+  }
+
+  function fillFailed(error) {
+    takeFillStartHandler()?.onFailure(error);
   }
 
   function milkEvent(event) {
@@ -234,7 +238,7 @@ export function createMediaController({
     fillLastEvent = 'idle';
     fillEverPlayed = false;
     fillBlocked = false;
-    fillStartHandler = null;
+    takeFillStartHandler();
     stopSounds();
     videos.forEach((video, index) => {
       video.pause();
@@ -375,9 +379,13 @@ export function createMediaController({
         // First play() MUST be in the original user gesture.
         next.classList.add('visible');
         fillEvent('play-requested');
-        const p = next.play();
-        p?.catch(error => {
-          if (destroyed || id !== session || ownTransition !== transitionId) return;
+        const playback = next.play();
+        const isCurrent = () => !destroyed && id === session && ownTransition === transitionId;
+        if (playback?.then) playback.then(() => {
+          // play() can resolve on a repeat start even without a new playing event.
+          if (bundledVideos && isCurrent()) fillStarted();
+        }).catch(error => {
+          if (!isCurrent()) return;
           fillBlocked = true;
           fillEvent('play-rejected');
           fillFailed(error);
@@ -422,7 +430,10 @@ export function createMediaController({
       phase = i;
       onPhase(i);
       if (i === 3) milkSoundTimer = schedule(() => playMilkSound(id), 60);
-    } catch (error) { onError(error); }
+    } catch (error) {
+      if (i === 0 && bundledVideos) fillFailed(error);
+      onError(error);
+    }
     finally {
       if (ownTransition === transitionId) {
         transitioning = false;
@@ -446,7 +457,7 @@ export function createMediaController({
     // Retain an interrupted destination for resume, but ignore its old play promise.
     transitionId++;
     transitioning = false;
-    fillStartHandler = null;
+    takeFillStartHandler();
     videos.forEach(v => v.pause());
     stopSounds();
   }
@@ -510,7 +521,14 @@ export function createMediaController({
     start: () => { active = true; void show(0); },
     startSynced: (onPlaying, onFailure = onError) => {
       if (destroyed) return;
-      fillStartHandler = { onPlaying, onFailure };
+      takeFillStartHandler();
+      const handler = { onPlaying, onFailure };
+      fillStartHandler = handler;
+      if (bundledVideos) {
+        handler.timeout = schedule(() => {
+          if (fillStartHandler === handler) fillFailed(new Error('Fill video playback timed out.'));
+        }, 8000);
+      }
       active = true;
       void show(0); // Calls play() synchronously in the initiating iPhone tap.
     },

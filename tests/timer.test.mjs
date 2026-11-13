@@ -783,3 +783,63 @@ test('Timer Kit still starts Milk when the clock skips the final cue', async () 
     media.destroy();
   }
 });
+
+test('native synchronized timer starts repeatedly even if Fill only resolves play()', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  const media = createKitMediaController({ videos, platform: 'ios',
+    assetBase: './media/', audioFactory: url => new FakeAudio(url),
+  });
+  const timer = createTimerController({ media, initialSeconds: 40,
+    audio: { unlock() {}, reset() {}, destroy() {} },
+    documentRef: new EventTarget(), navigatorRef: {},
+    scheduler: { setInterval: () => 1, clearInterval() {} },
+  });
+  try {
+    for (let run = 1; run <= 2; run++) {
+      timer.start();
+      await nextLoop();
+      assert.equal(timer.state().running, true);
+      assert.equal(timer.state().preparing, false);
+      assert.equal(videos[0].plays, run);
+      timer.reset();
+      assert.equal(timer.state().running, false);
+      assert.equal(videos[0].currentTime, 0);
+    }
+  } finally {
+    timer.destroy();
+  }
+});
+
+test('a stalled native Fill start times out and a later tap can start again', async () => {
+  const videos = Array.from({ length: 4 }, () => new FakeVideo());
+  let resolveStale;
+  videos[0].play = () => new Promise(resolve => { resolveStale = resolve; });
+  let expire;
+  const media = createKitMediaController({ videos, platform: 'ios',
+    assetBase: './media/', audioFactory: url => new FakeAudio(url),
+    schedule: callback => { expire = callback; return 1; }, clearSchedule() {},
+  });
+  const errors = [];
+  const timer = createTimerController({ media, initialSeconds: 40,
+    audio: { unlock() {}, reset() {}, destroy() {} },
+    documentRef: new EventTarget(), navigatorRef: {},
+    scheduler: { setInterval: () => 1, clearInterval() {} },
+    onError: error => errors.push(error.message),
+  });
+  try {
+    timer.start();
+    assert.equal(timer.state().preparing, true);
+    expire();
+    resolveStale();
+    await nextLoop();
+    assert.equal(timer.state().preparing, false);
+    assert.equal(timer.state().running, false);
+    assert.deepEqual(errors, ['Fill video playback timed out.']);
+    videos[0].play = async () => {};
+    timer.start();
+    await nextLoop();
+    assert.equal(timer.state().running, true);
+  } finally {
+    timer.destroy();
+  }
+});

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createAudioController } from '../src/timer/audioController.js';
 import { createHomeAudioController } from '../src/timer/homeSoundProfile.js';
 
-function harness({ profile, legacy = false, context = null, play } = {}) {
+function harness({ profile, legacy = false, context = null, play, ...overrides } = {}) {
   const files = [];
   const documentRef = new EventTarget();
   documentRef.hidden = false;
@@ -18,6 +18,7 @@ function harness({ profile, legacy = false, context = null, play } = {}) {
       };
       files.push(audio); return audio;
     },
+    ...overrides,
   };
   const controller = legacy ? createAudioController(options) : createHomeAudioController(options, profile);
   return { controller, files, documentRef, finished: files[0], almost: files[1],
@@ -165,5 +166,88 @@ test('Ready reports one useful error if both playback APIs are denied', async ()
   };
   const h = harness({ context, play: () => Promise.reject(new DOMException('Blocked', 'NotAllowedError')) });
   await assert.rejects(h.controller.playFinished(), /Ready-Ton konnte nicht gestartet werden/);
+  h.controller.destroy();
+});
+
+const nativeAudio = {
+  platform: 'ios',
+  assetBase: './media/',
+  locationRef: new URL('capacitor://localhost/'),
+};
+
+test('native Ready accepts status zero only after successful decoding', async () => {
+  const sources = [];
+  const context = {
+    state: 'running', destination: {}, close: async () => {},
+    decodeAudioData: async bytes => {
+      assert.equal(bytes.byteLength, 42);
+      return {};
+    },
+    createBufferSource() {
+      const source = { connect() {}, disconnect() {}, start() {}, stop() { this.stopped = true; } };
+      sources.push(source);
+      return source;
+    },
+  };
+  const h = harness({ ...nativeAudio, context,
+    fetchImpl: async () => ({ ok: false, status: 0, arrayBuffer: async () => new ArrayBuffer(42) }),
+    onError: error => assert.fail(error.message),
+  });
+  await h.controller.playFinished();
+  assert.equal(h.finished.plays, 0);
+  assert.equal(sources[0].loop, true);
+  h.hide();
+  assert.equal(sources[0].stopped, true);
+  h.show();
+  await h.controller.playFinished();
+  assert.equal(sources[1].loop, true);
+  h.controller.reset();
+  assert.equal(sources[1].stopped, true);
+  h.controller.destroy();
+});
+
+test('native Ready falls back to the gesture-primed element after empty or undecodable bytes', async () => {
+  for (const size of [0, 42]) {
+    const context = { state: 'running', close: async () => {},
+      decodeAudioData: async () => { throw new Error('Invalid MP3'); },
+    };
+    const h = harness({ ...nativeAudio, context,
+      fetchImpl: async () => ({ ok: false, status: 0, arrayBuffer: async () => new ArrayBuffer(size) }),
+      onError: error => assert.fail(error.message),
+    });
+    h.controller.unlock();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.finished.plays, 1);
+    assert.equal(h.finished.playing, false);
+    await h.controller.playFinished();
+    assert.equal(h.finished.loop, true);
+    assert.equal(h.finished.playing, true);
+    h.controller.reset();
+    assert.equal(h.finished.playing, false);
+    h.controller.destroy();
+  }
+});
+
+test('native Ready surfaces a failure when both paths cannot load the file', async () => {
+  const context = { state: 'running', close: async () => {},
+    decodeAudioData: async () => assert.fail('Missing response must not be decoded'),
+  };
+  const h = harness({ ...nativeAudio, context,
+    fetchImpl: async () => ({ ok: false, status: 404 }),
+    play: async () => { throw new Error('Missing media'); },
+  });
+  await assert.rejects(h.controller.playFinished(), /Ready.mp3 konnte nicht geladen oder abgespielt werden/);
+  h.controller.destroy();
+});
+
+test('web Audio still rejects status zero', async () => {
+  const errors = [];
+  const context = { state: 'running', close: async () => {} };
+  const h = harness({ context, onError: error => errors.push(error.message),
+    fetchImpl: async () => ({ ok: false, status: 0, arrayBuffer: () => assert.fail('Unexpected read') }),
+  });
+  await assert.rejects(h.controller.playFinished(), /Ready.mp3 konnte nicht geladen werden/);
+  assert.ok(errors.includes('Audio file not available: finishSound'));
+  assert.equal(h.finished.plays, 0);
   h.controller.destroy();
 });

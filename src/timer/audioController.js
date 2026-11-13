@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { MEDIA_ASSETS } from './mediaManifest.js';
 
 /**
@@ -16,8 +17,11 @@ export function createAudioController({
     return Context ? new Context() : null;
   },
   fetchImpl = fetch,
+  platform = Capacitor.getPlatform(),
+  locationRef = globalThis.location,
 }) {
   const path = name => assetBase + (soundFiles[name] || MEDIA_ASSETS[name].file);
+  const localIosAudio = platform === 'ios' && locationRef?.protocol === 'capacitor:';
   const finished = audioFactory(path('finishSound'));
   const almost = audioFactory(path('almostSound'));
   finished.preload = 'auto';
@@ -27,6 +31,8 @@ export function createAudioController({
   let clickBuffer = null;
   let almostBuffer = null;
   let finishBufferReady = null;
+  let finishBuffer = null;
+  let finishPlayback = 0;
   let disposed = false;
   let generation = 0;
   const activeSources = new Set();
@@ -73,18 +79,33 @@ export function createAudioController({
     fallback.preload = 'auto';
   } else {
     function loadBuffer(name, callback) {
-      return fetchImpl(path(name))
+      const url = path(name);
+      const resolved = localIosAudio ? new URL(url, locationRef.href) : null;
+      const bundled = resolved?.protocol === 'capacitor:' && resolved.host === locationRef.host;
+      return Promise.resolve()
+        .then(() => bundled
+          ? fetchImpl(url, { signal: AbortSignal.timeout(5000) })
+          : fetchImpl(url))
         .then(response => {
-          if (!response.ok) throw new Error('Audio file not available: ' + name);
+          // The Capacitor scheme handler serves local MP3s as URLResponse.
+          if (!response.ok && !(bundled && response.status === 0)) {
+            throw new Error('Audio file not available: ' + name);
+          }
           return response.arrayBuffer();
         })
-        .then(bytes => context.decodeAudioData(bytes))
+        .then(bytes => {
+          if (!bytes.byteLength) throw new Error('Empty audio file: ' + name);
+          return context.decodeAudioData(bytes);
+        })
         .then(buffer => { if (!disposed) callback(buffer); return buffer; })
-        .catch(onError);
+        .catch(error => {
+          // Native playback can recover using the corresponding media element.
+          if (!disposed && !bundled) onError(error);
+        });
     }
     loadBuffer('clickSound', buffer => { clickBuffer = buffer; });
     loadBuffer('almostSound', buffer => { almostBuffer = buffer; });
-    finishBufferReady = loadBuffer('finishSound', () => {});
+    finishBufferReady = loadBuffer('finishSound', buffer => { finishBuffer = buffer; });
   }
 
   function bufferPlay(buffer, loop = false) {
@@ -102,12 +123,32 @@ export function createAudioController({
     if (context) {
       // Called directly from Start, not at the end of the timer.
       if (context.state === 'running') armAudioOutput();
-      else Promise.resolve(context.resume()).then(armAudioOutput).catch(() => {
-        // Playback handles a possible temporary iOS audio interruption.
-      });
+      else {
+        const current = generation;
+        Promise.resolve(context.resume()).then(() => {
+          if (current === generation) armAudioOutput();
+        }).catch(() => {
+          // Playback handles a possible temporary iOS audio interruption.
+        });
+      }
     }
     if (almost.readyState === 0) almost.load();
     if (finished.readyState === 0) finished.load();
+    if (localIosAudio && !finishBuffer && (!loopFinished || !documentRef?.hidden)) {
+      // Authorize the same fallback element during the Start gesture.
+      const request = ++finishPlayback;
+      finished.muted = true;
+      try {
+        Promise.resolve(finished.play()).catch(() => {}).then(() => {
+          if (disposed || request !== finishPlayback) return;
+          finished.pause();
+          try { finished.currentTime = 0; } catch { /* metadata */ }
+          finished.muted = false;
+        });
+      } catch {
+        finished.muted = false;
+      }
+    }
   }
   function playAlmost() {
     if (disposed) return;
@@ -136,6 +177,7 @@ export function createAudioController({
   }
   function playHtmlFinished(current) {
     if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return Promise.resolve();
+    finishPlayback++;
     finished.pause();
     try { finished.currentTime = 0; } catch { /* metadata */ }
     finished.muted = false;
@@ -153,20 +195,25 @@ export function createAudioController({
     if (!context) return playHtmlFinished(current);
     return Promise.resolve(finishBufferReady).then(async buffer => {
       if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
-      if (!buffer) throw new Error('Ready.mp3 konnte nicht geladen werden.');
+      if (!buffer && !localIosAudio) throw new Error('Ready.mp3 konnte nicht geladen werden.');
       try {
+        if (!buffer) throw new Error('Ready.mp3 konnte nicht geladen werden.');
         // Normally running since Start; resume only after an iOS interruption.
         if (context.state !== 'running') await context.resume();
         if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
         bufferPlay(buffer, loopFinished);
         stopAudioOutput();
-      } catch (webAudioError) {
+      } catch {
         if (disposed || current !== generation || (loopFinished && documentRef?.hidden)) return;
         // Last resort if the Web Audio output was interrupted.
         // Surface one error only if both audio paths fail.
         try { await playHtmlFinished(current); }
         catch {
           if (!disposed && current === generation) {
+            if (localIosAudio) {
+              throw new Error(buffer ? 'Ready-Ton konnte nicht gestartet werden.' :
+                'Ready.mp3 konnte nicht geladen oder abgespielt werden.');
+            }
             throw new Error('Ready-Ton konnte nicht gestartet werden. Bitte Safari bzw. die Homescreen-App neu öffnen.');
           }
         }
@@ -175,6 +222,8 @@ export function createAudioController({
   }
   function reset() {
     generation++;
+    finishPlayback++;
+    if (localIosAudio) finished.muted = false;
     finished.loop = false;
     stopAudioOutput();
     for (const source of activeSources) {
