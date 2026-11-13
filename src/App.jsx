@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Box, Button, Drawer, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
@@ -245,6 +246,8 @@ export default function App() {
         } } }}
         PaperProps={{
           className:'fac-sheet-paper',
+          'data-native-expanded-gap': Capacitor.getPlatform() === 'ios' && (isSearch || mode === 'prep')
+            ? 'true' : undefined,
           ref:paperRef,
           'data-dragging':drag.active,
           'data-open':sheetOpen,

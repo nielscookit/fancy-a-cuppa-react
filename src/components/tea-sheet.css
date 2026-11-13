@@ -1,13 +1,14 @@
-/* Figma 184:427 and 158:614. One MUI Drawer shared by both states. */
+/* Shared Drawer; native Search and Detail use Figma 184:427 and 232:286. */
 .fac-sheet-paper.MuiDrawer-paper {
-  height:calc(var(--sheet-viewport-height, 100dvh) - 32px);
-  max-height:calc(var(--sheet-viewport-height, 100dvh) - 32px);
+  height:calc(var(--sheet-viewport-height, 100dvh) - var(--sheet-top-gap, 32px));
+  max-height:calc(var(--sheet-viewport-height, 100dvh) - var(--sheet-top-gap, 32px));
   bottom:var(--sheet-bottom, 0px);
   border-radius:30px 30px 0 0;
   background:#fff; overflow:hidden;
   width:min(100%, 375px); margin-inline:auto;
   box-shadow:0 -1px 3px rgba(0,0,0,.14);
 }
+.fac-sheet-paper[data-native-expanded-gap="true"] { --sheet-top-gap:52px; }
 .fac-sheet { display:flex; flex-direction:column; min-height:0; height:100%; color:#1B272B; }
 .fac-sheet-handle {
   display:block; position:relative; flex:0 0 32px; width:100%; height:32px;
