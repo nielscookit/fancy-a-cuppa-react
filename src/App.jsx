@@ -36,6 +36,7 @@ function readRecents() {
  * Existing iPhone-validated video controllers and /timer-test/ are untouched.
  */
 export default function App() {
+  const nativeIOS = Capacitor.getPlatform() === 'ios';
   const [catalog, setCatalog] = useState({ status:'loading', teas:[], error:'' });
   const [mode, setMode] = useState('closed'); // closed | search | prep | edit | add
   const [closing, setClosing] = useState(false);
@@ -246,7 +247,7 @@ export default function App() {
         } } }}
         PaperProps={{
           className:'fac-sheet-paper',
-          'data-native-expanded-gap': Capacitor.getPlatform() === 'ios' && (isSearch || mode === 'prep')
+          'data-native-expanded-gap': nativeIOS && ['search', 'prep', 'add', 'edit'].includes(mode)
             ? 'true' : undefined,
           ref:paperRef,
           'data-dragging':drag.active,
@@ -326,6 +327,7 @@ export default function App() {
               pinned={pinnedIds.includes(selected.id)}
               onTogglePin={() => togglePin(selected.id)}
               onBrew={startDetailTimer}
+              fixedBrew={nativeIOS}
             />
           )}
           {(mode === 'add' || mode === 'edit') && (

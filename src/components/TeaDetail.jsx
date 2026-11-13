@@ -25,13 +25,21 @@ function VolumeOption({ value, current, onChange }) {
 /** Node 123:144 — selected tea preparation, mounted in the continuous Home page. */
 export default function TeaDetail({
   tea, volume, onVolumeChange, customMl, onCustomChange,
-  minutes, onMinuteStep, onEdit, onClose, pinned, onTogglePin, onBrew,
+  minutes, onMinuteStep, onEdit, onClose, pinned, onTogglePin, onBrew, fixedBrew = false,
 }) {
   if (!tea) return null;
   const water = volume === null ? Number(customMl) : volume;
   const validWater = Number.isInteger(water) && water >= 50 && water <= 5000;
   const dose = validWater ? calculateDose(tea, water) : null;
+  const brewButton = (
+    <Button type="button" variant="contained" fullWidth disableRipple disableElevation
+      className="fac-tea-result__brew" onClick={onBrew}
+      disabled={!validWater}>
+      BREW
+    </Button>
+  );
   return (
+    <>
     <section className="fac-tea-detail fac-sheet-scroll fac-sheet-scroll--detail" aria-label="Tea preparation">
       <TeaCard tea={tea} onEdit={onEdit} onClose={onClose} pinned={pinned} onTogglePin={onTogglePin} />
 
@@ -87,12 +95,10 @@ export default function TeaDetail({
             <img src={asset + 'tea-v2-plus.svg'} width="66" height="66" alt="" />
           </Button>
         </div>
-        <Button type="button" variant="contained" fullWidth disableRipple disableElevation
-          className="fac-tea-result__brew" onClick={onBrew}
-          disabled={!validWater}>
-          BREW
-        </Button>
+        {!fixedBrew && brewButton}
       </div>
     </section>
+    {fixedBrew && <div className="fac-sheet-footer fac-sheet-footer--brew">{brewButton}</div>}
+    </>
   );
 }

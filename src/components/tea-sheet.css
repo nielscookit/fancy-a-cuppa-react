@@ -161,3 +161,13 @@
 .fac-sheet--detail .fac-sheet-handle::after {
   content:""; position:absolute; inset:0 0 -18px;
 }
+
+.fac-sheet-paper[data-native-expanded-gap="true"] .fac-sheet-footer {
+  padding-bottom:max(14px, env(safe-area-inset-bottom));
+}
+.fac-sheet-footer--brew .fac-tea-result__brew.MuiButton-root,
+.fac-sheet-footer--brew .fac-tea-result__brew.MuiButton-root:hover {
+  margin-top:0;
+  background:#B9FC69; color:#1B272B;
+}
+.fac-sheet-paper[data-native-expanded-gap="true"] .fac-sheet-editor-actions { margin-top:48px; }

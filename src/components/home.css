@@ -184,3 +184,8 @@ body {
   .fac-home__tea-stage.timer-kit-stage { top:30px; width:var(--image-size); left:50%; transform:translateX(-50%); }
   .fac-home__time-control { bottom:196px; }
 }
+
+/* Native controls share the Home canvas and scroll with the document. */
+.fac-home[data-native-ios] .fac-home__time-control { bottom:210px; }
+.fac-home[data-native-ios] .fac-home__action--primary.MuiButton-root { bottom:96px; }
+.fac-home[data-native-ios] + .fac-home__assistant-slot { margin:-80px auto 14px; }

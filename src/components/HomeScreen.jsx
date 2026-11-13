@@ -77,7 +77,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
 
   return (
     <>
-      <Box component="section" className="fac-home" aria-label="Home">
+      <Box component="section" className="fac-home" data-native-ios={native || undefined} aria-label="Home">
       <Box className="fac-home__canvas">
         <Box className="timer-kit-stage fac-home__tea-stage" aria-hidden="true"
           style={{ backgroundImage: `url(${FILL_POSTER})` }}>

@@ -36,3 +36,23 @@ test('only Web/PWA Home opts into durable timer recovery', () => {
   assert.match(home, /storageKey: native \? undefined : 'fac-v3-active-timer'/);
   assert.match(home, /onPersist: push\.syncTimer/);
 });
+
+test('native Home keeps the assistant in flow and anchors all three controls to the canvas', () => {
+  const css = readFileSync('src/components/home.css', 'utf8');
+  assert.match(css, /\[data-native-ios\] \.fac-home__time-control \{ bottom:210px/);
+  assert.match(css, /\[data-native-ios\] \.fac-home__action--primary\.MuiButton-root \{ bottom:96px/);
+  assert.match(css, /\[data-native-ios\] \+ \.fac-home__assistant-slot \{ margin:-80px auto 14px/);
+});
+
+test('native drawer scopes all four modes and renders one validated BREW in its footer', () => {
+  const app = readFileSync('src/App.jsx', 'utf8');
+  const detail = readFileSync('src/components/TeaDetail.jsx', 'utf8');
+  const css = readFileSync('src/components/tea-sheet.css', 'utf8');
+  assert.match(app, /nativeIOS && \['search', 'prep', 'add', 'edit'\]\.includes\(mode\)/);
+  assert.match(app, /fixedBrew=\{nativeIOS\}/);
+  assert.match(detail, /disabled=\{!validWater\}/);
+  assert.match(detail, /\{!fixedBrew && brewButton\}/);
+  assert.match(detail, /<\/section>\s+\{fixedBrew && <div className="fac-sheet-footer fac-sheet-footer--brew">\{brewButton\}/);
+  assert.match(css, /padding-bottom:max\(14px, env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\[data-native-expanded-gap="true"\] \.fac-sheet-editor-actions \{ margin-top:48px/);
+});
