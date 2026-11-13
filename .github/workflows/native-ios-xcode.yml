@@ -13,6 +13,8 @@ on:
       - src/timer-kit/mediaController.js
       - src/timer/videoPreloader.js
       - tests/videoPreloader.test.mjs
+      - src/timer-kit/nativeVideoController.js
+      - tests/nativeVideoController.test.mjs
 
 permissions:
   contents: write # Only commit native ios/ source files after successful build

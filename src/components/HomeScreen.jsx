@@ -4,6 +4,7 @@ import { Box, Button, IconButton, Typography } from '@mui/material';
 import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js';
 import { useTeaTimer } from '../timer/useTeaTimer.js';
 import { createMediaController } from '../timer-kit/mediaController.js';
+import { createNativeVideoController } from '../timer-kit/nativeVideoController.js';
 import { MEDIA_ASSETS } from '../timer-kit/mediaManifest.js';
 import { usePushNotifications } from '../push/usePushNotifications.js';
 import { createHomeAudioController } from '../timer/homeSoundProfile.js';
@@ -22,7 +23,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
     videoRefs,
     storageKey: 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
-    mediaFactory: createMediaController,
+    mediaFactory: Capacitor.getPlatform() === 'ios' ? createNativeVideoController : createMediaController,
     audioFactory: createHomeAudioController,
     onPersist: push.syncTimer,
   });
