@@ -27,3 +27,54 @@ export async function prefetchVideoAsBlob({
   }
   return () => revokeObjectURL(objectURL);
 }
+
+
+// Capacitor's iOS asset handler can serve MP4s without an HTTP status.
+export function preloadBundledVideo({ video, url, signal, timeoutMs = 15000 }) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('Video load cancelled.'));
+      return;
+    }
+
+    function cleanup() {
+      clearTimeout(timeout);
+      video.removeEventListener('loadedmetadata', onMetadata);
+      video.removeEventListener('error', onError);
+      signal?.removeEventListener('abort', onAbort);
+    }
+    function fail(error) {
+      cleanup();
+      reject(error);
+    }
+    function onMetadata() {
+      if (!Number.isFinite(video.duration) || video.duration <= 0 ||
+          video.videoWidth <= 0 || video.videoHeight <= 0) {
+        fail(new Error('Invalid video metadata.'));
+        return;
+      }
+      cleanup();
+      resolve();
+    }
+    function onError() {
+      fail(new Error('Video could not be loaded (media error ' + (video.error?.code ?? 'unknown') + ').'));
+    }
+    function onAbort() {
+      fail(new Error('Video load cancelled.'));
+    }
+
+    // WKWebView can defer the first frame until play(). Metadata is enough
+    // to initialize the clip without requiring playback before the Start tap.
+    const timeout = setTimeout(() => fail(new Error('Video metadata load timed out.')), timeoutMs);
+    video.addEventListener('loadedmetadata', onMetadata);
+    video.addEventListener('error', onError);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      video.preload = 'auto';
+      video.src = url;
+      video.load();
+    } catch (error) {
+      fail(error);
+    }
+  });
+}

@@ -1,5 +1,6 @@
+import { Capacitor } from '@capacitor/core';
 import { MEDIA_ASSETS } from './mediaManifest.js';
-import { prefetchVideoAsBlob } from '../timer/videoPreloader.js';
+import { preloadBundledVideo, prefetchVideoAsBlob } from '../timer/videoPreloader.js';
 
 /**
  * React-independent HTMLVideoElement / HTMLAudioElement controller.
@@ -9,6 +10,7 @@ import { prefetchVideoAsBlob } from '../timer/videoPreloader.js';
 export function createMediaController({
   videos,
   assetBase,
+  platform = Capacitor.getPlatform(),
   onError = () => {},
   onPhase = () => {},
   onMilkRequested = () => {},
@@ -24,6 +26,7 @@ export function createMediaController({
   if (typeof assetBase !== 'string' || !assetBase.endsWith('/')) {
     throw new Error('Media assetBase must end with a slash.');
   }
+  const bundledVideos = platform === 'ios';
   const path = name => assetBase + MEDIA_ASSETS[name].file;
   const sources = ['fill', 'brew', 'steep', 'milk'];
   const sounds = {
@@ -129,7 +132,7 @@ export function createMediaController({
     listeners.push(() => element.removeEventListener(name, fn));
   }
   videos.forEach((video, i) => {
-    video.src = path(sources[i]);
+    if (!bundledVideos) video.src = path(sources[i]);
     video.muted = true;
     video.defaultMuted = true;
     video.preload = 'auto';
@@ -137,7 +140,7 @@ export function createMediaController({
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
     video.removeAttribute('hidden');
-    video.load();
+    if (!bundledVideos) video.load();
   });
 
   // The preview should never go blank, including the initial load and Reset.
@@ -158,27 +161,29 @@ export function createMediaController({
     return video.readyState >= 2;
   }
 
-  // Every clip is < 0.5 MB in the pinned V2 snapshot. Explicitly fetch all
-  // four instead of relying on iPhone's advisory preload="auto" behavior.
-  // In particular, brew and steep must not wait forever for loadeddata.
   function preloadVideo(index, { fetchImpl, createObjectURL, revokeObjectURL } = {}) {
     if (destroyed) return Promise.reject(new Error('Media controller disposed.'));
     if (videoPreloadPromises[index]) return videoPreloadPromises[index];
-    const promise = prefetchVideoAsBlob({
-      video: videos[index], url: path(sources[index]), fetchImpl,
-      createObjectURL, revokeObjectURL, signal: preloadAbort.signal,
-    }).then(cleanup => {
+    const video = videos[index];
+    const url = path(sources[index]);
+    const signal = preloadAbort.signal;
+    // Keep the explicit Blob preload for Safari and the Homescreen PWA.
+    const loading = bundledVideos
+      ? preloadBundledVideo({ video, url, signal })
+      : prefetchVideoAsBlob({ video, url, signal, fetchImpl, createObjectURL, revokeObjectURL });
+    const promise = loading.then(cleanup => {
       if (destroyed || preloadAbort.signal.aborted) {
-        cleanup();
+        cleanup?.();
         throw new Error('Media controller disposed.');
       }
       videoBlobCleanups[index] = cleanup;
-      if (index === 0) fillEvent('file-prefetched');
+      if (index === 0) fillEvent(bundledVideos ? 'metadata-loaded' : 'file-prefetched');
       return true;
     }).catch(error => {
       if (videoPreloadPromises[index] === promise) videoPreloadPromises[index] = null;
-      if (!destroyed) onError(new Error(sources[index] + ' video preload: ' + error.message));
-      throw error;
+      const failure = new Error(sources[index] + ' video preload: ' + error.message, { cause: error });
+      if (!destroyed) onError(failure);
+      throw bundledVideos ? failure : error;
     });
     videoPreloadPromises[index] = promise;
     return promise;

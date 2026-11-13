@@ -10,6 +10,9 @@ on:
       - src/push/nativeNotificationController.js
       - src/push/nativeNotificationController.test.js
       - public/audio/Ready.mp3
+      - src/timer-kit/mediaController.js
+      - src/timer/videoPreloader.js
+      - tests/videoPreloader.test.mjs
 
 permissions:
   contents: write # Only commit native ios/ source files after successful build
