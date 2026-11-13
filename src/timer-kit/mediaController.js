@@ -54,6 +54,8 @@ export function createMediaController({
   let fillEverPlayed = false;
   let fillBlocked = false;
   let fillStartHandler = null;
+  const videoMetadataReady = Array(4).fill(false);
+  let backgroundPreloadStarted = false;
   const videoPreloadPromises = Array(4).fill(null);
   const videoBlobCleanups = Array(4).fill(null);
   const preloadAbort = new AbortController();
@@ -172,6 +174,7 @@ export function createMediaController({
     const url = path(sources[index]);
     const signal = preloadAbort.signal;
     // Keep the explicit Blob preload for Safari and the Homescreen PWA.
+    const startedAt = performance.now();
     const loading = bundledVideos
       ? preloadBundledVideo({ video, url, signal })
       : prefetchVideoAsBlob({ video, url, signal, fetchImpl, createObjectURL, revokeObjectURL });
@@ -181,12 +184,21 @@ export function createMediaController({
         throw new Error('Media controller disposed.');
       }
       videoBlobCleanups[index] = cleanup;
+      if (bundledVideos) {
+        videoMetadataReady[index] = true;
+        console.info('[FAC media] metadata ready', sources[index], Math.round(performance.now() - startedAt),
+          'ms load;', Math.round(performance.now()), 'ms since navigation');
+      }
       if (index === 0) fillEvent(bundledVideos ? 'metadata-loaded' : 'file-prefetched');
       return true;
     }).catch(error => {
       if (videoPreloadPromises[index] === promise) videoPreloadPromises[index] = null;
       const failure = new Error(sources[index] + ' video preload: ' + error.message, { cause: error });
-      if (!destroyed) onError(failure);
+      if (!destroyed) {
+        if (bundledVideos) console.warn('[FAC media] metadata failed', sources[index],
+          Math.round(performance.now() - startedAt), 'ms', video.readyState, video.networkState, error.message);
+        onError(failure);
+      }
       throw bundledVideos ? failure : error;
     });
     videoPreloadPromises[index] = promise;
@@ -200,6 +212,23 @@ export function createMediaController({
     const loaded = [];
     for (const index of sources.keys()) loaded.push(await preloadVideo(index, options));
     return loaded;
+  }
+  async function preloadForStart() {
+    const startedAt = performance.now();
+    await preloadFill();
+    if (destroyed) return;
+    console.info('[FAC media] Start ready', Math.round(performance.now() - startedAt), 'ms since preload',
+      Math.round(performance.now()), 'ms since navigation');
+    // Keep WKWebView metadata reads sequential, while releasing the Start
+    // button after Fill. Stop the queue only on teardown.
+    if (backgroundPreloadStarted) return;
+    backgroundPreloadStarted = true;
+    void (async () => {
+      for (const index of [1, 2, 3]) {
+        if (destroyed) return;
+        await preloadVideo(index).catch(() => {});
+      }
+    })();
   }
   function waitReady(video) {
     if (ready(video)) return Promise.resolve();
@@ -265,6 +294,9 @@ export function createMediaController({
   // Preloading the media file alone does not grant playback permission.
   function primeMilkVideo() {
     if (destroyed || milkStarted || milkPriming || milkPrimed) return;
+    // Attach Milk's source within the gesture even if its background turn
+    // has not come up yet. Its preload promise is shared with the queue.
+    if (bundledVideos && !videoMetadataReady[3]) void preloadVideo(3).catch(() => {});
     const id = session;
     const video = videos[3];
     milkPriming = true;
@@ -347,6 +379,7 @@ export function createMediaController({
       // Native clips have metadata and can request playback directly.
       // Keep the existing deferred Milk path for browser/PWA Blob URLs.
       if (i === 3 && !bundledVideos && !ready(next)) await waitReady(next);
+      if (bundledVideos && i > 0 && !videoMetadataReady[i]) await preloadVideo(i);
       if (!active || destroyed || id !== session || ownTransition !== transitionId) return;
       try { next.currentTime = 0; } catch (error) {
         // Do not block a muted MP4 play() merely because metadata is pending.
@@ -520,6 +553,7 @@ export function createMediaController({
     prepare: () => Promise.all(videos.map(waitReady)),
     preloadFill,
     preloadAll,
+    ...(bundledVideos ? { preloadForStart } : {}),
     restore,
     unlock,
     reset,

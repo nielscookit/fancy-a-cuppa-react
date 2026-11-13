@@ -1,4 +1,5 @@
 import { useEffect, useImperativeHandle, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Box, Button, IconButton, Typography } from '@mui/material';
 import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js';
 import { useTeaTimer } from '../timer/useTeaTimer.js';
@@ -30,6 +31,25 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const inSession = running || preparing || finished || remaining < total;
   const seconds = Math.ceil(remaining);
   const timeLabel = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'ios') {
+      console.info('[FAC media] Home mounted; time controls available', Math.round(performance.now()), 'ms since navigation');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'ios' && preload === 'ready') {
+      console.info('[FAC media] Start enabled', Math.round(performance.now()), 'ms since navigation');
+    }
+  }, [preload]);
+
+  const stepTime = delta => {
+    if (Capacitor.getPlatform() === 'ios') {
+      console.info('[FAC media] Time step', delta, Math.round(performance.now()), 'ms since navigation');
+    }
+    onStep(delta);
+  };
 
   const begin = seconds => {
     if (preload !== 'ready' || inSession) return false;
@@ -77,7 +97,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
               <IconButton
                 aria-label="Decrease brewing time by one minute"
                 className="fac-home__time-button"
-                onClick={() => onStep(-1)}
+                onClick={() => stepTime(-1)}
                 disabled={minutes <= MIN_QUICK_MINUTES}
                 disableRipple
               >
@@ -89,7 +109,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
               <IconButton
                 aria-label="Increase brewing time by one minute"
                 className="fac-home__time-button"
-                onClick={() => onStep(1)}
+                onClick={() => stepTime(1)}
                 disabled={minutes >= MAX_QUICK_MINUTES}
                 disableRipple
               >

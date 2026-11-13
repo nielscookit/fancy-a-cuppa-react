@@ -23,3 +23,9 @@ test('Home switches from duration controls to countdown and reset', () => {
   assert.match(home, /Resume timer/);
   assert.doesNotMatch(home, /Brew again/);
 });
+
+test('Home duration buttons are independent of media preload', () => {
+  const home = readFileSync('src/components/HomeScreen.jsx', 'utf8');
+  assert.match(home, /onClick=\{\(\) => stepTime\(-1\)\}\s+disabled=\{minutes <= MIN_QUICK_MINUTES\}/);
+  assert.match(home, /onClick=\{\(\) => stepTime\(1\)\}\s+disabled=\{minutes >= MAX_QUICK_MINUTES\}/);
+});

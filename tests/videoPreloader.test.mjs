@@ -144,3 +144,44 @@ test('bundled preload reuses already available metadata for the same URL', async
   video.load = () => assert.fail('Valid metadata must not be discarded');
   await preloadBundledVideo({ video, url: './milk.mp4' });
 });
+
+test('native Home releases Start after Fill and reuses the in-flight Brew load at transition', async () => {
+  const { createMediaController } = await import('../src/timer-kit/mediaController.js');
+  const videos = Array.from({ length: 4 }, () => metadataVideo());
+  const loads = [0, 0, 0, 0];
+  const phases = [];
+  const finishLoad = index => {
+    videos[index].setMetadata();
+    videos[index].dispatchEvent(new Event('loadedmetadata'));
+  };
+  videos.forEach((video, index) => {
+    video.load = () => {
+      loads[index]++;
+      if (index !== 1) finishLoad(index);
+    };
+    video.play = async () => {};
+  });
+  const media = createMediaController({
+    videos, assetBase: 'capacitor://localhost/media/', platform: 'ios',
+    audioFactory: () => ({ play: async () => {}, pause() {} }),
+    onPhase: phase => phases.push(phase),
+  });
+  try {
+    await media.preloadForStart();
+    assert.deepEqual(loads, [1, 1, 0, 0]);
+    await media.preloadForStart();
+    assert.deepEqual(loads, [1, 1, 0, 0]);
+    let starts = 0;
+    media.startSynced(() => starts++);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(starts, 1);
+    videos[0].dispatchEvent(new Event('ended'));
+    assert.deepEqual(phases, [0]);
+    finishLoad(1);
+    await media.preloadAll();
+    assert.deepEqual(loads, [1, 1, 1, 1]);
+    assert.deepEqual(phases, [0, 1]);
+  } finally {
+    media.destroy();
+  }
+});

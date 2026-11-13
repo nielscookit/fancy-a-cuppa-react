@@ -77,14 +77,16 @@ export function createTeaTimerSession({
   }
 
   // This never starts the countdown. It can safely run on mount.
-  // All 4 clips must be cached before the first Start tap is enabled.
+  // Native Home only gates Start on Fill. Recovery can seek into any phase.
   function prefetch() {
     if (disposed) return Promise.reject(new Error('Timer session destroyed.'));
     if (preload === 'ready') return Promise.resolve(true);
     preload = 'loading';
     error = null;
     notify();
-    return media.preloadAll().then(() => {
+    const loading = !recoveryPending && media.preloadForStart
+      ? media.preloadForStart() : media.preloadAll();
+    return loading.then(() => {
       if (disposed) return false;
       preload = 'ready';
       if (recoveryPending) { recoveryPending = false; timer.restore(saved); }

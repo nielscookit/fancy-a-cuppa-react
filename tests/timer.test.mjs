@@ -846,11 +846,19 @@ test('a stalled native Fill start times out and a later tap can start again', as
 
 test('native Milk can start when only its metadata is ready', async () => {
   const videos = Array.from({ length: 4 }, () => new FakeVideo());
-  videos[3].readyState = 1;
+  for (const video of videos) {
+    video.load = () => {
+      video.currentSrc = video.src;
+      video.readyState = 1;
+      video.duration = 5;
+      video.videoWidth = video.videoHeight = 375;
+    };
+  }
   const media = createKitMediaController({ videos, platform: 'ios',
     assetBase: './media/', audioFactory: url => new FakeAudio(url),
   });
   try {
+    await media.preloadAll();
     media.start();
     media.milk();
     await nextLoop();
