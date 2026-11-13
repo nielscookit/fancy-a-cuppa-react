@@ -28,7 +28,9 @@ export function createTeaTimerSession({
   const makeAudio = factories.audio || createAudioController;
   const makeMedia = factories.media || createMediaController;
   const makeTimer = factories.timer || createTimerController;
-  const saved = storageKey ? readTimerSession(storage, storageKey) : null;
+  const stored = storageKey ? readTimerSession(storage, storageKey) : null;
+  // A paused snapshot at its original duration is equivalent to idle.
+  const saved = stored?.status === 'paused' && stored.remaining === stored.total ? null : stored;
   let recoveryPending = Boolean(saved);
   let disposed = false;
   let preload = stillMedia ? 'ready' : 'loading';
@@ -77,15 +79,20 @@ export function createTeaTimerSession({
   }
 
   // This never starts the countdown. It can safely run on mount.
-  // Native Home attaches sources immediately. Recovery can seek into any phase.
+  // Native Home attaches sources immediately, including during recovery.
   function prefetch() {
     if (disposed) return Promise.reject(new Error('Timer session destroyed.'));
     if (preload === 'ready') return Promise.resolve(true);
     preload = 'loading';
     error = null;
     notify();
-    const loading = !recoveryPending && media.preloadForStart
-      ? media.preloadForStart() : media.preloadAll();
+    const loading = media.preloadForStart
+      ? media.preloadForStart({
+        storedStatus: stored?.status ?? 'none',
+        restoreStatus: !recoveryPending ? 'none'
+          : saved.status === 'running' && saved.deadline <= Date.now() ? 'finished' : saved.status,
+      })
+      : media.preloadAll();
     return loading.then(() => {
       if (disposed) return false;
       preload = 'ready';

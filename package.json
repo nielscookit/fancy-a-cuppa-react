@@ -12,7 +12,7 @@
     "sync:media": "node scripts/sync-v2-media.mjs",
     "verify:pages": "node scripts/verify-pages.mjs",
     "test": "node --test",
-    "build:native": "vite build --config vite.native.config.js"
+    "build:native": "vite build --config vite.native.config.js --mode native"
   },
   "dependencies": {
     "@capacitor/core": "8.6.0",

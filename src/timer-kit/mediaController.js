@@ -222,9 +222,12 @@ export function createMediaController({
     });
   }
 
-  async function preloadForStart() {
+  async function preloadForStart(recovery = {}) {
     if (destroyed || sourcesAttached) return;
     sourcesAttached = true;
+    console.info('[FAC media] native-recovery-v1', {
+      platform, preload: 'attach-sources', ...recovery,
+    });
     // Let WebKit warm up the sources, but leave any deferred metadata read
     // to play(). A background load() retry could abort a pending play().
     videos.forEach((video, index) => {
@@ -534,6 +537,13 @@ export function createMediaController({
     const ownSession = session;
     const video = videos[index];
     videos.forEach((item, i) => item.classList.toggle('visible', i === index));
+    function playRestoredVideo() {
+      video.play()?.catch(() => {
+        if (!destroyed && ownSession === session && active) {
+          onError(new Error('Tap the countdown to pause, then tap again to resume video and sound.'));
+        }
+      });
+    }
     function seek() {
       if (destroyed || ownSession !== session) return;
       const duration = Number(video.duration);
@@ -541,14 +551,14 @@ export function createMediaController({
       const target = time === Infinity ? Math.max(0,duration - 0.05)
         : index === 2 ? time % duration : Math.min(time,Math.max(0,duration - 0.05));
       try { video.currentTime = target; } catch (error) { onError(error); }
-      if (active) video.play()?.catch(() => {
-        onError(new Error('Tap the countdown to pause, then tap again to resume video and sound.'));
-      });
+      if (active && (!bundledVideos || video.paused)) playRestoredVideo();
     }
     if (video.readyState >= 1) seek();
     else {
       const loaded = () => { video.removeEventListener('loadedmetadata', loaded); seek(); };
       listen(video, 'loadedmetadata', loaded);
+      // A running timer can request playback even if WebKit defers metadata.
+      if (bundledVideos && active) playRestoredVideo();
     }
   }
 

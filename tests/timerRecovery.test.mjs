@@ -41,3 +41,37 @@ test('corrupt or unavailable storage cannot break timer recovery',()=>{
  assert.equal(readTimerSession({getItem:()=>raw},'x'),null);
  assert.doesNotThrow(()=>persistTimerSession({getItem(){throw Error()}},'x',{running:true,total:60,remaining:60}));
 });
+
+test('native Home restores persisted states without waiting on video metadata', async () => {
+  const { createTeaTimerSession } = await import('../src/timer/teaTimerSession.js');
+  for (const [status, remaining, deadline, expected] of [
+    ['none', 60, null, 'none'],
+    ['running', 60, Date.now() + 40000, 'running'],
+    ['paused', 23, null, 'paused'],
+    ['finished', 0, null, 'finished'],
+    ['running', 60, Date.now() - 1000, 'finished'],
+    ['paused', 60, null, 'none'],
+  ]) {
+    const restored = [];
+    const session = createTeaTimerSession({
+      videos: [{}, {}, {}, {}], assetBase: './media/', storageKey: 'timer',
+      storage: { getItem: () => status === 'none' ? null
+        : JSON.stringify({ version: 1, status, total: 60, remaining, deadline }) },
+      factories: {
+        audio: () => ({ destroy() {} }),
+        media: () => ({
+          preloadAll: () => assert.fail('Native recovery must not wait for metadata'),
+          preloadForStart: async diagnosis => {
+            assert.equal(diagnosis.storedStatus, status);
+            assert.equal(diagnosis.restoreStatus, expected);
+          },
+        }),
+        timer: () => ({ restore: state => restored.push(state), destroy() {} }),
+      },
+    });
+    assert.equal(await session.prefetch(), true);
+    assert.equal(session.getSnapshot().preload, 'ready');
+    assert.deepEqual(restored.map(state => state.status), expected === 'none' ? [] : [status]);
+    session.destroy();
+  }
+});

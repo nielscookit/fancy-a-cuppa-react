@@ -33,8 +33,9 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const timeLabel = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
 
   useEffect(() => {
-    if (Capacitor.getPlatform() === 'ios') {
-      console.info('[FAC media] Home mounted; time controls available', Math.round(performance.now()), 'ms since navigation');
+    const platform = Capacitor.getPlatform();
+    if (import.meta.env.MODE === 'native') {
+      console.info('[FAC media] native-recovery-v1 Home mounted', { platform, preload: platform === 'ios' ? 'attach-sources' : 'preloadAll', ms: Math.round(performance.now()) });
     }
   }, []);
 
