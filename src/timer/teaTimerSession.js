@@ -77,7 +77,7 @@ export function createTeaTimerSession({
   }
 
   // This never starts the countdown. It can safely run on mount.
-  // Native Home only gates Start on Fill. Recovery can seek into any phase.
+  // Native Home attaches sources immediately. Recovery can seek into any phase.
   function prefetch() {
     if (disposed) return Promise.reject(new Error('Timer session destroyed.'));
     if (preload === 'ready') return Promise.resolve(true);

@@ -145,42 +145,43 @@ test('bundled preload reuses already available metadata for the same URL', async
   await preloadBundledVideo({ video, url: './milk.mp4' });
 });
 
-test('native Home releases Start after Fill and reuses the in-flight Brew load at transition', async () => {
+test('native Home can start when metadata is deferred until play', async () => {
   const { createMediaController } = await import('../src/timer-kit/mediaController.js');
   const videos = Array.from({ length: 4 }, () => metadataVideo());
-  const loads = [0, 0, 0, 0];
-  const phases = [];
-  const finishLoad = index => {
-    videos[index].setMetadata();
-    videos[index].dispatchEvent(new Event('loadedmetadata'));
-  };
+  const played = [];
+  let confirmFill;
   videos.forEach((video, index) => {
-    video.load = () => {
-      loads[index]++;
-      if (index !== 1) finishLoad(index);
+    video.load = () => assert.fail('Native cold start must not force a metadata reload');
+    video.play = () => {
+      assert.ok(video.src.endsWith('.mp4'));
+      played.push(index);
+      if (index === 0) return new Promise(resolve => { confirmFill = resolve; });
+      return Promise.resolve();
     };
-    video.play = async () => {};
   });
   const media = createMediaController({
     videos, assetBase: 'capacitor://localhost/media/', platform: 'ios',
     audioFactory: () => ({ play: async () => {}, pause() {} }),
-    onPhase: phase => phases.push(phase),
   });
   try {
     await media.preloadForStart();
-    assert.deepEqual(loads, [1, 1, 0, 0]);
     await media.preloadForStart();
-    assert.deepEqual(loads, [1, 1, 0, 0]);
+    assert.deepEqual(videos.map(video => video.readyState), [0, 0, 0, 0]);
     let starts = 0;
     media.startSynced(() => starts++);
+    assert.deepEqual(played, [0]);
+    assert.equal(starts, 0);
+    confirmFill();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(starts, 1);
-    videos[0].dispatchEvent(new Event('ended'));
-    assert.deepEqual(phases, [0]);
-    finishLoad(1);
-    await media.preloadAll();
-    assert.deepEqual(loads, [1, 1, 1, 1]);
-    assert.deepEqual(phases, [0, 1]);
+    for (const index of [0, 1]) {
+      videos[index].dispatchEvent(new Event('ended'));
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    media.milk();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(played, [0, 1, 2, 3]);
+    assert.equal(media.phase, 3);
   } finally {
     media.destroy();
   }

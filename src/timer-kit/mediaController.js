@@ -54,8 +54,7 @@ export function createMediaController({
   let fillEverPlayed = false;
   let fillBlocked = false;
   let fillStartHandler = null;
-  const videoMetadataReady = Array(4).fill(false);
-  let backgroundPreloadStarted = false;
+  let sourcesAttached = false;
   const videoPreloadPromises = Array(4).fill(null);
   const videoBlobCleanups = Array(4).fill(null);
   const preloadAbort = new AbortController();
@@ -185,7 +184,6 @@ export function createMediaController({
       }
       videoBlobCleanups[index] = cleanup;
       if (bundledVideos) {
-        videoMetadataReady[index] = true;
         console.info('[FAC media] metadata ready', sources[index], Math.round(performance.now() - startedAt),
           'ms load;', Math.round(performance.now()), 'ms since navigation');
       }
@@ -213,22 +211,30 @@ export function createMediaController({
     for (const index of sources.keys()) loaded.push(await preloadVideo(index, options));
     return loaded;
   }
+  function logVideo(event, index) {
+    const video = videos[index];
+    console.info('[FAC media]', sources[index], event, {
+      ms: Math.round(performance.now()),
+      readyState: video.readyState,
+      networkState: video.networkState,
+      currentSrc: video.currentSrc,
+      error: video.error ? { code: video.error.code, message: video.error.message } : null,
+    });
+  }
+
   async function preloadForStart() {
-    const startedAt = performance.now();
-    await preloadFill();
-    if (destroyed) return;
-    console.info('[FAC media] Start ready', Math.round(performance.now() - startedAt), 'ms since preload',
-      Math.round(performance.now()), 'ms since navigation');
-    // Keep WKWebView metadata reads sequential, while releasing the Start
-    // button after Fill. Stop the queue only on teardown.
-    if (backgroundPreloadStarted) return;
-    backgroundPreloadStarted = true;
-    void (async () => {
-      for (const index of [1, 2, 3]) {
-        if (destroyed) return;
-        await preloadVideo(index).catch(() => {});
+    if (destroyed || sourcesAttached) return;
+    sourcesAttached = true;
+    // Let WebKit warm up the sources, but leave any deferred metadata read
+    // to play(). A background load() retry could abort a pending play().
+    videos.forEach((video, index) => {
+      for (const event of ['loadstart', 'loadedmetadata', 'playing', 'waiting', 'stalled', 'abort', 'error', 'ended']) {
+        listen(video, event, () => logVideo(event, index));
       }
-    })();
+      video.preload = 'metadata';
+      video.src = path(sources[index]);
+      logVideo('source attached', index);
+    });
   }
   function waitReady(video) {
     if (ready(video)) return Promise.resolve();
@@ -294,9 +300,6 @@ export function createMediaController({
   // Preloading the media file alone does not grant playback permission.
   function primeMilkVideo() {
     if (destroyed || milkStarted || milkPriming || milkPrimed) return;
-    // Attach Milk's source within the gesture even if its background turn
-    // has not come up yet. Its preload promise is shared with the queue.
-    if (bundledVideos && !videoMetadataReady[3]) void preloadVideo(3).catch(() => {});
     const id = session;
     const video = videos[3];
     milkPriming = true;
@@ -376,14 +379,15 @@ export function createMediaController({
     const previous = phase >= 0 ? videos[phase] : null;
     try {
       // On iPhone, 'loadeddata' may never fire until play() is requested.
-      // Native clips have metadata and can request playback directly.
+      // Native clips can request playback before metadata is available.
       // Keep the existing deferred Milk path for browser/PWA Blob URLs.
       if (i === 3 && !bundledVideos && !ready(next)) await waitReady(next);
-      if (bundledVideos && i > 0 && !videoMetadataReady[i]) await preloadVideo(i);
       if (!active || destroyed || id !== session || ownTransition !== transitionId) return;
+      if (bundledVideos && next.error) next.load();
+      if (bundledVideos) logVideo('play requested', i);
       try { next.currentTime = 0; } catch (error) {
         // Do not block a muted MP4 play() merely because metadata is pending.
-        if (i === 3) throw error;
+        if (i === 3 && !bundledVideos) throw error;
       }
       if (i === 2) { bubblePlayed = false; lastStillTime = 0; }
       if (i === 3) {
@@ -565,7 +569,9 @@ export function createMediaController({
       fillStartHandler = handler;
       if (bundledVideos) {
         handler.timeout = schedule(() => {
-          if (fillStartHandler === handler) fillFailed(new Error('Fill video playback timed out.'));
+          if (fillStartHandler !== handler) return;
+          logVideo('playback timed out', 0);
+          fillFailed(new Error('Fill video playback timed out.'));
         }, 8000);
       }
       active = true;
