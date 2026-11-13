@@ -55,6 +55,10 @@ export function createMediaController({
   let fillBlocked = false;
   let fillStartHandler = null;
   let sourcesAttached = false;
+  let fillSourceAt;
+  let fillRequestAt;
+  let fillAttempt = 0;
+  let fillPromiseState = 'none';
   const videoPreloadPromises = Array(4).fill(null);
   const videoBlobCleanups = Array(4).fill(null);
   const preloadAbort = new AbortController();
@@ -154,7 +158,9 @@ export function createMediaController({
   listen(videos[0], 'loadeddata', () => {
     if (!active && phase === -1) {
       videos[0].pause();
-      try { videos[0].currentTime = 0; } catch { /* not yet seekable */ }
+      try {
+        if (!bundledVideos || videos[0].currentTime > 0) videos[0].currentTime = 0;
+      } catch { /* not yet seekable */ }
       videos[0].classList.add('visible');
     }
   });
@@ -213,7 +219,16 @@ export function createMediaController({
   }
   function logVideo(event, index) {
     const video = videos[index];
+    const now = performance.now();
     console.info('[FAC media]', sources[index], event, {
+      ...(index === 0 ? {
+        attempt: fillAttempt, promise: fillPromiseState,
+        sinceSourceMs: fillSourceAt == null ? null : Math.round(now - fillSourceAt),
+        sincePlayMs: fillRequestAt == null ? null : Math.round(now - fillRequestAt),
+      } : {}),
+      paused: video.paused,
+      currentTime: video.currentTime,
+      src: video.src,
       ms: Math.round(performance.now()),
       readyState: video.readyState,
       networkState: video.networkState,
@@ -235,6 +250,7 @@ export function createMediaController({
         listen(video, event, () => logVideo(event, index));
       }
       video.preload = 'metadata';
+      if (index === 0) fillSourceAt = performance.now();
       video.src = path(sources[index]);
       logVideo('source attached', index);
     });
@@ -287,7 +303,9 @@ export function createMediaController({
       video.pause();
       if (index === 0) video.classList.add('visible');
       else video.classList.remove('visible');
-      try { video.currentTime = 0; } catch { /* metadata not ready */ }
+      try {
+        if (!bundledVideos || (video.readyState >= 1 && video.currentTime > 0)) video.currentTime = 0;
+      } catch { /* metadata not ready */ }
     });
     // Phase -1 means idle, but the first VIDEO FRAME remains visible.
     onPhase(-1);
@@ -336,7 +354,7 @@ export function createMediaController({
   // All playback requests are issued in the direct user gesture.
   function unlock() {
     if (destroyed) return;
-    primeMilkVideo();
+    if (!bundledVideos) primeMilkVideo();
     const audio = sounds.milk;
     audio.muted = true;
     let p;
@@ -387,8 +405,12 @@ export function createMediaController({
       if (i === 3 && !bundledVideos && !ready(next)) await waitReady(next);
       if (!active || destroyed || id !== session || ownTransition !== transitionId) return;
       if (bundledVideos && next.error) next.load();
-      if (bundledVideos) logVideo('play requested', i);
-      try { next.currentTime = 0; } catch (error) {
+      try {
+        // Avoid starting a seek on a fresh native resource before its first play.
+        if (!bundledVideos || i !== 0 || (next.readyState >= 1 && next.currentTime > 0)) {
+          next.currentTime = 0;
+        }
+      } catch (error) {
         // Do not block a muted MP4 play() merely because metadata is pending.
         if (i === 3 && !bundledVideos) throw error;
       }
@@ -424,13 +446,31 @@ export function createMediaController({
         // First play() MUST be in the original user gesture.
         next.classList.add('visible');
         fillEvent('play-requested');
+        if (bundledVideos) {
+          fillAttempt++;
+          fillRequestAt = performance.now();
+          fillPromiseState = 'requested';
+          logVideo('play requested', 0);
+        }
         const playback = next.play();
+        if (bundledVideos) {
+          fillPromiseState = playback?.then ? 'pending' : 'unavailable';
+          logVideo('play returned', 0);
+        }
         const isCurrent = () => !destroyed && id === session && ownTransition === transitionId;
         if (playback?.then) playback.then(() => {
           // play() can resolve on a repeat start even without a new playing event.
-          if (bundledVideos && isCurrent()) fillStarted();
+          if (bundledVideos && isCurrent()) {
+            fillPromiseState = 'fulfilled';
+            logVideo('play fulfilled', 0);
+            fillStarted();
+          }
         }).catch(error => {
           if (!isCurrent()) return;
+          if (bundledVideos) {
+            fillPromiseState = 'rejected';
+            logVideo('play rejected: ' + (error?.message || error), 0);
+          }
           fillBlocked = true;
           fillEvent('play-rejected');
           fillFailed(error);
@@ -476,7 +516,11 @@ export function createMediaController({
       onPhase(i);
       if (i === 3) milkSoundTimer = schedule(() => playMilkSound(id), 60);
     } catch (error) {
-      if (i === 0 && bundledVideos) fillFailed(error);
+      if (i === 0 && bundledVideos) {
+        fillPromiseState = 'threw';
+        logVideo('play threw: ' + (error?.message || error), 0);
+        fillFailed(error);
+      }
       onError(error);
     }
     finally {
@@ -586,6 +630,8 @@ export function createMediaController({
       }
       active = true;
       void show(0); // Calls play() synchronously in the initiating iPhone tap.
+      // Preserve the gesture for Milk, with Fill claiming playback first.
+      if (bundledVideos && active) primeMilkVideo();
     },
     resume: () => {
       active = true;

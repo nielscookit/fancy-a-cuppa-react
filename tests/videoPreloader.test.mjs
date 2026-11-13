@@ -150,6 +150,10 @@ test('native Home can start when metadata is deferred until play', async () => {
   const videos = Array.from({ length: 4 }, () => metadataVideo());
   const played = [];
   let confirmFill;
+  let fillSeeks = 0;
+  Object.defineProperty(videos[0], 'currentTime', {
+    get: () => 0, set: () => { fillSeeks++; },
+  });
   videos.forEach((video, index) => {
     video.load = () => assert.fail('Native cold start must not force a metadata reload');
     video.play = () => {
@@ -168,8 +172,10 @@ test('native Home can start when metadata is deferred until play', async () => {
     await media.preloadForStart();
     assert.deepEqual(videos.map(video => video.readyState), [0, 0, 0, 0]);
     let starts = 0;
+    media.reset();
     media.startSynced(() => starts++);
-    assert.deepEqual(played, [0]);
+    assert.equal(fillSeeks, 0);
+    assert.deepEqual(played, [0, 3]);
     assert.equal(starts, 0);
     confirmFill();
     await new Promise(resolve => setImmediate(resolve));
@@ -180,7 +186,7 @@ test('native Home can start when metadata is deferred until play', async () => {
     }
     media.milk();
     await new Promise(resolve => setImmediate(resolve));
-    assert.deepEqual(played, [0, 1, 2, 3]);
+    assert.deepEqual(played, [0, 3, 1, 2, 3]);
     assert.equal(media.phase, 3);
   } finally {
     media.destroy();
