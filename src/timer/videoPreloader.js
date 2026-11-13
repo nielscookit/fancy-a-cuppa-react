@@ -30,16 +30,25 @@ export async function prefetchVideoAsBlob({
 
 
 // Capacitor's iOS asset handler can serve MP4s without an HTTP status.
-export function preloadBundledVideo({ video, url, signal, timeoutMs = 15000 }) {
+export async function preloadBundledVideo({ video, url, signal, timeoutMs = 15000 }) {
+  // Retry only a silent stall, with the original per-clip deadline split
+  // between the two attempts. A media error or abort must reach the caller.
+  if (await loadVideoMetadata(video, url, signal, timeoutMs / 2)) return;
+  if (await loadVideoMetadata(video, url, signal, timeoutMs / 2)) return;
+  throw new Error('Video metadata load timed out.');
+}
+
+function loadVideoMetadata(video, url, signal, timeoutMs) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new Error('Video load cancelled.'));
       return;
     }
 
+    let timeout;
     function cleanup() {
       clearTimeout(timeout);
-      video.removeEventListener('loadedmetadata', onMetadata);
+      video.removeEventListener('loadedmetadata', checkMetadata);
       video.removeEventListener('error', onError);
       signal?.removeEventListener('abort', onAbort);
     }
@@ -47,32 +56,46 @@ export function preloadBundledVideo({ video, url, signal, timeoutMs = 15000 }) {
       cleanup();
       reject(error);
     }
-    function onMetadata() {
+    function checkMetadata() {
+      // Check the selected source and state, since a queued event can
+      // belong to the load that was just replaced.
+      if (!video.currentSrc || video.currentSrc !== video.src || video.readyState < 1) return false;
       if (!Number.isFinite(video.duration) || video.duration <= 0 ||
-          video.videoWidth <= 0 || video.videoHeight <= 0) {
+          !(video.videoWidth > 0 && video.videoHeight > 0)) {
         fail(new Error('Invalid video metadata.'));
-        return;
+      } else {
+        cleanup();
+        resolve(true);
       }
-      cleanup();
-      resolve();
+      return true;
     }
     function onError() {
-      fail(new Error('Video could not be loaded (media error ' + (video.error?.code ?? 'unknown') + ').'));
+      if (!video.error) return;
+      fail(new Error('Video could not be loaded (media error ' + video.error.code + ').'));
     }
     function onAbort() {
       fail(new Error('Video load cancelled.'));
     }
 
-    // WKWebView can defer the first frame until play(). Metadata is enough
-    // to initialize the clip without requiring playback before the Start tap.
-    const timeout = setTimeout(() => fail(new Error('Video metadata load timed out.')), timeoutMs);
-    video.addEventListener('loadedmetadata', onMetadata);
+    // Keep valid metadata when the previous attempt completed late.
+    const sameSource = video.src && (video.src === url || (video.baseURI && new URL(url, video.baseURI).href === video.src));
+    if (sameSource && !video.error && checkMetadata()) return;
+
+    video.addEventListener('loadedmetadata', checkMetadata);
     video.addEventListener('error', onError);
     signal?.addEventListener('abort', onAbort, { once: true });
+    timeout = setTimeout(() => {
+      if (video.error) onError();
+      else if (!checkMetadata()) {
+        cleanup();
+        resolve(false);
+      }
+    }, timeoutMs);
     try {
-      video.preload = 'auto';
+      video.preload = 'metadata';
       video.src = url;
       video.load();
+      checkMetadata();
     } catch (error) {
       fail(error);
     }

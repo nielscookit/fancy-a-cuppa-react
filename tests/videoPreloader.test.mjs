@@ -32,11 +32,16 @@ test('failed download does not replace existing video source', async () => {
 
 function metadataVideo() {
   const video = new EventTarget();
+  video.readyState = 0;
   video.duration = 4;
   video.videoWidth = 375;
   video.videoHeight = 375;
   video.classList = { add() {}, remove() {} };
   video.setAttribute = video.removeAttribute = video.pause = () => {};
+  video.setMetadata = () => {
+    video.currentSrc = video.src;
+    video.readyState = 1;
+  };
   return video;
 }
 
@@ -46,14 +51,20 @@ test('native Timer Kit loads all four bundled URLs directly, and retries a faile
   const assetBase = new URL('./media/', 'capacitor://localhost/').href;
   const videos = clips.map(() => metadataVideo());
   let failMilk = true;
+  let pending = 0;
   const loads = [];
   const errors = [];
   videos.forEach((video, index) => {
     video.load = () => {
+      assert.equal(pending++, 0, 'native metadata requests are serialized');
       loads.push(video.src);
       const missing = index === 3 && failMilk;
       video.error = missing ? { code: 4 } : null;
-      queueMicrotask(() => video.dispatchEvent(new Event(missing ? 'error' : 'loadedmetadata')));
+      queueMicrotask(() => {
+        pending--;
+        if (!missing) video.setMetadata();
+        video.dispatchEvent(new Event(missing ? 'error' : 'loadedmetadata'));
+      });
     };
   });
   const media = createMediaController({
@@ -66,7 +77,8 @@ test('native Timer Kit loads all four bundled URLs directly, and retries a faile
     await assert.rejects(media.preloadAll(options), /milk video preload:.*media error 4/);
     assert.deepEqual(errors, ['milk video preload: Video could not be loaded (media error 4).']);
     failMilk = false;
-    assert.deepEqual(await media.preloadAll(options), [true, true, true, true]);
+    assert.deepEqual(await Promise.all([media.preloadAll(options), media.preloadAll(options)]),
+      [[true, true, true, true], [true, true, true, true]]);
     assert.deepEqual(loads, [...clips, 'milk'].map(clip => 'capacitor://localhost/media/timer-kit/' + clip + '.mp4'));
   } finally {
     media.destroy();
@@ -76,7 +88,10 @@ test('native Timer Kit loads all four bundled URLs directly, and retries a faile
 test('bundled preload rejects invalid video metadata', async () => {
   const video = metadataVideo();
   video.videoWidth = 0;
-  video.load = () => video.dispatchEvent(new Event('loadedmetadata'));
+  video.load = () => {
+    video.setMetadata();
+    video.dispatchEvent(new Event('loadedmetadata'));
+  };
   await assert.rejects(preloadBundledVideo({ video, url: './bad.mp4' }), /Invalid video metadata/);
 });
 
@@ -103,4 +118,29 @@ test('web Blob preload still rejects a response with status zero', async () => {
       blob: () => assert.fail('Rejected responses must not be read'),
     }),
   }), /HTTP 0/);
+});
+
+
+test('bundled preload recovers from one stalled load and ignores a stale metadata event', async () => {
+  const video = metadataVideo();
+  let loads = 0;
+  video.load = () => {
+    loads++;
+    if (loads === 2) {
+      video.dispatchEvent(new Event('loadedmetadata'));
+      queueMicrotask(() => video.setMetadata());
+    }
+  };
+  await preloadBundledVideo({ video, url: './milk.mp4', timeoutMs: 30 });
+  assert.equal(loads, 2);
+  assert.equal(video.preload, 'metadata');
+});
+
+test('bundled preload reuses already available metadata for the same URL', async () => {
+  const video = metadataVideo();
+  video.baseURI = 'capacitor://localhost/';
+  video.src = 'capacitor://localhost/milk.mp4';
+  video.setMetadata();
+  video.load = () => assert.fail('Valid metadata must not be discarded');
+  await preloadBundledVideo({ video, url: './milk.mp4' });
 });

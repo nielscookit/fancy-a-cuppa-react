@@ -193,9 +193,14 @@ export function createMediaController({
     return promise;
   }
   const preloadFill = options => preloadVideo(0, options);
-  const preloadAll = options => Promise.all(
-    sources.map((_, index) => preloadVideo(index, options)),
-  );
+  async function preloadAll(options) {
+    if (!bundledVideos) return Promise.all(sources.map((_, index) => preloadVideo(index, options)));
+    // Let the local scheme handler finish one metadata read before starting
+    // the next. Parallel callers share the existing per-video promises.
+    const loaded = [];
+    for (const index of sources.keys()) loaded.push(await preloadVideo(index, options));
+    return loaded;
+  }
   function waitReady(video) {
     if (ready(video)) return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -339,9 +344,9 @@ export function createMediaController({
     const previous = phase >= 0 ? videos[phase] : null;
     try {
       // On iPhone, 'loadeddata' may never fire until play() is requested.
-      // The clips are fetched in advance as Blob URLs. Request playback of
-      // fill/brew/steep immediately; ONLY milk retains its older deferred path.
-      if (i === 3 && !ready(next)) await waitReady(next);
+      // Native clips have metadata and can request playback directly.
+      // Keep the existing deferred Milk path for browser/PWA Blob URLs.
+      if (i === 3 && !bundledVideos && !ready(next)) await waitReady(next);
       if (!active || destroyed || id !== session || ownTransition !== transitionId) return;
       try { next.currentTime = 0; } catch (error) {
         // Do not block a muted MP4 play() merely because metadata is pending.
