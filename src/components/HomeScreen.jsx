@@ -18,12 +18,13 @@ const FILL_POSTER = MEDIA_BASE + MEDIA_ASSETS.fill.poster;
 
 export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTimerError }) {
   const videoRefs = useRef([]);
+  const native = Capacitor.getPlatform() === 'ios';
   const push = usePushNotifications();
   const { snapshot, actions } = useTeaTimer({
     videoRefs,
-    storageKey: 'fac-v3-active-timer',
+    storageKey: native ? undefined : 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
-    mediaFactory: Capacitor.getPlatform() === 'ios' ? createNativeVideoController : createMediaController,
+    mediaFactory: native ? createNativeVideoController : createMediaController,
     audioFactory: createHomeAudioController,
     onPersist: push.syncTimer,
   });

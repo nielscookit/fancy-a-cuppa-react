@@ -6,6 +6,8 @@ const idle = -1;
 export function createNativeVideoController({
   videos, assetBase, onPhase = () => {}, onError = () => {},
   audioFactory = url => new Audio(url),
+  schedule = setTimeout, unschedule = clearTimeout,
+  log = (event, details) => console.info('[FAC Milk]', event, details),
 }) {
   const url = name => assetBase + MEDIA_ASSETS[name].file;
   const pour = audioFactory(url('pourSound'));
@@ -14,6 +16,7 @@ export function createNativeVideoController({
   let pending = null;
   let paused = true;
   let finished = false;
+  let milkRequested = false;
   let request = 0;
   let cancelPlayback = () => {};
   let cancelSeek = () => {};
@@ -29,6 +32,23 @@ export function createNativeVideoController({
     }
     return video;
   }
+
+  function logMilk(event) {
+    const video = videos[3];
+    log(event, {
+      ms: Math.round(performance.now()), src: video.currentSrc,
+      currentTime: video.currentTime, readyState: video.readyState,
+      networkState: video.networkState, paused: video.paused,
+      error: video.error ? { code: video.error.code, message: video.error.message } : null,
+    });
+  }
+
+  const milkListeners = ['loadedmetadata', 'playing', 'waiting', 'stalled', 'ended', 'error', 'timeupdate']
+    .map(event => {
+      const listener = () => logMilk(event);
+      videos[3].addEventListener(event, listener);
+      return () => videos[3].removeEventListener(event, listener);
+    });
 
   function display(index) {
     phase = index;
@@ -53,6 +73,7 @@ export function createNativeVideoController({
     cancelSeek();
     pending = null;
     finished = false;
+    milkRequested = false;
     videos.forEach(video => {
       if (video.readyState >= 1 && video.currentTime !== 0) video.currentTime = 0;
     });
@@ -70,6 +91,7 @@ export function createNativeVideoController({
     if (!resume && video.readyState >= 1 && video.currentTime !== 0) video.currentTime = 0;
 
     let settled = false;
+    let deadline;
     function confirm() {
       if (settled || id !== request || paused || pending !== index) return;
       cleanup();
@@ -77,6 +99,11 @@ export function createNativeVideoController({
       if (previous >= 0 && previous !== index) videos[previous].pause();
       stopSounds();
       display(index);
+      if (index === 0 && !resume) {
+        // Prepare Milk after Fill confirms, without a competing play() call.
+        attach(3).preload = 'auto';
+        logMilk('warmup');
+      }
       onPlaying?.();
       if (id !== request || paused) return;
       const sound = index === 0 ? pour : index === 3 ? milkSound : null;
@@ -89,6 +116,10 @@ export function createNativeVideoController({
       if (settled || id !== request || pending !== index) return;
       cleanup();
       video.pause();
+      if (index === 3) {
+        // Keep the previous frame and allow an explicit later retry.
+        pending = null;
+      }
       onFailure(error);
     }
     function onMediaError() {
@@ -96,6 +127,7 @@ export function createNativeVideoController({
     }
     function cleanup() {
       settled = true;
+      if (deadline !== undefined) unschedule(deadline);
       if (video.style) video.style.visibility = '';
       video.removeEventListener('playing', confirm);
       video.removeEventListener('error', onMediaError);
@@ -107,7 +139,23 @@ export function createNativeVideoController({
     video.addEventListener('error', onMediaError);
     try {
       // Same direct call as the device-tested Fill probe.
-      video.play()?.then(confirm, fail);
+      if (index !== 3) {
+        video.play()?.then(confirm, fail);
+        return;
+      }
+      logMilk('play requested');
+      const playback = video.play();
+      if (!settled) deadline = schedule(() => {
+        logMilk('play stalled');
+        fail(new Error('Milk playback did not start.'));
+      }, 5000);
+      playback?.then(() => {
+        if (!settled || id === request) logMilk('play fulfilled');
+        confirm();
+      }, error => {
+        if (!settled || id === request) logMilk('play rejected: ' + error.message);
+        fail(error);
+      });
     } catch (error) {
       fail(error);
     }
@@ -123,7 +171,8 @@ export function createNativeVideoController({
   });
 
   function milk() {
-    if (paused || phase === 3 || pending === 3) return;
+    if (paused || phase === 3 || milkRequested) return;
+    milkRequested = true;
     play(3);
   }
 
@@ -169,6 +218,6 @@ export function createNativeVideoController({
     finish() { finished = true; milk(); },
     restore,
     retryMilkPlayback() { if (phase === 3 || finished) play(3); },
-    destroy() { reset(); ended.forEach(remove => remove()); },
+    destroy() { reset(); ended.forEach(remove => remove()); milkListeners.forEach(remove => remove()); },
   };
 }

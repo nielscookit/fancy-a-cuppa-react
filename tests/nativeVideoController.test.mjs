@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createNativeVideoController } from '../src/timer-kit/nativeVideoController.js';
 
-function setup() {
+function setup(options = {}) {
   const calls = [];
   const phases = [];
   const videos = Array.from({ length: 4 }, (_, i) => Object.assign(new EventTarget(), {
@@ -12,7 +12,7 @@ function setup() {
     play() { calls.push(i); return new Promise(resolve => { this.confirm = resolve; }); },
   }));
   const media = createNativeVideoController({
-    videos, assetBase: './media/', onPhase: phase => phases.push(phase),
+    ...options, videos, assetBase: './media/', onPhase: phase => phases.push(phase),
     audioFactory: () => ({ pause() {}, play: async () => {} }),
   });
   return { media, videos, calls, phases };
@@ -67,5 +67,30 @@ test('native reset cancels stale startup and a restored pause preserves position
   media.resume();
   assert.deepEqual(calls, [0, 1, 1]);
   assert.equal(videos[1].currentTime, 2);
+  media.destroy();
+});
+
+test('Milk warms only after Fill confirmation and reports a stalled play once', async () => {
+  const errors = [];
+  const events = [];
+  let expire;
+  const { media, videos, calls } = setup({
+    onError: error => errors.push(error.message),
+    log: event => events.push(event),
+    schedule: callback => { expire = callback; return 1; },
+    unschedule: () => {},
+  });
+  await media.preloadForStart();
+  media.startSynced(() => {});
+  assert.equal(videos[3].src, undefined);
+  videos[0].dispatchEvent(new Event('playing'));
+  assert.equal(videos[3].preload, 'auto');
+  assert.deepEqual(calls, [0]);
+  media.milk();
+  expire();
+  media.finish();
+  assert.deepEqual(calls, [0, 3]);
+  assert.deepEqual(errors, ['Milk playback did not start.']);
+  assert.deepEqual(events, ['warmup', 'play requested', 'play stalled']);
   media.destroy();
 });
