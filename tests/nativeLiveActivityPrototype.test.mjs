@@ -49,9 +49,27 @@ test('native deadline reconciliation and media suspension follow the scene lifec
   const scene = readFileSync('ios/App/App/SceneDelegate.swift', 'utf8');
   const plugin = readFileSync('ios/App/LiveActivity/FACLiveActivityPlugin.swift', 'utf8');
   assert.match(scene, /sceneDidEnterBackground[^}]+setAllMediaPlaybackSuspended\(true/);
-  assert.match(scene, /sceneDidBecomeActive[^}]+resumeWebMedia\(in: scene\)[^}]+finishExpiredActivities\(\)/);
+  assert.match(scene, /sceneDidBecomeActive[\s\S]+?resumeWebMedia\(in: scene\)[^}]+finishExpiredActivities\(\)/);
   assert.match(scene, /evaluateJavaScript[^\n]+fac:native-foreground[\s\S]+mediaSuspension == suspension[\s\S]+setAllMediaPlaybackSuspended\(false/);
   assert.match(plugin, /completionTask\?\.cancel\(\)/);
   assert.match(plugin, /current\.content\.state\.endDate == endDate/);
   assert.match(plugin, /state\.status == "running", state\.endDate <= Date\(\)/);
+});
+
+test('AlarmKit prototype is explicitly enabled in Debug and owns one isolated alarm', () => {
+  const scene = readFileSync('ios/App/App/SceneDelegate.swift', 'utf8');
+  const plist = readFileSync('ios/App/App/Info.plist', 'utf8');
+  const widget = readFileSync('ios/App/LiveActivity/FACLiveActivityWidget.swift', 'utf8');
+  const project = readFileSync('ios/App/App.xcodeproj/project.pbxproj', 'utf8');
+  assert.match(scene, /#if DEBUG && canImport\(AlarmKit\)\s+if #available\(iOS 26\.0, \*\), ProcessInfo\.processInfo\.arguments\.contains\("-FACAlarmKitPrototype"\)/);
+  assert.match(scene, /UIHostingController\(rootView: FACAlarmKitPrototypeView\(\)\)[\s\S]+?return\s+}\s+#endif[\s\S]+?FACBridgeViewController\(\)/);
+  assert.match(scene, /private let alarmID = UUID\(uuid:/);
+  assert.match(scene, /try clearAlarm\(\)[\s\S]+?manager\.schedule\(id: alarmID, configuration: \.timer\(\s+duration: 60, attributes: attributes, sound: \.named\("Ready\.caf"\)/);
+  for (const operation of ['pause', 'resume', 'stop', 'cancel']) {
+    assert.ok(scene.includes('manager.' + operation + '(id: alarmID)'));
+  }
+  assert.match(plist, /<key>NSAlarmKitUsageDescription<\/key>\s*<string>[^<]+/);
+  assert.match(project, /Ready\.caf in Resources/);
+  assert.match(widget, /ActivityConfiguration\(for: AlarmAttributes<FACAlarmPrototypeMetadata>\.self\)/);
+  assert.doesNotMatch(scene, /LocalNotifications|secondaryButton|postAlert/);
 });

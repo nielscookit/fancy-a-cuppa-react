@@ -6,6 +6,8 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Allow the Fancy a Cuppa test countdown to alert you when it ends.</string>
 	<key>CFBundleDisplayName</key>
         <string>Fancy a Cuppa</string>
 	<key>NSSupportsLiveActivities</key>

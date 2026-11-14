@@ -3,15 +3,15 @@ import SwiftUI
 import CoreText
 import ImageIO
 import WidgetKit
+#if canImport(AlarmKit)
+import AlarmKit
+#endif
 
 @available(iOS 16.2, *)
 private struct FACLockScreenActivityView: View {
-    let context: ActivityViewContext<FACLiveActivityAttributes>
-
-    private var isFinished: Bool {
-        context.state.status == "finished"
-            || (context.state.status == "running" && (context.isStale || context.state.endDate <= Date()))
-    }
+    let isFinished: Bool
+    let interval: ClosedRange<Date>
+    let pauseDate: Date?
 
     private let charcoal = Color(red: 27 / 255, green: 39 / 255, blue: 43 / 255)
     private let lime = Color(red: 185 / 255, green: 252 / 255, blue: 105 / 255)
@@ -83,8 +83,8 @@ private struct FACLockScreenActivityView: View {
                     Text("READY")
                         .font(monoFont(19))
                 } else {
-                    Text(timerInterval: context.state.startDate...context.state.endDate,
-                         pauseTime: context.state.pauseDate,
+                    Text(timerInterval: interval,
+                         pauseTime: pauseDate,
                          countsDown: true,
                          showsHours: false)
                         .font(monoFont(26))
@@ -114,7 +114,12 @@ private struct FACLockScreenActivityView: View {
 struct FACLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FACLiveActivityAttributes.self) { context in
-            FACLockScreenActivityView(context: context)
+            FACLockScreenActivityView(
+                isFinished: context.state.status == "finished"
+                    || (context.state.status == "running" && (context.isStale || context.state.endDate <= Date())),
+                interval: context.state.startDate...max(context.state.startDate, context.state.endDate),
+                pauseDate: context.state.pauseDate
+            )
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {
@@ -136,5 +141,45 @@ struct FACLiveActivityWidget: Widget {
 struct FACLiveActivityWidgetBundle: WidgetBundle {
     var body: some Widget {
         FACLiveActivityWidget()
+        #if canImport(AlarmKit)
+        if #available(iOS 26.0, *) {
+            FACAlarmPrototypeWidget()
+        }
+        #endif
     }
 }
+
+#if canImport(AlarmKit)
+@available(iOS 26.0, *)
+private struct FACAlarmPrototypeWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: AlarmAttributes<FACAlarmPrototypeMetadata>.self) { context in
+            switch context.state.mode {
+            case .countdown(let countdown):
+                FACLockScreenActivityView(
+                    isFinished: false, interval: min(countdown.startDate, countdown.fireDate)...countdown.fireDate, pauseDate: nil
+                )
+            case .paused(let paused):
+                let start = Date(timeIntervalSinceReferenceDate: 0)
+                let end = start.addingTimeInterval(paused.totalCountdownDuration)
+                FACLockScreenActivityView(
+                    isFinished: false, interval: start...end,
+                    pauseDate: min(end, start.addingTimeInterval(paused.previouslyElapsedDuration))
+                )
+            default:
+                EmptyView()
+            }
+        } dynamicIsland: { _ in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.center) { Text("Fancy a Cuppa?") }
+            } compactLeading: {
+                Image(systemName: "timer")
+            } compactTrailing: {
+                EmptyView()
+            } minimal: {
+                Image(systemName: "timer")
+            }
+        }
+    }
+}
+#endif

@@ -13,3 +13,10 @@ struct FACLiveActivityAttributes: ActivityAttributes {
     var sessionID: String
     var translucent: Bool
 }
+
+#if canImport(AlarmKit)
+import AlarmKit
+
+@available(iOS 26.0, *)
+struct FACAlarmPrototypeMetadata: AlarmMetadata {}
+#endif
