@@ -8,7 +8,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        // Match the white native launch screen before Capacitor's WebView paints.
+        window?.backgroundColor = .white
+        window?.overrideUserInterfaceStyle = .light
+        let bridgeController = CAPBridgeViewController()
+        bridgeController.view.backgroundColor = .white
+        window?.rootViewController = bridgeController
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
