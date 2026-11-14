@@ -177,3 +177,8 @@
 .fac-sheet-paper[data-native-expanded-gap="true"] .fac-tea-custom-field .MuiFilledInput-root.Mui-focused {
   border-color:#1B272B;
 }
+
+/* Native Add/Edit only: inset scroll targets without changing sheet geometry. */
+.fac-sheet-paper[data-native-editor="true"] .fac-sheet-scroll--editor {
+  scroll-padding-block:16px;
+}

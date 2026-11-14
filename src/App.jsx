@@ -17,6 +17,7 @@ import './components/tea-detail.css';
 import HomeScreen from './components/HomeScreen.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
 import Snackbar from '@mui/material/Snackbar';
+import { nativeEditorSheetGeometry, focusedEditorScrollDelta } from './features/nativeEditorKeyboard.js';
 import './components/tea-sheet.css';
 
 const SHEET_DURATION = { enter: 360, exit: 260 };
@@ -182,21 +183,47 @@ export default function App() {
   };
   const sheetOpen = mode !== 'closed' && !closing;
   const isSearch = mode === 'search';
+  const nativeEditor = nativeIOS && (mode === 'add' || mode === 'edit');
   useEffect(() => {
     if (!sheetOpen) return;
-    // Safari's keyboard can resize the visual viewport without changing 100dvh.
+    // iOS keyboard focus may pan visualViewport without resizing the layout viewport.
     const viewport = window.visualViewport;
+    let revealFrame = 0;
+    const revealFocusedField = () => {
+      revealFrame = 0;
+      const scroller = paperRef.current?.querySelector('.fac-sheet-scroll--editor');
+      const focused = document.activeElement;
+      if (!scroller || !focused || !scroller.contains(focused)) return;
+      const field = focused.closest('.MuiFormControl-root') || focused;
+      const delta = focusedEditorScrollDelta(
+        field.getBoundingClientRect(), scroller.getBoundingClientRect(),
+      );
+      if (Math.abs(delta) > 1) scroller.scrollTop += delta;
+    };
+    const scheduleReveal = () => {
+      if (revealFrame) cancelAnimationFrame(revealFrame);
+      revealFrame = requestAnimationFrame(revealFocusedField);
+    };
     const update = () => {
       const paper = paperRef.current;
       if (!paper) return;
-      const height = viewport?.height ?? window.innerHeight;
-      const bottom = Math.max(0, window.innerHeight - height - (viewport?.offsetTop ?? 0));
-      paper.style.setProperty('--sheet-viewport-height', `${height}px`);
-      paper.style.setProperty('--sheet-bottom', `${bottom}px`);
-      const editing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+      const visualHeight = viewport?.height ?? window.innerHeight;
+      const offsetTop = viewport?.offsetTop ?? 0;
       const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
-      paper.dataset.keyboardOpen = String(layoutHeight - height > 150
+      // Only Add/Edit on native iOS gets the stable top anchor. Web/PWA,
+      // Search and Detail retain their existing, iPhone-approved geometry.
+      const geometry = nativeEditor
+        ? nativeEditorSheetGeometry({ layoutHeight, visualHeight, offsetTop })
+        : { height: visualHeight,
+            bottom: Math.max(0, window.innerHeight - visualHeight - offsetTop) };
+      paper.style.setProperty('--sheet-viewport-height', `${geometry.height}px`);
+      paper.style.setProperty('--sheet-bottom', `${geometry.bottom}px`);
+      const editing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+      const keyboardOpen = layoutHeight - visualHeight > 150;
+      paper.dataset.keyboardOpen = String(keyboardOpen
         && (editing || paper.dataset.keyboardOpen === 'true'));
+      // The focused input remains in view; only the editor scroller moves.
+      if (nativeEditor && editing && keyboardOpen) scheduleReveal();
     };
     update();
     viewport?.addEventListener('resize', update);
@@ -205,13 +232,14 @@ export default function App() {
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
     return () => {
+      if (revealFrame) cancelAnimationFrame(revealFrame);
       viewport?.removeEventListener('resize', update);
       viewport?.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
     };
-  }, [sheetOpen]);
+  }, [sheetOpen, nativeEditor]);
 
   const renderTeaRow = tea => (
     <Button key={tea.id} type="button" fullWidth className="fac-tea-catalog__item"
@@ -249,6 +277,7 @@ export default function App() {
           className:'fac-sheet-paper',
           'data-native-expanded-gap': nativeIOS && ['search', 'prep', 'add', 'edit'].includes(mode)
             ? 'true' : undefined,
+          'data-native-editor': nativeEditor ? 'true' : undefined,
           ref:paperRef,
           'data-dragging':drag.active,
           'data-open':sheetOpen,
