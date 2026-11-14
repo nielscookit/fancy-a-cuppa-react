@@ -22,7 +22,7 @@
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 
         FACA1A000000000000000001 /* FACActivityAttributes.swift in App Sources */ = {isa = PBXBuildFile; fileRef = FACA1A00000000000000000A /* FACActivityAttributes.swift */; };
-        FACA1A000000000000000002 /* FACLiveActivityPrototype.swift in App Sources */ = {isa = PBXBuildFile; fileRef = FACA1A00000000000000000B /* FACLiveActivityPrototype.swift */; };
+        FACA1A000000000000000002 /* FACLiveActivityPlugin.swift in App Sources */ = {isa = PBXBuildFile; fileRef = FACA1A00000000000000000B /* FACLiveActivityPlugin.swift */; };
         FACA1A000000000000000003 /* FACActivityAttributes.swift in Activity Sources */ = {isa = PBXBuildFile; fileRef = FACA1A00000000000000000A /* FACActivityAttributes.swift */; };
         FACA1A000000000000000004 /* FACLiveActivityWidget.swift in Activity Sources */ = {isa = PBXBuildFile; fileRef = FACA1A00000000000000000C /* FACLiveActivityWidget.swift */; };
         FACA1A000000000000000005 /* AppIcon PNG in Activity Resources */ = {isa = PBXBuildFile; fileRef = FACA1A00000000000000000F /* AppIcon-512@2x.png */; };
@@ -56,7 +56,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 
         FACA1A00000000000000000A /* FACActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACActivityAttributes.swift; sourceTree = "<group>"; };
-        FACA1A00000000000000000B /* FACLiveActivityPrototype.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACLiveActivityPrototype.swift; sourceTree = "<group>"; };
+        FACA1A00000000000000000B /* FACLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACLiveActivityPlugin.swift; sourceTree = "<group>"; };
         FACA1A00000000000000000C /* FACLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACLiveActivityWidget.swift; sourceTree = "<group>"; };
         FACA1A00000000000000000D /* Activity Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
         FACA1A00000000000000000E /* FACLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FACLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -115,7 +115,7 @@
 			sourceTree = "<group>";
 		};
 
-        FACA1A000000000000000011 /* LiveActivity */ = {isa = PBXGroup; children = (FACA2A000000000000000001 /* RobotoMono-Regular.ttf */, FACA1A00000000000000000A /* FACActivityAttributes.swift */, FACA1A00000000000000000B /* FACLiveActivityPrototype.swift */, FACA1A00000000000000000C /* FACLiveActivityWidget.swift */, FACA1A00000000000000000D /* Activity Info.plist */,); path = LiveActivity; sourceTree = "<group>"; };
+        FACA1A000000000000000011 /* LiveActivity */ = {isa = PBXGroup; children = (FACA2A000000000000000001 /* RobotoMono-Regular.ttf */, FACA1A00000000000000000A /* FACActivityAttributes.swift */, FACA1A00000000000000000B /* FACLiveActivityPlugin.swift */, FACA1A00000000000000000C /* FACLiveActivityWidget.swift */, FACA1A00000000000000000D /* Activity Info.plist */,); path = LiveActivity; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -213,7 +213,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				FACA1A000000000000000001 /* FACActivityAttributes.swift in App Sources */,
-				FACA1A000000000000000002 /* FACLiveActivityPrototype.swift in App Sources */,
+				FACA1A000000000000000002 /* FACLiveActivityPlugin.swift in App Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -14,8 +14,8 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(project,/com\.fancyacuppa\.app\.liveactivity/);
   assert.match(info,/<key>NSSupportsLiveActivities<\/key>\s*<true\/>/);
   assert.match(ext,/com\.apple\.widgetkit-extension/);
-  assert.match(delegate,/func sceneDidBecomeActive/);
-  assert.match(delegate,/if !didLaunchFACActivityPrototype/);
+  assert.match(delegate,/let bridgeController = FACBridgeViewController\(\)/);
+  assert.doesNotMatch(delegate,/FACLiveActivityPrototype/);
   assert.match(model,/struct FACLiveActivityAttributes: ActivityAttributes/);
   assert.match(widget,/ActivityConfiguration\(for: FACLiveActivityAttributes\.self\)/);
   assert.match(widget,/"Your cuppa is ready" : "Brewing your Tea"/);

@@ -30,10 +30,10 @@ test('Home duration buttons are independent of media preload', () => {
   assert.match(home, /onClick=\{\(\) => stepTime\(1\)\}\s+disabled=\{minutes >= MAX_QUICK_MINUTES\}/);
 });
 
-test('only Web/PWA Home opts into durable timer recovery', () => {
+test('native and Web/PWA use separate durable timer snapshots', () => {
   const home = readFileSync('src/components/HomeScreen.jsx', 'utf8');
   assert.match(home, /const native = Capacitor\.getPlatform\(\) === 'ios'/);
-  assert.match(home, /storageKey: native \? undefined : 'fac-v3-active-timer'/);
+  assert.match(home, /storageKey: native \? 'fac-v3-native-active-timer' : 'fac-v3-active-timer'/);
   assert.match(home, /onPersist: push\.syncTimer/);
 });
 

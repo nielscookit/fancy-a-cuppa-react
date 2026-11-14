@@ -83,6 +83,7 @@ private struct FACLockScreenActivityView: View {
                         .font(monoFont(19))
                 } else {
                     Text(timerInterval: context.state.startDate...context.state.endDate,
+                         pauseTime: context.state.pauseDate,
                          countsDown: true,
                          showsHours: false)
                         .font(monoFont(26))

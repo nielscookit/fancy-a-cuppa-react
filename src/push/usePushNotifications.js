@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { supabaseConfig } from '../data/supabaseConfig.js';
 import { createPushController } from './pushController.js';
 import { createNativeNotificationController } from './nativeNotificationController.js';
+
+import { createNativeLiveActivitySync } from '../timer/nativeLiveActivity.js';
+
+const liveActivity = createNativeLiveActivitySync(registerPlugin('FACLiveActivity'), error => {
+  console.warn('[FAC Activity]', error);
+});
 
 // Browser/PWA keeps Supabase Web Push; native Capacitor uses local notifications.
 // Never instantiate both controllers for a single timer.
@@ -26,7 +32,11 @@ export function usePushNotifications() {
     void push.prepare();
     return () => { controller.current = null; push.destroy(); };
   }, []);
-  const syncTimer = useCallback(state => { timer.current = state; controller.current?.syncTimer(state); }, []);
+  const syncTimer = useCallback(state => {
+    timer.current = state;
+    controller.current?.syncTimer(state);
+    if (Capacitor.getPlatform() === 'ios') void liveActivity(state);
+  }, []);
   const enable = useCallback(() => controller.current?.enable(), []);
   const disable = useCallback(() => controller.current?.disable(), []);
   const retry = useCallback(() => controller.current?.retry(), []);
