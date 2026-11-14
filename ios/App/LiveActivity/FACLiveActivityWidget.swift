@@ -1,6 +1,6 @@
 import ActivityKit
 import SwiftUI
-import UIKit
+import ImageIO
 import WidgetKit
 
 @available(iOS 16.2, *)
@@ -14,14 +14,20 @@ private struct FACLockScreenActivityView: View {
     private let charcoal = Color(red: 27 / 255, green: 39 / 255, blue: 43 / 255)
     private let lime = Color(red: 185 / 255, green: 252 / 255, blue: 105 / 255)
 
-    // The existing PNG is copied as a *loose resource* into the WidgetKit
-    // extension, not compiled into an asset catalog. Resolve it explicitly from
-    // the extension bundle; Image("name") is an asset lookup on some iOS builds.
-    private static let bundledAppIcon: UIImage? = {
-        guard let url = Bundle.main.url(forResource: "AppIcon-512@2x", withExtension: "png") else {
+    // ActivityKit may replace oversized images with a gray placeholder.
+    // The original AppIcon is 1024px; decode only a 32px thumbnail for
+    // the 32pt Lock Screen icon slot. Never pass the full-size UIImage.
+    private static let bundledAppIcon: CGImage? = {
+        guard let url = Bundle.main.url(forResource: "AppIcon-512@2x", withExtension: "png"),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
             return nil
         }
-        return UIImage(contentsOfFile: url.path)
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 32
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }()
 
     var body: some View {
@@ -29,7 +35,7 @@ private struct FACLockScreenActivityView: View {
             HStack(spacing: 9) {
                 // Exact existing application icon; copied into this extension's bundle.
                 if let appIcon = Self.bundledAppIcon {
-                    Image(uiImage: appIcon)
+                    Image(decorative: appIcon, scale: 1)
                         .resizable()
                         .frame(width: 32, height: 32)
                         .clipShape(RoundedRectangle(cornerRadius: 6))

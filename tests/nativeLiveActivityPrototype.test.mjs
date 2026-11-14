@@ -21,7 +21,10 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(widget,/"Your cuppa is ready" : "Brewing your Tea"/);
   assert.match(widget,/Text\("READY"\)/);
   assert.match(widget,/Bundle\.main\.url\(forResource: "AppIcon-512@2x", withExtension: "png"\)/);
-  assert.match(widget,/Image\(uiImage: appIcon\)/);
+  assert.match(widget,/CGImageSourceCreateThumbnailAtIndex\(source, 0, options as CFDictionary\)/);
+  assert.match(widget,/kCGImageSourceThumbnailMaxPixelSize: 32/);
+  assert.match(widget,/Image\(decorative: appIcon, scale: 1\)/);
+  assert.doesNotMatch(widget,/Image\(uiImage: appIcon\)/);
   assert.doesNotMatch(widget,/Image\("AppIcon-512@2x"\)/);
 });
 

@@ -45,3 +45,11 @@ Source branch: `feature/native-ios`. No React Timer, media, audio, or notificati
 - Confirmed by user screenshot: finished layout displayed `Your cuppa is ready` and `READY`. Exact deadline repaint timing has **not** been proven.
 - Confirmed by user: tapping the Live Activity opened Fancy a Cuppa. Restoration of a production React timer remains outside Phase 1.
 - Defect discovered: the app icon slot remained empty despite the PNG being embedded in the widget bundle. The explicit bundle-PNG lookup is a candidate correction and **requires another physical-device check**.
+
+## iPhone 13 mini – second device observation and next fix (14 Nov 2026)
+
+- Confirmed by user screenshot: the first loose-PNG UIKit loading change (`924526f`) produced a **solid gray image placeholder**, not the approved green cup.
+- Verified source file: the original bundled AppIcon is the correct green cup at 1024×1024 pixels.
+- Apple's ActivityKit rules constrain Live Activity images to the resolution of their presentation; a 1024px original for a 32pt icon slot is oversized.
+- The next isolated test change uses ImageIO to decode a maximum 32×32-pixel thumbnail **before** passing it to SwiftUI. The original app icon and the Xcode project file are unchanged.
+- **Still open:** physical iPhone confirmation that the small image now renders; Swift compilation alone is not enough to prove visual correctness.
