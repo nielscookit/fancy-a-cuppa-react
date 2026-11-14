@@ -21,6 +21,7 @@ export function createNativeVideoController({
   let cancelPlayback = () => {};
   let cancelSeek = () => {};
   const attached = new Set();
+  let activeCue = null;
 
   function attach(index) {
     const video = videos[index];
@@ -56,8 +57,44 @@ export function createNativeVideoController({
     onPhase(index);
   }
 
+  function silence(sound) {
+    sound.muted = true;
+    sound.pause();
+    if (sound.currentTime > 0) sound.currentTime = 0;
+  }
+
+  const cueGuards = [pour, milkSound].map(sound => {
+    sound.muted = true;
+    const guard = () => {
+      if (activeCue?.sound !== sound) silence(sound);
+    };
+    sound.addEventListener('play', guard);
+    sound.addEventListener('playing', guard);
+    return () => {
+      sound.removeEventListener('play', guard);
+      sound.removeEventListener('playing', guard);
+    };
+  });
+
   function stopSounds() {
-    for (const sound of [pour, milkSound]) sound.pause();
+    activeCue = null;
+    for (const sound of [pour, milkSound]) silence(sound);
+  }
+
+  function playCue(sound) {
+    const cue = { sound };
+    activeCue = cue;
+    sound.currentTime = 0;
+    sound.muted = false;
+    sound.play()?.then(() => {
+      // A newer request on the same element owns its playback.
+      if (activeCue?.sound !== sound) silence(sound);
+    }, error => {
+      if (activeCue !== cue) return;
+      activeCue = null;
+      silence(sound);
+      onError(error);
+    });
   }
 
   function pause() {
@@ -109,10 +146,7 @@ export function createNativeVideoController({
       onPlaying?.();
       if (id !== request || paused) return;
       const sound = index === 0 ? pour : index === 3 ? milkSound : null;
-      if (sound && cue && !resume) {
-        sound.currentTime = 0;
-        sound.play()?.catch(onError);
-      }
+      if (sound && cue && !resume) playCue(sound);
     }
     function fail(error) {
       if (settled || id !== request || pending !== index) return;
@@ -239,6 +273,7 @@ export function createNativeVideoController({
     retryMilkPlayback() { if (phase === 3 || finished) play(3); },
     destroy() {
       reset();
+      cueGuards.forEach(remove => remove());
       playbackGuards.forEach(remove => remove());
       ended.forEach(remove => remove());
       milkListeners.forEach(remove => remove());

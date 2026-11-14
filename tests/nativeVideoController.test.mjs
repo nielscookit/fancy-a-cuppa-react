@@ -5,6 +5,19 @@ import { createNativeVideoController } from '../src/timer-kit/nativeVideoControl
 function setup(options = {}) {
   const calls = [];
   const phases = [];
+  const sounds = [];
+  const audioFactory = () => {
+    const sound = Object.assign(new EventTarget(), {
+      currentTime: 0, paused: true, requests: [],
+      pause() { this.paused = true; },
+      play() {
+        this.paused = false;
+        return new Promise((resolve, reject) => this.requests.push({ resolve, reject }));
+      },
+    });
+    sounds.push(sound);
+    return sound;
+  };
   const videos = Array.from({ length: 4 }, (_, i) => Object.assign(new EventTarget(), {
     classList: { toggle() {} },
     currentTime: 0, readyState: 1, duration: i === 1 ? 15 : 5,
@@ -14,9 +27,9 @@ function setup(options = {}) {
   }));
   const media = createNativeVideoController({
     ...options, videos, assetBase: './media/', onPhase: phase => phases.push(phase),
-    audioFactory: () => ({ pause() {}, play: async () => {} }),
+    audioFactory,
   });
-  return { media, videos, calls, phases };
+  return { media, videos, calls, phases, sounds };
 }
 
 test('native sequence starts directly and keeps the Milk frame until reset', async () => {
@@ -140,5 +153,59 @@ test('late playback events preserve the position of both running and paused vide
   fill.dispatchEvent(new Event('playing'));
   assert.equal(fill.paused, true);
   assert.equal(fill.currentTime, 2);
+  media.destroy();
+});
+
+test('reset silences late audio events and a pending cue fulfillment', async () => {
+  const { media, videos, sounds } = setup();
+  media.start();
+  videos[0].dispatchEvent(new Event('playing'));
+  const [pour] = sounds;
+  assert.equal(pour.muted, false);
+  media.reset();
+  for (const [i, event] of ['play', 'playing'].entries()) {
+    const sound = sounds[i];
+    sound.paused = false;
+    sound.currentTime = 1;
+    sound.dispatchEvent(new Event(event));
+    assert.equal(sound.paused, true);
+    assert.equal(sound.currentTime, 0);
+    assert.equal(sound.muted, true);
+  }
+  pour.paused = false;
+  pour.requests[0].resolve();
+  await Promise.resolve();
+  assert.equal(pour.paused, true);
+  media.destroy();
+});
+
+test('pause and resume suppress old cues without interrupting a new START or Milk', async () => {
+  const errors = [];
+  const { media, videos, sounds } = setup({ onError: error => errors.push(error) });
+  const [pour, milk] = sounds;
+  media.start();
+  videos[0].dispatchEvent(new Event('playing'));
+  media.pause();
+  media.resume();
+  videos[0].dispatchEvent(new Event('playing'));
+  pour.paused = false;
+  pour.dispatchEvent(new Event('playing'));
+  assert.equal(pour.paused, true);
+  assert.equal(pour.requests.length, 1);
+
+  media.reset();
+  media.start();
+  videos[0].dispatchEvent(new Event('playing'));
+  pour.requests[0].reject(new Error('Superseded'));
+  await Promise.resolve();
+  assert.deepEqual(errors, []);
+  assert.equal(pour.paused, false);
+  assert.equal(pour.muted, false);
+
+  media.milk();
+  videos[3].dispatchEvent(new Event('playing'));
+  assert.equal(pour.paused, true);
+  assert.equal(milk.muted, false);
+  assert.equal(milk.requests.length, 1);
   media.destroy();
 });
