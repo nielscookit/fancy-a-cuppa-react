@@ -8,7 +8,7 @@ Source branch: `feature/native-ios`. No React Timer, media, audio, or notificati
 - Xcode target `FACLiveActivityExtension` embedded inside `App.app/PlugIns`.
 - Shared ActivityKit model lives in `ios/App/LiveActivity/FACActivityAttributes.swift` and belongs to both targets.
 - Native SwiftUI Live Activity lives in `ios/App/LiveActivity/FACLiveActivityWidget.swift`.
-- The existing iOS app icon PNG is linked into the extension's resources (no substitute symbol).
+- The existing iOS app icon PNG is linked into the extension's resources (no substitute symbol); the WidgetKit view explicitly loads this loose PNG from the extension bundle, rather than assuming an asset-catalog entry.
 - The host app's `NSSupportsLiveActivities` is enabled in `ios/App/App/Info.plist`.
 - No JavaScript bridge is installed in Phase 1. The Debug launch hook lives in `SceneDelegate.sceneDidBecomeActive` (the app uses iOS scenes); `AppDelegate` is unchanged.
 - **Font caveat:** Roboto Mono is not bundled as a native font. The temporary system monospaced fallback requires a separate licensed font asset and design comparison before final approval.
@@ -38,3 +38,10 @@ Source branch: `feature/native-ios`. No React Timer, media, audio, or notificati
 ### Safety
 
 `main`, V2, web/PWA, Supabase, timer controller, media controller and local notification controller must stay untouched. Preserve the native UI-/Design-Freeze `fe51fdc` and Timer-/Media-Freeze `f858e63`. Do not uninstall the app to troubleshoot icon caching without checking local data.
+
+## iPhone 13 mini – first device observations (14 Nov 2026)
+
+- Confirmed by user screenshots: iOS offered Live Activity authorization; running countdown was visible while locked and advanced from 1:20 through 1:07 to 0:54.
+- Confirmed by user screenshot: finished layout displayed `Your cuppa is ready` and `READY`. Exact deadline repaint timing has **not** been proven.
+- Confirmed by user: tapping the Live Activity opened Fancy a Cuppa. Restoration of a production React timer remains outside Phase 1.
+- Defect discovered: the app icon slot remained empty despite the PNG being embedded in the widget bundle. The explicit bundle-PNG lookup is a candidate correction and **requires another physical-device check**.

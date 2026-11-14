@@ -20,7 +20,9 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(widget,/ActivityConfiguration\(for: FACLiveActivityAttributes\.self\)/);
   assert.match(widget,/"Your cuppa is ready" : "Brewing your Tea"/);
   assert.match(widget,/Text\("READY"\)/);
-  assert.match(widget,/Image\("AppIcon-512@2x"\)/);
+  assert.match(widget,/Bundle\.main\.url\(forResource: "AppIcon-512@2x", withExtension: "png"\)/);
+  assert.match(widget,/Image\(uiImage: appIcon\)/);
+  assert.doesNotMatch(widget,/Image\("AppIcon-512@2x"\)/);
 });
 
 test('native prototype does not modify existing timer or native notification code', () => {
