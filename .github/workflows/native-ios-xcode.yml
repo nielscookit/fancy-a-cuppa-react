@@ -15,6 +15,10 @@ on:
       - tests/videoPreloader.test.mjs
       - src/timer-kit/nativeVideoController.js
       - tests/nativeVideoController.test.mjs
+      - ios/App/LiveActivity/**
+      - ios/App/App/Info.plist
+      - ios/App/App/AppDelegate.swift
+      - tests/nativeLiveActivityPrototype.test.mjs
 
 permissions:
   contents: write # Only commit native ios/ source files after successful build
@@ -71,6 +75,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
           test -d "$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app/PlugIns/FACLiveActivityExtension.appex"
       - name: Verify Ready.caf is in the app's main bundle
         run: |
           APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
