@@ -171,3 +171,9 @@
   background:#B9FC69; color:#1B272B;
 }
 .fac-sheet-paper[data-native-expanded-gap="true"] .fac-sheet-editor-actions { margin-top:48px; }
+
+/* Native iOS only: neutral focus border for the custom water quantity field.
+   Keep Web/PWA styling and the red validation-error outline unchanged. */
+.fac-sheet-paper[data-native-expanded-gap="true"] .fac-tea-custom-field .MuiFilledInput-root.Mui-focused {
+  border-color:#1B272B;
+}
