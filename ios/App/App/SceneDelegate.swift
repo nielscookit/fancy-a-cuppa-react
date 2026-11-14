@@ -151,23 +151,30 @@ private struct FACAlarmKitPrototypeView: View {
             return
         }
         try clearAlarm()
-        let accent = Color(red: 185 / 255, green: 252 / 255, blue: 105 / 255)
-        let attributes = AlarmAttributes(
-            presentation: AlarmPresentation(
-                alert: .init(title: "Your cuppa is ready", stopButton: AlarmButton(
-                    text: "Stop", textColor: .white, systemImageName: "stop.circle"
-                )),
-                countdown: .init(title: "Brewing your Tea", pauseButton: nil),
-                paused: .init(title: "Paused", resumeButton: AlarmButton(
-                    text: "Resume", textColor: accent, systemImageName: "play.circle"
-                ))
-            ),
-            metadata: FACAlarmPrototypeMetadata(),
-            tintColor: accent
-        )
+        let attributes = facTeaAlarmAttributes(prototype: true)
         alarm = try await manager.schedule(id: alarmID, configuration: .timer(
             duration: 60, attributes: attributes, sound: .named("Ready.caf")
         ))
     }
+}
+#endif
+
+#if canImport(AlarmKit)
+@available(iOS 26.0, *)
+func facTeaAlarmAttributes(prototype: Bool = false) -> AlarmAttributes<FACAlarmPrototypeMetadata> {
+    let accent = Color(red: 185 / 255, green: 252 / 255, blue: 105 / 255)
+    return AlarmAttributes(
+        presentation: AlarmPresentation(
+            alert: .init(title: "Your cuppa is ready", stopButton: AlarmButton(
+                text: "Stop", textColor: .white, systemImageName: "stop.circle"
+            )),
+            countdown: .init(title: "Brewing your Tea", pauseButton: nil),
+            paused: prototype ? .init(title: "Paused", resumeButton: AlarmButton(
+                text: "Resume", textColor: accent, systemImageName: "play.circle"
+            )) : nil
+        ),
+        metadata: FACAlarmPrototypeMetadata(),
+        tintColor: accent
+    )
 }
 #endif

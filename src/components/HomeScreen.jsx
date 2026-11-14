@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Box, Button, IconButton, Typography } from '@mui/material';
 import { MAX_QUICK_MINUTES, MIN_QUICK_MINUTES } from '../features/quickTimer.js';
@@ -20,13 +20,26 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const videoRefs = useRef([]);
   const native = Capacitor.getPlatform() === 'ios';
   const push = usePushNotifications();
+  const audioFactory = useCallback(options => {
+    const audio = createHomeAudioController(options);
+    if (!native) return audio;
+    return {
+      ...audio,
+      async playFinished() {
+        const owner = push.useReady();
+        if (owner === true || (typeof owner !== 'boolean' && await owner)) {
+          return audio.playFinished();
+        }
+      },
+    };
+  }, [native, push.useReady]);
   const { snapshot, actions } = useTeaTimer({
     videoRefs,
     resetOnBackgroundExpiry: native,
     storageKey: native ? 'fac-v3-native-active-timer' : 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
     mediaFactory: native ? createNativeVideoController : createMediaController,
-    audioFactory: createHomeAudioController,
+    audioFactory,
     onPersist: push.syncTimer,
   });
   const { countdown, preload, error } = snapshot;
@@ -67,7 +80,10 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
     if (error) onTimerError(error);
   }, [error, onTimerError]);
 
-  const reset = () => actions.setSeconds(minutes * 60);
+  const reset = () => {
+    actions.setSeconds(minutes * 60);
+    void push.resetAlarm();
+  };
   const handlePrimary = () => {
     if (preload === 'error') void actions.retryPreload();
     else if (inSession) reset();
@@ -90,8 +106,10 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
         </Box>
         <Box className="fac-home__time-control" aria-label="Brewing time">
           {inSession ? (
-            <Button onClick={actions.toggle} disabled={finished || preload !== 'ready'}
-              aria-label={running ? 'Pause timer' : 'Resume timer'}
+            <Button component={native ? 'div' : 'button'} role={native ? 'presentation' : undefined}
+              tabIndex={native ? -1 : undefined} disableRipple={native}
+              onClick={native ? undefined : actions.toggle} disabled={finished || preload !== 'ready'}
+              aria-label={native ? undefined : running ? 'Pause timer' : 'Resume timer'}
               sx={{borderRadius:0,padding:0,minWidth:194,minHeight:49,height:49}}>
               <Typography component="output" role="timer" className="fac-home__countdown"
                 aria-label="Brewing countdown">{timeLabel}</Typography>

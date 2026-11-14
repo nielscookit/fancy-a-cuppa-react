@@ -18,7 +18,7 @@ test('Home switches from duration controls to countdown and reset', () => {
   assert.match(home, /inSession \? 'Reset'/);
   assert.match(home, /else if \(inSession\) reset\(\)/);
   assert.match(home, /onClick=\{onTeaAssistant\}\s+disabled=\{inSession\}/);
-  assert.match(home, /onClick=\{actions\.toggle\}/);
+  assert.match(home, /onClick=\{native \? undefined : actions\.toggle\}/);
   assert.match(home, /Pause timer/);
   assert.match(home, /Resume timer/);
   assert.doesNotMatch(home, /Brew again/);

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>NSAlarmKitUsageDescription</key>
-	<string>Allow the Fancy a Cuppa test countdown to alert you when it ends.</string>
+	<string>Allow Fancy a Cuppa to sound an alarm when your tea is ready.</string>
 	<key>CFBundleDisplayName</key>
         <string>Fancy a Cuppa</string>
 	<key>NSSupportsLiveActivities</key>
