@@ -82,6 +82,10 @@ jobs:
           test -s "$APP/Ready.caf"
           cmp "$APP/Ready.caf" ios/App/App/Ready.caf
           echo "Validated Ready.caf in App.app root (not just the WebView)."
+      - name: Verify compiled app icon metadata
+        run: |
+          APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")" = AppIcon
       - name: Commit Capacitor-synced iOS source files
         run: |
           git add ios/

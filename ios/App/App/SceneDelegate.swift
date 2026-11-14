@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import WebKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -17,6 +18,24 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+    }
+
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        setWebMediaSuspended(true)
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        setWebMediaSuspended(false)
+        if #available(iOS 16.2, *) {
+            Task { @MainActor in
+                await FACLiveActivityPlugin.finishExpiredActivities()
+            }
+        }
+    }
+
+    private func setWebMediaSuspended(_ suspended: Bool) {
+        let controller = window?.rootViewController as? FACBridgeViewController
+        controller?.webView?.setAllMediaPlaybackSuspended(suspended, completionHandler: nil)
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

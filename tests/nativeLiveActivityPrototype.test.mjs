@@ -44,3 +44,13 @@ test('native prototype does not modify existing timer or native notification cod
   assert.match(harness,/Activity<FACLiveActivityAttributes>\.request/);
   assert.doesNotMatch(harness,/LocalNotifications|useTeaTimer|nativeNotificationController/);
 });
+
+test('native deadline reconciliation and media suspension follow the scene lifecycle', () => {
+  const scene = readFileSync('ios/App/App/SceneDelegate.swift', 'utf8');
+  const plugin = readFileSync('ios/App/LiveActivity/FACLiveActivityPlugin.swift', 'utf8');
+  assert.match(scene, /sceneDidEnterBackground[^}]+setWebMediaSuspended\(true\)/);
+  assert.match(scene, /sceneDidBecomeActive[^}]+setWebMediaSuspended\(false\)[^}]+finishExpiredActivities\(\)/);
+  assert.match(plugin, /completionTask\?\.cancel\(\)/);
+  assert.match(plugin, /current\.content\.state\.endDate == endDate/);
+  assert.match(plugin, /state\.status == "running", state\.endDate <= Date\(\)/);
+});

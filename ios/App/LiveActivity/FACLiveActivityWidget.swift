@@ -9,7 +9,8 @@ private struct FACLockScreenActivityView: View {
     let context: ActivityViewContext<FACLiveActivityAttributes>
 
     private var isFinished: Bool {
-        context.state.status == "finished" || context.isStale
+        context.state.status == "finished"
+            || (context.state.status == "running" && (context.isStale || context.state.endDate <= Date()))
     }
 
     private let charcoal = Color(red: 27 / 255, green: 39 / 255, blue: 43 / 255)
