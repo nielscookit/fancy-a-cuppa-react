@@ -95,6 +95,9 @@ private struct FACLockScreenActivityView: View {
             .multilineTextAlignment(.trailing)
             .frame(width: 94, alignment: .trailing)
         }
+        // Fill the available Live Activity width; otherwise WidgetKit may
+        // size the HStack to its contents, leaving the countdown beside the title.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 15)
         .padding(.vertical, 8)
         .frame(height: 70)

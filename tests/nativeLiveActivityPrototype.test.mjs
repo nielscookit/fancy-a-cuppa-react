@@ -25,6 +25,7 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(widget,/kCGImageSourceThumbnailMaxPixelSize: 96/);
   assert.match(widget,/Image\(decorative: appIcon, scale: 3\)/);
   assert.match(widget, /activityBackgroundTint\(charcoal\.opacity\(0\.8\)\)/);
+  assert.match(widget, /\.frame\(maxWidth: \.infinity, alignment: \.leading\)/);
   assert.match(widget, /activitySystemActionForegroundColor\(charcoal\)/);
   assert.match(widget, /CTFontManagerRegisterFontsForURL/);
   for (const weight of ['Regular', 'Medium']) {
