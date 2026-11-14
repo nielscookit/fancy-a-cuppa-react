@@ -13,7 +13,7 @@ final class FACBridgeViewController: CAPBridgeViewController {
 final class FACLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "FACLiveActivityPlugin"
     let jsName = "FACLiveActivity"
-    let pluginMethods = [CAPPluginMethod(name: "sync", returnType: CAPPluginReturnPromise)]
+    let pluginMethods: [CAPPluginMethod] = [CAPPluginMethod(name: "sync", returnType: CAPPluginReturnPromise)]
 
     @objc func sync(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else {
