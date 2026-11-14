@@ -53,6 +53,6 @@ test('native drawer scopes all four modes and renders one validated BREW in its 
   assert.match(detail, /disabled=\{!validWater\}/);
   assert.match(detail, /\{!fixedBrew && brewButton\}/);
   assert.match(detail, /<\/section>\s+\{fixedBrew && <div className="fac-sheet-footer fac-sheet-footer--brew">\{brewButton\}/);
-  assert.match(css, /padding-bottom:max\(14px, env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.fac-sheet-paper\[data-native-expanded-gap="true"\] \.fac-sheet-footer \{\s*padding-bottom:14px;/);
   assert.match(css, /\[data-native-expanded-gap="true"\] \.fac-sheet-editor-actions \{ margin-top:48px/);
 });

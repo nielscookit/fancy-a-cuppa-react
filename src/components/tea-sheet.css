@@ -163,7 +163,7 @@
 }
 
 .fac-sheet-paper[data-native-expanded-gap="true"] .fac-sheet-footer {
-  padding-bottom:max(14px, env(safe-area-inset-bottom));
+  padding-bottom:14px;
 }
 .fac-sheet-footer--brew .fac-tea-result__brew.MuiButton-root,
 .fac-sheet-footer--brew .fac-tea-result__brew.MuiButton-root:hover {
