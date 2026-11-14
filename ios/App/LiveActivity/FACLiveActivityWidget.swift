@@ -1,5 +1,6 @@
 import ActivityKit
 import SwiftUI
+import CoreText
 import ImageIO
 import WidgetKit
 
@@ -15,7 +16,7 @@ private struct FACLockScreenActivityView: View {
     private let lime = Color(red: 185 / 255, green: 252 / 255, blue: 105 / 255)
 
     // ActivityKit may replace oversized images with a gray placeholder.
-    // The original AppIcon is 1024px; decode only a 32px thumbnail for
+    // The original AppIcon is 1024px; decode at most a 96px thumbnail for
     // the 32pt Lock Screen icon slot. Never pass the full-size UIImage.
     private static let bundledAppIcon: CGImage? = {
         guard let url = Bundle.main.url(forResource: "AppIcon-512@2x", withExtension: "png"),
@@ -25,17 +26,34 @@ private struct FACLockScreenActivityView: View {
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 32
+            kCGImageSourceThumbnailMaxPixelSize: 96
         ]
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }()
+
+    private static let registeredFonts: Set<String> = {
+        Set(["RobotoMono-Regular", "RobotoMono-Medium"].filter { name in
+            guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else {
+                return false
+            }
+            return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        })
+    }()
+
+    private func monoFont(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
+        let name = weight == .regular ? "RobotoMono-Regular" : "RobotoMono-Medium"
+        if Self.registeredFonts.contains(name) {
+            return .custom(name, fixedSize: size)
+        }
+        return .system(size: size, weight: weight, design: .monospaced)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 9) {
                 // Exact existing application icon; copied into this extension's bundle.
                 if let appIcon = Self.bundledAppIcon {
-                    Image(decorative: appIcon, scale: 1)
+                    Image(decorative: appIcon, scale: 3)
                         .resizable()
                         .frame(width: 32, height: 32)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -47,12 +65,12 @@ private struct FACLockScreenActivityView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Fancy a Cuppa?")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .font(monoFont(12))
                         .textCase(.uppercase)
                         .foregroundStyle(.white)
 
                     Text(isFinished ? "Your cuppa is ready" : "Brewing your Tea")
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .font(monoFont(10, weight: .regular))
                         .foregroundStyle(Color(red: 243 / 255, green: 242 / 255, blue: 240 / 255))
                 }
                 .lineLimit(1)
@@ -62,24 +80,26 @@ private struct FACLockScreenActivityView: View {
             Group {
                 if isFinished {
                     Text("READY")
-                        .font(.system(size: 20, weight: .medium, design: .monospaced))
+                        .font(monoFont(19))
                 } else {
                     Text(timerInterval: context.state.startDate...context.state.endDate,
                          countsDown: true,
                          showsHours: false)
-                        .font(.system(size: 26, weight: .medium, design: .monospaced))
+                        .font(monoFont(26))
                         .monospacedDigit()
                 }
             }
             .foregroundStyle(lime)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 94, alignment: .trailing)
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 8)
-        .frame(minHeight: 70)
-        .activityBackgroundTint(charcoal.opacity(context.attributes.translucent ? 0.74 : 1))
-        .activitySystemActionForegroundColor(lime)
+        .frame(height: 70)
+        .activityBackgroundTint(charcoal.opacity(0.8))
+        .activitySystemActionForegroundColor(charcoal)
     }
 }
 

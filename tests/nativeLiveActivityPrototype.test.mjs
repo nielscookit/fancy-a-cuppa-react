@@ -22,8 +22,16 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(widget,/Text\("READY"\)/);
   assert.match(widget,/Bundle\.main\.url\(forResource: "AppIcon-512@2x", withExtension: "png"\)/);
   assert.match(widget,/CGImageSourceCreateThumbnailAtIndex\(source, 0, options as CFDictionary\)/);
-  assert.match(widget,/kCGImageSourceThumbnailMaxPixelSize: 32/);
-  assert.match(widget,/Image\(decorative: appIcon, scale: 1\)/);
+  assert.match(widget,/kCGImageSourceThumbnailMaxPixelSize: 96/);
+  assert.match(widget,/Image\(decorative: appIcon, scale: 3\)/);
+  assert.match(widget, /activityBackgroundTint\(charcoal\.opacity\(0\.8\)\)/);
+  assert.match(widget, /activitySystemActionForegroundColor\(charcoal\)/);
+  assert.match(widget, /CTFontManagerRegisterFontsForURL/);
+  for (const weight of ['Regular', 'Medium']) {
+    const font = 'RobotoMono-' + weight + '.ttf';
+    assert.ok(project.includes(font + ' in Activity Resources'));
+    assert.ok(readFileSync('ios/App/LiveActivity/Fonts/' + font).length > 0);
+  }
   assert.doesNotMatch(widget,/Image\(uiImage: appIcon\)/);
   assert.doesNotMatch(widget,/Image\("AppIcon-512@2x"\)/);
 });

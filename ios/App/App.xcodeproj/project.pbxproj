@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        FACA2B000000000000000003 /* OFL.txt in Activity Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000003 /* OFL.txt */; };
+        FACA2B000000000000000002 /* RobotoMono-Medium.ttf in Activity Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000002 /* RobotoMono-Medium.ttf */; };
+        FACA2B000000000000000001 /* RobotoMono-Regular.ttf in Activity Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000001 /* RobotoMono-Regular.ttf */; };
 		FACA0A000000000000000001 /* Ready.caf in Resources */ = {isa = PBXBuildFile; fileRef = FACA0A000000000000000002 /* Ready.caf */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
@@ -36,6 +39,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        FACA2A000000000000000003 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fonts/OFL.txt"; sourceTree = "<group>"; };
+        FACA2A000000000000000002 /* RobotoMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/RobotoMono-Medium.ttf"; sourceTree = "<group>"; };
+        FACA2A000000000000000001 /* RobotoMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/RobotoMono-Regular.ttf"; sourceTree = "<group>"; };
 		FACA0A000000000000000002 /* Ready.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Ready.caf; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
@@ -109,7 +115,7 @@
 			sourceTree = "<group>";
 		};
 
-        FACA1A000000000000000011 /* LiveActivity */ = {isa = PBXGroup; children = (FACA1A00000000000000000A /* FACActivityAttributes.swift */, FACA1A00000000000000000B /* FACLiveActivityPrototype.swift */, FACA1A00000000000000000C /* FACLiveActivityWidget.swift */, FACA1A00000000000000000D /* Activity Info.plist */,); path = LiveActivity; sourceTree = "<group>"; };
+        FACA1A000000000000000011 /* LiveActivity */ = {isa = PBXGroup; children = (FACA2A000000000000000001 /* RobotoMono-Regular.ttf */, FACA1A00000000000000000A /* FACActivityAttributes.swift */, FACA1A00000000000000000B /* FACLiveActivityPrototype.swift */, FACA1A00000000000000000C /* FACLiveActivityWidget.swift */, FACA1A00000000000000000D /* Activity Info.plist */,); path = LiveActivity; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -197,7 +203,7 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 
-        FACA1A00000000000000001A /* Activity Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (FACA1A000000000000000005 /* AppIcon PNG in Activity Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+        FACA1A00000000000000001A /* Activity Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (FACA2B000000000000000001 /* RobotoMono-Regular.ttf in Activity Resources */, FACA1A000000000000000005 /* AppIcon PNG in Activity Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
