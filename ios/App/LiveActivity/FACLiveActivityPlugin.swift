@@ -110,7 +110,7 @@ final class FACLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 final class FACTeaAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "FACTeaAlarmPlugin"
     let jsName = "FACTeaAlarm"
-    let pluginMethods = [
+    let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "schedule", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise)
