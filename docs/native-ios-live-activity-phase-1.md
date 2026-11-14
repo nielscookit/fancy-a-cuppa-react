@@ -10,7 +10,7 @@ Source branch: `feature/native-ios`. No React Timer, media, audio, or notificati
 - Native SwiftUI Live Activity lives in `ios/App/LiveActivity/FACLiveActivityWidget.swift`.
 - The existing iOS app icon PNG is linked into the extension's resources (no substitute symbol).
 - The host app's `NSSupportsLiveActivities` is enabled in `ios/App/App/Info.plist`.
-- No JavaScript bridge is installed in Phase 1.
+- No JavaScript bridge is installed in Phase 1. The Debug launch hook lives in `SceneDelegate.sceneDidBecomeActive` (the app uses iOS scenes); `AppDelegate` is unchanged.
 - **Font caveat:** Roboto Mono is not bundled as a native font. The temporary system monospaced fallback requires a separate licensed font asset and design comparison before final approval.
 - `context.isStale` is used as a test-only READY candidate; exact 0:00 repaint is not guaranteed or approved yet.
 - Dynamic Island is represented by a minimal required WidgetKit fallback; not a product feature.

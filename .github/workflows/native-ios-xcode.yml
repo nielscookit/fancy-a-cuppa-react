@@ -17,7 +17,7 @@ on:
       - tests/nativeVideoController.test.mjs
       - ios/App/LiveActivity/**
       - ios/App/App/Info.plist
-      - ios/App/App/AppDelegate.swift
+      - ios/App/App/SceneDelegate.swift
       - tests/nativeLiveActivityPrototype.test.mjs
 
 permissions:

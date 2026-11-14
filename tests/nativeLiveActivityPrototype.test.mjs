@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 test('native Live Activity Phase 1 is a separate embedded widget extension', () => {
   const project=readFileSync('ios/App/App.xcodeproj/project.pbxproj','utf8');
   const info=readFileSync('ios/App/App/Info.plist','utf8');
-  const delegate=readFileSync('ios/App/App/AppDelegate.swift','utf8');
+  const delegate=readFileSync('ios/App/App/SceneDelegate.swift','utf8');
   const widget=readFileSync('ios/App/LiveActivity/FACLiveActivityWidget.swift','utf8');
   const model=readFileSync('ios/App/LiveActivity/FACActivityAttributes.swift','utf8');
   const ext=readFileSync('ios/App/LiveActivity/Info.plist','utf8');
@@ -14,6 +14,7 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(project,/com\.fancyacuppa\.app\.liveactivity/);
   assert.match(info,/<key>NSSupportsLiveActivities<\/key>\s*<true\/>/);
   assert.match(ext,/com\.apple\.widgetkit-extension/);
+  assert.match(delegate,/func sceneDidBecomeActive/);
   assert.match(delegate,/if !didLaunchFACActivityPrototype/);
   assert.match(model,/struct FACLiveActivityAttributes: ActivityAttributes/);
   assert.match(widget,/ActivityConfiguration\(for: FACLiveActivityAttributes\.self\)/);

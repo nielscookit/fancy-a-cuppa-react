@@ -4,6 +4,10 @@ import Capacitor
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
+#if DEBUG
+    private var didLaunchFACActivityPrototype = false
+#endif
+
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
@@ -17,6 +21,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+#if DEBUG
+        if !didLaunchFACActivityPrototype {
+            didLaunchFACActivityPrototype = true
+            if #available(iOS 16.2, *) {
+                Task { @MainActor in
+                    FACLiveActivityPrototype.launchIfRequested()
+                }
+            }
+        }
+#endif
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
