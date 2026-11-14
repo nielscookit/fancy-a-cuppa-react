@@ -68,15 +68,17 @@ export function createNativeVideoController({
     stopSounds();
   }
 
+  function rewind(video) {
+    if (video.readyState >= 1 && video.currentTime !== 0) video.currentTime = 0;
+  }
+
   function reset() {
     pause();
     cancelSeek();
     pending = null;
     finished = false;
     milkRequested = false;
-    videos.forEach(video => {
-      if (video.readyState >= 1 && video.currentTime !== 0) video.currentTime = 0;
-    });
+    videos.forEach(rewind);
     display(idle);
   }
 
@@ -161,6 +163,23 @@ export function createNativeVideoController({
     }
   }
 
+  // WebKit can resume a suspended element after the foreground reset has
+  // already invalidated its play request. Enforce the current intent when
+  // playback actually starts, including after the native suspension is lifted.
+  const playbackGuards = videos.map(video => {
+    function enforcePause() {
+      if (!paused) return;
+      if (!video.paused) video.pause();
+      if (phase === idle && pending === null) rewind(video);
+    }
+    video.addEventListener('play', enforcePause);
+    video.addEventListener('playing', enforcePause);
+    return () => {
+      video.removeEventListener('play', enforcePause);
+      video.removeEventListener('playing', enforcePause);
+    };
+  });
+
   const ended = videos.map((video, index) => {
     function advance() {
       if (paused || pending !== null || phase !== index) return;
@@ -218,6 +237,11 @@ export function createNativeVideoController({
     finish() { finished = true; milk(); },
     restore,
     retryMilkPlayback() { if (phase === 3 || finished) play(3); },
-    destroy() { reset(); ended.forEach(remove => remove()); milkListeners.forEach(remove => remove()); },
+    destroy() {
+      reset();
+      playbackGuards.forEach(remove => remove());
+      ended.forEach(remove => remove());
+      milkListeners.forEach(remove => remove());
+    },
   };
 }

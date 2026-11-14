@@ -8,8 +8,9 @@ function setup(options = {}) {
   const videos = Array.from({ length: 4 }, (_, i) => Object.assign(new EventTarget(), {
     classList: { toggle() {} },
     currentTime: 0, readyState: 1, duration: i === 1 ? 15 : 5,
-    pause() {},
-    play() { calls.push(i); return new Promise(resolve => { this.confirm = resolve; }); },
+    paused: true,
+    pause() { this.paused = true; },
+    play() { this.paused = false; calls.push(i); return new Promise(resolve => { this.confirm = resolve; }); },
   }));
   const media = createNativeVideoController({
     ...options, videos, assetBase: './media/', onPhase: phase => phases.push(phase),
@@ -92,5 +93,52 @@ test('Milk warms only after Fill confirmation and reports a stalled play once', 
   assert.deepEqual(calls, [0, 3]);
   assert.deepEqual(errors, ['Milk playback did not start.']);
   assert.deepEqual(events, ['warmup', 'play requested', 'play stalled']);
+  media.destroy();
+});
+
+test('playback resumed by WebKit after reset is stopped and rewound until a new START', async () => {
+  const { media, videos, calls } = setup();
+  await media.preloadForStart();
+  let starts = 0;
+  media.startSynced(() => starts++);
+  const staleConfirm = videos[0].confirm;
+  media.reset();
+
+  for (const event of ['play', 'playing']) {
+    for (const video of videos) {
+      video.currentTime = 0.25;
+      video.paused = false;
+      video.dispatchEvent(new Event(event));
+      assert.equal(video.paused, true);
+      assert.equal(video.currentTime, 0);
+    }
+  }
+  staleConfirm();
+  await Promise.resolve();
+  assert.equal(starts, 0);
+
+  media.startSynced(() => starts++);
+  videos[0].dispatchEvent(new Event('playing'));
+  assert.equal(videos[0].paused, false);
+  assert.equal(starts, 1);
+  assert.deepEqual(calls, [0, 0]);
+  media.destroy();
+});
+
+test('late playback events preserve the position of both running and paused video', () => {
+  const { media, videos } = setup();
+  media.startSynced(() => {});
+  const [fill] = videos;
+  fill.dispatchEvent(new Event('playing'));
+  fill.currentTime = 2;
+  fill.dispatchEvent(new Event('playing'));
+  assert.equal(fill.paused, false);
+  assert.equal(fill.currentTime, 2);
+
+  media.pause();
+  fill.paused = false;
+  fill.dispatchEvent(new Event('playing'));
+  assert.equal(fill.paused, true);
+  assert.equal(fill.currentTime, 2);
   media.destroy();
 });
