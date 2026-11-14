@@ -4,6 +4,7 @@ import WebKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    private var mediaSuspension: UUID?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -21,11 +22,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        setWebMediaSuspended(true)
+        mediaSuspension = UUID()
+        webView?.setAllMediaPlaybackSuspended(true, completionHandler: nil)
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        setWebMediaSuspended(false)
+        resumeWebMedia(in: scene)
         if #available(iOS 16.2, *) {
             Task { @MainActor in
                 await FACLiveActivityPlugin.finishExpiredActivities()
@@ -33,9 +35,22 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
-    private func setWebMediaSuspended(_ suspended: Bool) {
-        let controller = window?.rootViewController as? FACBridgeViewController
-        controller?.webView?.setAllMediaPlaybackSuspended(suspended, completionHandler: nil)
+    private var webView: WKWebView? {
+        (window?.rootViewController as? FACBridgeViewController)?.webView
+    }
+
+    private func resumeWebMedia(in scene: UIScene) {
+        guard let suspension = mediaSuspension, let webView else { return }
+        // Reconcile the existing page before WebKit can resume a stale clip.
+        webView.evaluateJavaScript("document.dispatchEvent(new Event('fac:native-foreground'))") { [weak self, weak scene] _, error in
+            guard let self, self.mediaSuspension == suspension,
+                  scene?.activationState == .foregroundActive else { return }
+            if let error {
+                NSLog("[FAC media] Foreground reconciliation failed: %@", error.localizedDescription)
+            }
+            self.mediaSuspension = nil
+            webView.setAllMediaPlaybackSuspended(false, completionHandler: nil)
+        }
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

@@ -22,6 +22,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
   const push = usePushNotifications();
   const { snapshot, actions } = useTeaTimer({
     videoRefs,
+    resetOnBackgroundExpiry: native,
     storageKey: native ? 'fac-v3-native-active-timer' : 'fac-v3-active-timer',
     assetBase: MEDIA_BASE,
     mediaFactory: native ? createNativeVideoController : createMediaController,

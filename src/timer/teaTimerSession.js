@@ -14,6 +14,7 @@ export function createTeaTimerSession({
   initialSeconds = 240,
   onChange = () => {},
   factories = {},
+  resetOnBackgroundExpiry = false,
   storageKey,
   storage,
   onPersist = () => {},
@@ -63,7 +64,7 @@ export function createTeaTimerSession({
       onPhase: nextPhase => { phase = nextPhase; notify(); },
     });
     timer = makeTimer({
-      media, audio, initialSeconds,
+      media, audio, initialSeconds, resetOnBackgroundExpiry,
       onPersist: state => {
         if (disposed || recoveryPending) return;
         if (storageKey) persistTimerSession(storage, storageKey, state);

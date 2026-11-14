@@ -75,3 +75,117 @@ test('native Home restores persisted states without waiting on video metadata', 
     session.destroy();
   }
 });
+
+function lifecycleHarness(resetOnBackgroundExpiry = true) {
+  let clock = 100_000;
+  let item = null;
+  const calls = [];
+  const documentRef = new EventTarget();
+  documentRef.hidden = false;
+  const storage = {
+    getItem: () => item,
+    setItem: (_, value) => { item = value; },
+    removeItem: () => { item = null; },
+  };
+  const timer = createTimerController({
+    media: {
+      start() {}, pause() {}, unlock() {}, resume() {},
+      reset() { calls.push('fill idle'); },
+      restore(state) { calls.push(state.finished ? 'restore milk' : 'restore active'); },
+      milk() { calls.push('milk'); },
+      finish() { calls.push('finish'); },
+    },
+    audio: {
+      unlock() {}, playAlmost() {},
+      reset() { calls.push('audio reset'); },
+      async playFinished() { calls.push('ready'); },
+    },
+    documentRef,
+    navigatorRef: null,
+    scheduler: { setInterval: () => 1, clearInterval() {} },
+    now: () => clock,
+    initialSeconds: 60,
+    resetOnBackgroundExpiry,
+    onPersist: state => persistTimerSession(storage, 'timer', state),
+  });
+  return {
+    timer, calls,
+    setClock: value => { clock = value; },
+    get stored() { return readTimerSession(storage, 'timer'); },
+    visibility(hidden) {
+      documentRef.hidden = hidden;
+      documentRef.dispatchEvent(new Event('visibilitychange'));
+    },
+    foreground() { documentRef.dispatchEvent(new Event('fac:native-foreground')); },
+  };
+}
+
+test('native expiry returns to idle even if timers and visibility events were suspended', () => {
+  const h = lifecycleHarness();
+  h.timer.start();
+  h.setClock(161_000);
+  h.foreground();
+  assert.equal(h.timer.state().remaining, 60);
+  assert.equal(h.timer.state().finished, false);
+  assert.equal(h.timer.state().running, false);
+  assert.equal(h.stored, null);
+  assert.deepEqual(h.calls, ['fill idle', 'audio reset']);
+  h.timer.start();
+  assert.equal(h.stored.deadline, 221_000);
+});
+
+test('native expiry resets on a hidden tick or when visibility catches up first', () => {
+  for (const catchUp of [h => h.timer.tick(), h => h.visibility(false)]) {
+    const h = lifecycleHarness();
+    h.timer.start();
+    h.visibility(true);
+    h.setClock(161_000);
+    catchUp(h);
+    assert.equal(h.stored, null);
+    assert.deepEqual(h.calls, ['fill idle', 'audio reset']);
+  }
+});
+
+test('native foreground preserves running and paused timers and their restorable state', () => {
+  const h = lifecycleHarness();
+  h.timer.restore({ status: 'running', total: 60, deadline: 160_000 });
+  h.setClock(125_000);
+  h.foreground();
+  assert.equal(h.stored.deadline, 160_000);
+  h.timer.pause();
+  h.setClock(170_000);
+  h.foreground();
+  assert.equal(h.stored.status, 'paused');
+  assert.equal(h.stored.remaining, 35);
+  assert.deepEqual(h.calls, ['restore active']);
+});
+
+test('native cold recovery clears expired running and previously finished sessions without restoring milk', () => {
+  for (const status of ['running', 'finished']) {
+    const h = lifecycleHarness();
+    h.timer.restore({ status, total: 90, remaining: 0, deadline: 99_000 });
+    assert.equal(h.timer.state().remaining, 90);
+    assert.equal(h.stored, null);
+    assert.deepEqual(h.calls, ['fill idle', 'audio reset']);
+  }
+});
+
+test('native foreground finish still plays Ready and Web keeps its existing background finish', () => {
+  const native = lifecycleHarness();
+  native.timer.start();
+  native.setClock(160_000);
+  native.timer.tick();
+  assert.equal(native.timer.state().finished, true);
+  assert.deepEqual(native.calls, ['finish', 'ready']);
+  native.foreground();
+  assert.deepEqual(native.calls, ['finish', 'ready', 'fill idle', 'audio reset']);
+
+  const web = lifecycleHarness(false);
+  web.timer.start();
+  web.visibility(true);
+  web.setClock(160_000);
+  web.foreground();
+  web.visibility(false);
+  assert.equal(web.timer.state().finished, true);
+  assert.deepEqual(web.calls, ['finish']);
+});

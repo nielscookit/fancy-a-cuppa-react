@@ -11,6 +11,7 @@ export function createTimerController({
   initialSeconds = 120,
   onPersist = () => {},
   now = () => Date.now(),
+  resetOnBackgroundExpiry = false,
   // Bind calls to globalThis: passing native Window timer methods as
   // object properties and invoking them as methods throws "Illegal invocation".
   // This happened in iPhone Safari after the first immediate tick.
@@ -77,6 +78,10 @@ export function createTimerController({
     wasHidden = hidden;
     remaining = Math.max(0, (deadline - now()) / 1000);
     if (remaining <= 0) {
+      if (resetOnBackgroundExpiry && !playCues) {
+        setSeconds(total);
+        return;
+      }
       clearTicker();
       running = false;
       remaining = 0;
@@ -170,6 +175,11 @@ export function createTimerController({
     total = saved.total;
     remaining = saved.status === 'running'
       ? Math.min(total, Math.max(0, (saved.deadline - now()) / 1000)) : saved.remaining;
+    if (resetOnBackgroundExpiry && (saved.status === 'finished' ||
+      (saved.status === 'running' && remaining === 0))) {
+      setSeconds(total);
+      return;
+    }
     finished = saved.status === 'finished' || remaining === 0;
     if (finished) remaining = 0;
     warnedThirty = Boolean(saved.warnedThirty) || remaining <= 30;
@@ -186,6 +196,13 @@ export function createTimerController({
       tick();
       void requestWakeLock();
     }
+  }
+  // SceneDelegate dispatches this before releasing WebKit's media suspension.
+  function nativeForeground() {
+    if (finished || (running && deadline <= now())) setSeconds(total);
+  }
+  if (resetOnBackgroundExpiry) {
+    documentRef?.addEventListener?.('fac:native-foreground', nativeForeground);
   }
   documentRef?.addEventListener?.('visibilitychange', visibilityChange);
   notify();
@@ -205,6 +222,9 @@ export function createTimerController({
       stop();
       destroyed = true;
       documentRef?.removeEventListener?.('visibilitychange', visibilityChange);
+      if (resetOnBackgroundExpiry) {
+        documentRef?.removeEventListener?.('fac:native-foreground', nativeForeground);
+      }
       media.destroy();
       audio.destroy();
     },
