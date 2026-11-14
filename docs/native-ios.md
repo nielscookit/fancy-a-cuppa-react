@@ -2,6 +2,8 @@
 
 Source branch: `feature/native-ios`. The React Web/PWA remains the baseline. Do not change V2, main, Pages deployment, UX, or Supabase.
 
+**Freigegebener nativer UI-/Designstand:** [UI-/Design-Freeze 01 · Quellstand `fe51fdc`](native-ios-ui-design-freeze-01.md). Dieser dokumentiert die aktuelle iPhone-Oberfläche; Live Activity, iOS-Notification-Icon, Sperrbildschirm-Mediensteuerung und ausstehende Systemtests sind nicht mit eingefroren.
+
 ## Current native setup
 
 - Capacitor Core/iOS/CLI 8.6.0 and Local Notifications 8.3.1 are pinned in package.json and lockfile.
