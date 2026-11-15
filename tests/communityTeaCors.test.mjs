@@ -111,3 +111,31 @@ test('an ambiguous database response cannot delete photos of a possibly committe
   assert.match((await response.json()).error, /could not be confirmed/);
   assert.ok(!requests.includes('DELETE'));
 });
+
+test('local signed photo links use the configured public URL instead of the runtime container address', async () => {
+  let photoHandler;
+  const path = 'community/00000000-0000-4000-8000-000000000001.jpg';
+  const values = {
+    SUPABASE_URL: 'http://kong:8000',
+    SUPABASE_SERVICE_ROLE_KEY: 'fixture',
+    COMMUNITY_TEA_PUBLIC_URL: 'http://127.0.0.1:54321/',
+  };
+  runInNewContext(source, {
+    Deno: { serve(callback) { photoHandler = callback; }, env: { get: key => values[key] } },
+    Response, uuid: /^[0-9a-f-]{36}$/, photoBucket: 'community-tea-photos',
+    readLimitedText: request => request.text(),
+    fetch: async target => {
+      assert.match(target, /^http:\/\/kong:8000\//);
+      return target.includes('/rpc/')
+        ? Response.json([path])
+        : Response.json([{ path, signedURL: '/object/sign/community-tea-photos/' + path }]);
+    },
+  });
+  const response = await photoHandler(new Request(url, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'photos', write_version: 4, id: '00000000-0000-4000-8000-000000000001' }),
+  }));
+  assert.equal(response.status, 200);
+  const [photo] = await response.json();
+  assert.match(photo.url, /^http:\/\/127\.0\.0\.1:54321\/storage\/v1\/object\/sign\//);
+});

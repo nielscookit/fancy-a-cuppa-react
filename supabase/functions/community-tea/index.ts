@@ -55,10 +55,13 @@ Deno.serve(async (req) => {
       });
       if (!signatures.ok) throw Error("Could not sign photos");
       const signed = await signatures.json();
+      // The local Edge runtime uses a container URL for internal requests.
+      // Signed links must use the address reachable from the client.
+      const publicUrl = (Deno.env.get("COMMUNITY_TEA_PUBLIC_URL") || url).replace(/\/$/, "");
       const photos = keys.map(key => {
         const path = signed.find((item: {path: string}) => item.path === key)?.signedURL;
         if (typeof path !== "string") throw Error("Missing photo signature");
-        return { key, url: url + "/storage/v1" + path };
+        return { key, url: publicUrl + "/storage/v1" + path };
       });
       return reply(photos);
     } catch {

@@ -7,21 +7,9 @@ await db.exec(`
 create role anon; create role authenticated; create role service_role;
 create schema storage;
 create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-create table teas(
- id uuid primary key default gen_random_uuid(), brand text, name text, category text, leaf_style text,
- status text, subcategory text, subcategory_other text, updated_at timestamptz
-);
-create table tea_preparations(
- tea_id uuid primary key references teas, brew_seconds integer, water_temp_c integer,
- dose_teaspoons numeric, dose_grams numeric, dose_bags numeric, dose_measures numeric,
- dose_water_ml integer, updated_at timestamptz
-);
-create table tea_codes(tea_id uuid not null references teas, code_type text, code_value text, unique(code_type,code_value));
-create table tea_write_limits(client_hash text, day date, write_count integer, primary key (client_hash,day));
-grant select,insert,update on teas,tea_preparations,tea_write_limits to service_role;
-grant select,insert on tea_codes to service_role;
-insert into teas(id,brand,name,status) values('00000000-0000-4000-8000-000000000001','Tea maker','Assam','published');
+alter role service_role bypassrls;
 `);
+await db.exec(readFileSync('tests/fixtures/community-tea-local-schema.sql','utf8'));
 await db.exec(readFileSync('supabase/migrations/20261115220827_community_tea_catalog.sql','utf8'));
 const old = '00000000-0000-4000-8000-000000000001';
 const key = 'community/00000000-0000-4000-8000-000000000002.jpg';
