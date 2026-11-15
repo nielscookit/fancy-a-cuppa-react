@@ -50,7 +50,7 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
 /**
  * V3 editor for tea identity and preparation.
  */
-export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) {
+export default function TeaEditor({ tea, barcode, photos = [], message, onCancel, onSaved }) {
   const [form,setForm]=useState(()=>{
     const next=initialTeaForm(tea);
     if(!tea&&barcode){
@@ -60,6 +60,7 @@ export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) 
     return next;
   });
   const savingRef=useRef(false);
+  const [previews,setPreviews]=useState(() => Array.isArray(photos) ? photos.filter(photo => typeof photo === 'string' && photo.startsWith('data:image/jpeg;base64,')) : []);
   const [fieldErrors,setFieldErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
@@ -77,6 +78,7 @@ export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) 
     if(savingRef.current)return;
     const errors={};
     for(const key of ['name','brand','category','qty','base','mins']) if(!String(form[key]??'').trim()) errors[key]='Required field';
+    if(form.codeValue && !form.codeType) errors.codeValue='Enter an EAN-8, UPC-A or EAN-13 barcode.';
     for(const [key,min,max] of [['qty',0.01,100],['base',50,10000],['mins',1,30],['temperature',40,100]]) {
       if(form[key]!=='' && (!Number.isFinite(Number(form[key])) || Number(form[key])<min || Number(form[key])>max)) errors[key]=`Enter a value from ${min} to ${max}.`;
     }
@@ -109,8 +111,42 @@ export default function TeaEditor({ tea, barcode, message, onCancel, onSaved }) 
       </Box>
       <Box className="fac-sheet-scroll fac-sheet-scroll--editor">
         {message && <Typography role="status">{message}</Typography>}
+        {!tea && (
+          <Box className="fac-editor-photos" aria-label="Tea photos">
+            <Box className="fac-editor-photos__hero">
+              {previews.length > 0
+                ? <img src={previews[0]} alt="First captured tea photo" />
+                : <span className="material-symbols-outlined" aria-hidden="true">add_a_photo</span>}
+            </Box>
+            {previews.length > 0 && (
+              <Box className="fac-editor-photos__thumbnails">
+                {previews.map((photo,index) => (
+                  <Box className="fac-editor-photos__thumbnail" key={index}>
+                    <img src={photo} alt={`Tea photo ${index+1}`} />
+                    <Button type="button" onClick={() => setPreviews(current => current.filter((_,i) => i !== index))}
+                      aria-label={`Remove tea photo ${index+1}`} className="fac-editor-photos__remove">×</Button>
+                  </Box>
+                ))}
+              </Box>
+            )}
+            {previews.length > 0 && <Typography sx={{fontSize:12,color:'#656c70'}}>Photos are previews only and are not saved yet.</Typography>}
+          </Box>
+        )}
         <Stack gap="24px">
           <Field label="Tea name" placeholder="Enter tea name" error={fieldErrors.name} value={form.name} onChange={e=>set('name',e.target.value)} required />
+          {!tea && (
+            <Box className="fac-editor-barcode">
+              <Field label="Barcode (EAN / UPC)" placeholder="Scan or enter barcode" value={form.codeValue}
+                onChange={e=> {
+                  const value=e.target.value.replace(/[^0-9]/g,'').slice(0,13);
+                  setForm(previous=>({...previous,codeValue:value,
+                    codeType:value.length===8?'ean_8':value.length===12?'upc_a':value.length===13?'ean_13':''}));
+                }} error={fieldErrors.codeValue} />
+              {form.codeValue && <Button type="button" aria-label="Clear barcode"
+                className="fac-editor-barcode__clear" onClick={() =>
+                  setForm(previous=>({...previous,codeValue:'',codeType:''}))}>×</Button>}
+            </Box>
+          )}
           <Field label="Manufacturer" placeholder="Enter manufacturer" error={fieldErrors.brand} value={form.brand} onChange={e=>set('brand',e.target.value)} required />
           <Field label="Category" error={fieldErrors.category} value={form.category ? getUiTeaCategory(form.category) : ''} onChange={e=>changeCategory(e.target.value)}
             choices={cats} required />

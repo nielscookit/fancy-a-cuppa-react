@@ -182,3 +182,26 @@
 .fac-sheet-paper[data-native-editor="true"] .fac-sheet-scroll--editor {
   scroll-padding-block:16px;
 }
+
+/* UC 02 / 07A–07C: manual, captured-photo, and recognized-photo Add New Tea. */
+.fac-editor-photos { margin:0 -8px 32px; }
+.fac-editor-photos__hero {
+  height:265px; display:flex; align-items:center; justify-content:center;
+  background:#F3F2F0; overflow:hidden; position:relative;
+}
+.fac-editor-photos__hero > img { width:100%; height:100%; object-fit:cover; opacity:.1; }
+.fac-editor-photos__hero > .material-symbols-outlined { font-size:32px; color:#1B272B; }
+.fac-editor-photos__thumbnails { display:flex; gap:8px; margin:8px; padding:0; overflow-x:auto; }
+.fac-editor-photos__thumbnail { width:66px; height:66px; flex:0 0 66px; position:relative; }
+.fac-editor-photos__thumbnail img { width:66px; height:66px; object-fit:cover; }
+.fac-editor-photos__thumbnail:first-child img { outline:3px solid #1B272B; outline-offset:-3px; }
+.fac-editor-photos__remove.MuiButton-root {
+  position:absolute; top:0; right:0; border-radius:0; min-width:20px;
+  width:20px; height:20px; padding:0; background:#1B272B; color:#fff; font-size:18px;
+}
+.fac-editor-photos > .MuiTypography-root { margin:8px; }
+.fac-editor-barcode { position:relative; }
+.fac-editor-barcode__clear.MuiButton-root {
+  min-width:40px; width:40px; height:40px; position:absolute; top:29px; right:4px;
+  border-radius:6px; background:transparent; color:#1B272B; font-size:24px;
+}

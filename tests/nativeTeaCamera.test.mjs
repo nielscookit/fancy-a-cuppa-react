@@ -89,3 +89,18 @@ test('unknown barcode is available as add-form metadata', async () => {
   assert.deepEqual(response.barcode,{type:'ean_8',value:'96385074'});
   assert.equal(response.tea,null);
 });
+
+test('native camera transfers photo previews only when adding, not closing', () => {
+  const source = readFileSync(new URL('../ios/App/App/FACTeaCameraPlugin.swift', import.meta.url),'utf8');
+  assert.ok(source.includes('let photos = action == "add" ? photoPreviews : []'));
+  assert.ok(source.includes('photoPreviews.removeAll()'));
+  assert.ok(source.includes('onClose(action, photos)'));
+});
+
+test('Add New Tea integrates the captured previews without changing photo_url writes', () => {
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url),'utf8');
+  const editor = readFileSync(new URL('../src/components/TeaEditor.jsx', import.meta.url),'utf8');
+  assert.ok(app.includes('photos={mode === \'add\' ? capturedPhotos : []}'));
+  assert.ok(editor.includes('Photos are previews only and are not saved yet.'));
+  assert.ok(editor.includes('Barcode (EAN / UPC)'));
+});

@@ -38,8 +38,8 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             let controller = FACTeaCameraViewController { [weak self] id, text, format in
                 self?.notifyListeners("barcode", data: ["id": id, "text": text, "format": format])
-            } onClose: { result in
-                call.resolve(["action": result])
+            } onClose: { result, photos in
+                call.resolve(["action": result, "photos": photos])
             }
             camera = controller
             controller.modalPresentationStyle = .fullScreen
@@ -66,7 +66,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         isGuidanceEnabled: false, isHighlightingEnabled: false
     )
     private let onBarcode: (String, String, String) -> Void
-    private let onClose: (String) -> Void
+    private let onClose: (String, [String]) -> Void
     private let charcoal = UIColor(red: 27/255, green: 39/255, blue: 43/255, alpha: 1)
     private let lime = UIColor(red: 185/255, green: 252/255, blue: 105/255, alpha: 1)
     private let finder = UIView()
@@ -77,6 +77,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private let add = UIButton(type: .custom)
     private let thumbnails = UIScrollView()
     private let strip = UIStackView()
+    // In-memory previews only. No photo is written to the catalogue or disk.
+    private var photoPreviews: [String] = []
     private let toast = UIStackView()
     private let toastIcon = UIImageView()
     private let titleLabel = UILabel()
@@ -91,7 +93,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private enum Result { case none, known, possible, noMatch }
     private var result = Result.none
 
-    init(onBarcode: @escaping (String, String, String) -> Void, onClose: @escaping (String) -> Void) {
+    init(onBarcode: @escaping (String, String, String) -> Void, onClose: @escaping (String, [String]) -> Void) {
         self.onBarcode = onBarcode
         self.onClose = onClose
         super.init(nibName: nil, bundle: nil)
@@ -324,6 +326,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 image.isAccessibilityElement = true
                 image.widthAnchor.constraint(equalToConstant: 66).isActive = true
                 strip.addArrangedSubview(image)
+                if let data = thumbnail.jpegData(compressionQuality: 0.72) {
+                    photoPreviews.append("data:image/jpeg;base64," + data.base64EncodedString())
+                }
                 if result == .possible || result == .noMatch {
                     result = .none
                     toast.isHidden = true
@@ -384,6 +389,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         scanner.delegate = nil
         NotificationCenter.default.removeObserver(self)
         strip.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        dismiss(animated: true) { [onClose] in onClose(action) }
+        // Discard all photo previews when the user closes with X.
+        let photos = action == "add" ? photoPreviews : []
+        photoPreviews.removeAll()
+        dismiss(animated: true) { [onClose] in onClose(action, photos) }
     }
 }

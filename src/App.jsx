@@ -54,6 +54,7 @@ export default function App() {
   const [scannerBusy, setScannerBusy] = useState(false);
   const [scanError, setScanError] = useState('');
   const [scannedCode, setScannedCode] = useState(null);
+  const [capturedPhotos, setCapturedPhotos] = useState([]);
   const [message, setMessage] = useState('');
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
   const [quickNotice, setQuickNotice] = useState('');
@@ -128,7 +129,7 @@ export default function App() {
     setScannerBusy(true);
     setScanError('');
     try {
-      const { action, tea, barcode } = await openNativeTeaCamera(
+      const { action, tea, barcode, photos } = await openNativeTeaCamera(
         registerPlugin('FACTeaCamera'), { lookupBarcode: lookupTeaByCode },
       );
       if (action === 'use') {
@@ -144,6 +145,7 @@ export default function App() {
         setQuickNotice('Photo identification is still a prototype; no tea has been verified.');
       } else if (action === 'add') {
         setScannedCode(barcode);
+        setCapturedPhotos(Array.isArray(photos) ? photos : []);
         setMessage('');
         setMode('add');
       }
@@ -183,6 +185,7 @@ export default function App() {
     try { updated = await listTeas(); }
     catch (error) {
       setScannedCode(null);
+      setCapturedPhotos([]);
       setMode('search');
       setMessage('Tee gespeichert. Der Katalog konnte nicht aktualisiert werden: ' +
         (error?.message || String(error)));
@@ -194,6 +197,7 @@ export default function App() {
       : tea.rawName.toLocaleLowerCase('de-DE') === payload.name.toLocaleLowerCase('de-DE') &&
         tea.brand.toLocaleLowerCase('de-DE') === payload.brand.toLocaleLowerCase('de-DE'));
     setScannedCode(null);
+    setCapturedPhotos([]);
     if (match) chooseTea(match);
     else {
       setMode('search');
@@ -201,10 +205,12 @@ export default function App() {
     }
   }
   function openAdd() {
+    setCapturedPhotos([]);
     setScannedCode(null);
     setMode('add');
   }
   const previousView = () => {
+    setCapturedPhotos([]);
     setScannedCode(null);
     setMessage('');
     setMode(mode === 'edit' && selected ? 'prep' : 'search');
@@ -392,6 +398,7 @@ export default function App() {
             <TeaEditor key={mode === 'edit' ? selected?.id : 'new'}
               tea={mode === 'edit' ? selected : null}
               barcode={scannedCode}
+              photos={mode === 'add' ? capturedPhotos : []}
               message={message}
               onCancel={previousView}
               onSaved={formSaved} />
