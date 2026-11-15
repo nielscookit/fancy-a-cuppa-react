@@ -140,6 +140,8 @@ export default function App() {
         } else {
           setQuickNotice('Photo identification is not yet connected to the tea catalogue.');
         }
+      } else if (action === 'use_photo') {
+        setQuickNotice('Photo identification is still a prototype; no tea has been verified.');
       } else if (action === 'add') {
         setScannedCode(barcode);
         setMessage('');

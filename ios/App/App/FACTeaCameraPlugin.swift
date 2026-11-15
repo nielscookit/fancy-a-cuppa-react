@@ -340,7 +340,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
 
     @objc private func identifyTea() {
-        if result == .possible { finish("use"); return }
+        if result == .possible { finish("use_photo"); return }
         if result == .noMatch { addTea(); return }
         guard !strip.arrangedSubviews.isEmpty, capture == nil, processing == nil else { return }
         candidateID = nil
