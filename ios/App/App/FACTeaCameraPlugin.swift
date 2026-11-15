@@ -82,9 +82,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private let titleLabel = UILabel()
     private let detailLabel = UILabel()
     private var seen = Set<String>()
+    private var visibleBarcodeIDs: [UUID: String] = [:]
     private var candidateID: String?
     private var capture: Task<Void, Never>?
     private var processing: Task<Void, Never>?
+    private var toastDismissTask: Task<Void, Never>?
     private var closed = false
     private enum Result { case none, known, possible, noMatch }
     private var result = Result.none
@@ -120,7 +122,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         close.accessibilityLabel = "Close camera"
         close.layer.cornerRadius = 24
         close.addTarget(self, action: #selector(closeCamera), for: .touchUpInside)
-        overlay.addSubview(close)
+        // The native close button must receive touches above the VisionKit view.
+        view.addSubview(close)
 
         strip.spacing = 16
         strip.translatesAutoresizingMaskIntoConstraints = false
@@ -203,7 +206,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         scanner.view.frame = CGRect(x: 0, y: top, width: width, height: cameraHeight)
         finder.frame = CGRect(x: (width - 189) / 2, y: cameraHeight * 152 / 496, width: 189, height: 116)
         scanner.regionOfInterest = finder.frame
-        close.frame = CGRect(x: width - 62, y: 14, width: 48, height: 48)
+        close.frame = CGRect(x: width - 62, y: top + 14, width: 48, height: 48)
         thumbnails.frame = CGRect(x: 16, y: cameraHeight - 73, width: width - 32, height: 66)
         let toastBottom: CGFloat = strip.arrangedSubviews.isEmpty ? 16 : 96
         toast.frame = CGRect(x: 12, y: cameraHeight - toastBottom - 56, width: width - 24, height: 56)
@@ -249,11 +252,22 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             let code = barcode.payloadStringValue ?? ""
             let format = barcode.observation.symbology == .ean8 ? "EAN8" : "EAN13"
             // Vision presents UPC-A as zero-prefixed EAN-13.
-            guard seen.insert(code.isEmpty ? barcode.id.uuidString : code).inserted else { continue }
+            let key = code.isEmpty ? barcode.id.uuidString : code
+            visibleBarcodeIDs[barcode.id] = key
+            guard seen.insert(key).inserted else { continue }
             let id = UUID().uuidString
             candidateID = id
             onBarcode(id, code, format)
             return
+        }
+    }
+
+    func dataScanner(_ dataScanner: DataScannerViewController,
+                     didRemove removedItems: [RecognizedItem], allItems: [RecognizedItem]) {
+        // Re-enable a barcode only after its last visible instance has left.
+        for item in removedItems {
+            guard let key = visibleBarcodeIDs.removeValue(forKey: item.id) else { continue }
+            if !visibleBarcodeIDs.values.contains(key) { seen.remove(key) }
         }
     }
 
@@ -263,22 +277,35 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         result = value == "known" ? .known : .none
         switch value {
         case "known": showToast("Tea Found", "Fancy a cuppa", found: true)
-        case "unknown": showToast("Tea Not Found", "No tea linked to this code.", found: false)
-        default: showToast("Barcode Not Readable", "Try again or identify by photo.", found: false)
+        case "unknown": showToast("Tea Not Found", "No tea linked to this code.", found: false, autoDismiss: true)
+        default: showToast("Barcode Not Readable", "Try again or identify by photo.", found: false, autoDismiss: true)
         }
     }
 
-    private func showToast(_ title: String, _ detail: String, found: Bool) {
+    private func showToast(_ title: String, _ detail: String, found: Bool, autoDismiss: Bool = false) {
+        toastDismissTask?.cancel()
+        toastDismissTask = nil
         titleLabel.text = title
         detailLabel.text = detail
         toastIcon.tintColor = found ? lime : UIColor(red: 1, green: 145/255, blue: 83/255, alpha: 1)
         toastIcon.image = UIImage(systemName: found ? "checkmark" : "exclamationmark.triangle")
         toast.isHidden = false
         view.setNeedsLayout()
+        if autoDismiss {
+            toastDismissTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                guard !Task.isCancelled, let self, !self.closed else { return }
+                self.toast.isHidden = true
+                self.toastDismissTask = nil
+            }
+        }
     }
 
     @objc private func takePhoto() {
         guard !closed, scanner.isScanning, capture == nil, processing == nil else { return }
+        toastDismissTask?.cancel()
+        toastDismissTask = nil
+        toast.isHidden = true
         capture = Task { @MainActor in
             defer { capture = nil; updateActions() }
             do {
@@ -349,6 +376,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private func finish(_ action: String) {
         guard !closed else { return }
         closed = true
+        toastDismissTask?.cancel()
+        toastDismissTask = nil
         stopScanner()
         processing?.cancel()
         scanner.delegate = nil

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { classifyCameraBarcode, DEMO_TEA_BARCODE, openNativeTeaCamera } from '../src/features/nativeTeaCamera.js';
 
 test('camera PoC classifies UPC-A and equivalent EAN-13 using existing normalization', () => {
@@ -32,4 +33,22 @@ test('camera bridge attaches before presentation and removes its listener on clo
     assert.deepEqual(calls, failure ? ['barcode', 'open', 'remove']
       : ['barcode', 'open', { id: 'scan-1', result: 'known' }, 'remove']);
   }
+});
+
+const cameraSwift = readFileSync(new URL('../ios/App/App/FACTeaCameraPlugin.swift', import.meta.url), 'utf8');
+
+test('camera Close is in the interactive root view, at original on-screen position', () => {
+  assert.ok(cameraSwift.includes('view.addSubview(close)'));
+  assert.ok(!cameraSwift.includes('overlay.addSubview(close)'));
+  assert.ok(cameraSwift.includes('y: top + 14, width: 48, height: 48'));
+  assert.ok(cameraSwift.includes('closeCamera() { finish("close") }'));
+});
+
+test('unknown barcode banner expires and repeat scanning waits for a removal event', () => {
+  assert.ok(cameraSwift.includes('didRemove removedItems: [RecognizedItem]'));
+  assert.ok(cameraSwift.includes('seen.remove(key)'));
+  assert.ok(cameraSwift.includes('visibleBarcodeIDs[barcode.id] = key'));
+  assert.ok(cameraSwift.includes('2_500_000_000'));
+  assert.ok(cameraSwift.includes('found: false, autoDismiss: true'));
+  assert.ok(cameraSwift.includes('toastDismissTask?.cancel()'));
 });
