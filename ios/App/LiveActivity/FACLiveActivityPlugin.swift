@@ -11,6 +11,7 @@ final class FACBridgeViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(FACLiveActivityPlugin())
         bridge?.registerPluginInstance(FACTeaAlarmPlugin())
+        bridge?.registerPluginInstance(FACTeaCameraPlugin())
     }
 }
 

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Box, Button, Drawer, Typography } from '@mui/material';
 import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
+import { openNativeTeaCamera } from './features/nativeTeaCamera.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
 import TeaCategoryIcon from './components/TeaCategoryIcon.jsx';
@@ -121,6 +122,22 @@ export default function App() {
     setMode('search');
     setScanError('');
     setMessage('');
+  }
+  async function openCamera() {
+    if (scannerBusy) return;
+    setScannerBusy(true);
+    setScanError('');
+    try {
+      const { action } = await openNativeTeaCamera(registerPlugin('FACTeaCamera'));
+      if (action === 'use') {
+        const demoTea = teas.find(tea => normalizeQuery(tea.name) === 'assam breakfast');
+        if (demoTea) chooseTea(demoTea);
+        else setQuickNotice('Prototype preview: Assam Breakfast.');
+      } else if (action === 'add') {
+        setQuickNotice('Prototype preview: Add New Tea.');
+      }
+    } catch (error) { setScanError(error?.message || String(error)); }
+    finally { setScannerBusy(false); }
   }
   async function scanPhoto(event) {
     const file = event.target.files?.[0];
@@ -297,6 +314,7 @@ export default function App() {
                   photoRef={photoRef}
                   scanning={scannerBusy}
                   onPhoto={scanPhoto}
+                  onOpenCamera={nativeIOS ? openCamera : undefined}
                 />
               </Box>
               {scannerBusy && <Typography role="status" sx={{px:2}}>Reading barcode…</Typography>}
