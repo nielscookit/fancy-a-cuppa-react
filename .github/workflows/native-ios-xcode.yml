@@ -26,7 +26,9 @@ permissions:
 jobs:
   ios-simulator-build:
     if: github.ref == 'refs/heads/feature/native-ios'
-    runs-on: macos-15
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     timeout-minutes: 30
     steps:
       - name: Checkout native branch
@@ -41,6 +43,11 @@ jobs:
           sw_vers
           xcodebuild -version
           xcode-select -p
+          xcrun --sdk iphonesimulator --show-sdk-version
+          printf 'import AlarmKit\n' > "$RUNNER_TEMP/check-alarmkit.swift"
+          xcrun --sdk iphonesimulator swiftc -typecheck \
+            -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            -target "$(uname -m)-apple-ios26.0-simulator" "$RUNNER_TEMP/check-alarmkit.swift"
       - name: Check native iOS project exists
         run: |
           test -f ios/App/App.xcodeproj/project.pbxproj

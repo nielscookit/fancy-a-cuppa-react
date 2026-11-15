@@ -166,7 +166,14 @@ private struct FACAlarmPrototypeWidget: Widget {
                     isFinished: false, interval: start...end,
                     pauseDate: min(end, start.addingTimeInterval(paused.previouslyElapsedDuration))
                 )
-            default:
+            case .alert:
+                // AlarmKit owns the system stop action. Keep the widget content
+                // visible if iOS presents the Live Activity while it rings.
+                let instant = Date(timeIntervalSinceReferenceDate: 0)
+                FACLockScreenActivityView(
+                    isFinished: true, interval: instant...instant, pauseDate: nil
+                )
+            @unknown default:
                 EmptyView()
             }
         } dynamicIsland: { _ in

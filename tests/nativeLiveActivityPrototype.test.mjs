@@ -73,3 +73,14 @@ test('AlarmKit prototype is explicitly enabled in Debug and owns one isolated al
   assert.match(widget, /ActivityConfiguration\(for: AlarmAttributes<FACAlarmPrototypeMetadata>\.self\)/);
   assert.doesNotMatch(scene, /LocalNotifications|secondaryButton|postAlert/);
 });
+
+test('AlarmKit alert mode renders the shared READY view and keeps the system stop action', () => {
+  const widget = readFileSync('ios/App/LiveActivity/FACLiveActivityWidget.swift', 'utf8');
+  const scene = readFileSync('ios/App/App/SceneDelegate.swift', 'utf8');
+  const alarmWidget = widget.split('private struct FACAlarmPrototypeWidget: Widget')[1];
+  assert.match(alarmWidget, /case \.countdown[\s\S]*case \.paused[\s\S]*case \.alert:/);
+  const alert = alarmWidget.split('case .alert:')[1].split('@unknown default:')[0];
+  assert.match(alert, /FACLockScreenActivityView\(\s*isFinished: true/);
+  assert.doesNotMatch(alert, /EmptyView|Button\(/);
+  assert.match(scene, /title: "Your cuppa is ready", stopButton: AlarmButton/);
+});
