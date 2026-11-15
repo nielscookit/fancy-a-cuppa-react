@@ -120,7 +120,7 @@
 			sourceTree = "<group>";
 		};
 
-        FACA1A000000000000000011 /* LiveActivity */ = {isa = PBXGroup; children = (FACA2A000000000000000001 /* RobotoMono-Regular.ttf */, FACA1A00000000000000000A /* FACActivityAttributes.swift */, FACA1A00000000000000000B /* FACLiveActivityPlugin.swift */, FACA1A00000000000000000C /* FACLiveActivityWidget.swift */, FACA1A00000000000000000D /* Activity Info.plist */,); path = LiveActivity; sourceTree = "<group>"; };
+        FACA1A000000000000000011 /* LiveActivity */ = {isa = PBXGroup; children = (FACA2A000000000000000002 /* RobotoMono-Medium.ttf */, FACA2A000000000000000001 /* RobotoMono-Regular.ttf */, FACA1A00000000000000000A /* FACActivityAttributes.swift */, FACA1A00000000000000000B /* FACLiveActivityPlugin.swift */, FACA1A00000000000000000C /* FACLiveActivityWidget.swift */, FACA1A00000000000000000D /* Activity Info.plist */,); path = LiveActivity; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
