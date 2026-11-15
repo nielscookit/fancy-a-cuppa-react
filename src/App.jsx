@@ -143,7 +143,7 @@ export default function App() {
           }
           chooseTea(tea);
         } else {
-          setQuickNotice('Photo identification is not yet connected to the tea catalogue.');
+          setQuickNotice('No verified tea found for this barcode.');
         }
       } else if (action === 'use_photo') {
         if (photoTea) chooseTea(photoTea);
@@ -192,6 +192,7 @@ export default function App() {
     catch (error) {
       setScannedCode(null);
       setCapturedPhotos([]);
+      setPhotoPrefill(null);
       setMode('search');
       setMessage('Tee gespeichert. Der Katalog konnte nicht aktualisiert werden: ' +
         (error?.message || String(error)));
@@ -204,6 +205,7 @@ export default function App() {
         tea.brand.toLocaleLowerCase('de-DE') === payload.brand.toLocaleLowerCase('de-DE'));
     setScannedCode(null);
     setCapturedPhotos([]);
+    setPhotoPrefill(null);
     if (match) chooseTea(match);
     else {
       setMode('search');
@@ -405,6 +407,7 @@ export default function App() {
           {(mode === 'add' || mode === 'edit') && (
             <TeaEditor key={mode === 'edit' ? selected?.id : 'new'}
               tea={mode === 'edit' ? selected : null}
+              nativeIOS={nativeIOS}
               barcode={scannedCode}
               photos={mode === 'add' ? capturedPhotos : []}
               prefill={mode === 'add' ? photoPrefill : null}

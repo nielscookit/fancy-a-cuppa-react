@@ -66,7 +66,7 @@ test('production camera barcode lookup returns a real tea and never uses the fix
       listeners.barcode({id:'first',text:DEMO_TEA_BARCODE,format:'UPC-A'});
       // Allow the asynchronous lookup to complete before selecting USE.
       await new Promise(resolve => setImmediate(resolve));
-      return {action:'use'};
+      return {action:'use',barcodeID:'first'};
     },
     async showBarcodeResult(result) { notifications.push(result); },
   }, { lookupBarcode:async () => tea });
@@ -82,7 +82,7 @@ test('unknown barcode is available as add-form metadata', async () => {
     async open() {
       listeners.barcode({id:'unknown',text:'96385074',format:'EAN8'});
       await new Promise(resolve => setImmediate(resolve));
-      return {action:'add'};
+      return {action:'add',barcodeID:'unknown'};
     },
     async showBarcodeResult() {},
   }, {lookupBarcode:async()=>null});
@@ -94,7 +94,7 @@ test('native camera transfers photo previews only when adding, not closing', () 
   const source = readFileSync(new URL('../ios/App/App/FACTeaCameraPlugin.swift', import.meta.url),'utf8');
   assert.ok(source.includes('let photos = action == "add" ? photoPreviews : []'));
   assert.ok(source.includes('photoPreviews.removeAll()'));
-  assert.ok(source.includes('onClose(action, photos)'));
+  assert.ok(source.includes('onClose(action, photos, barcodeID, photoID)'));
 });
 
 test('Add New Tea integrates the captured previews without changing photo_url writes', () => {
@@ -130,4 +130,86 @@ test('new tea prefill never copies a barcode belonging to an existing catalogue 
   assert.ok(editor.includes("if(!tea&&barcode)"));
   assert.ok(editor.includes("Add tea information."));
   assert.ok(editor.includes('aria-label="Add a tea photo"'));
+});
+
+test('out-of-order lookup cannot replace the accepted result or reopen a closed camera', async () => {
+  const listeners = {};
+  const lookups = new Map();
+  const shown = [];
+  const tea = { id: 'cloud-newer', rawName: 'Tea B' };
+  const response = await openNativeTeaCamera({
+    async addListener(name, callback) {
+      listeners[name] = callback;
+      return { remove: async () => {} };
+    },
+    async open() {
+      const old = listeners.barcode({ id: 'old', text: '96385074', format: 'EAN8' });
+      const newer = listeners.barcode({ id: 'newer', text: DEMO_TEA_BARCODE, format: 'UPC-A' });
+      assert.equal(lookups.get('96385074').signal.aborted, true);
+      lookups.get(DEMO_TEA_BARCODE).resolve(tea);
+      await newer;
+      lookups.get('96385074').resolve({ id: 'cloud-old' });
+      await old;
+      return { action: 'use', barcodeID: 'newer' };
+    },
+    async showBarcodeResult(value) { shown.push(value); },
+  }, {
+    lookupBarcode: (code, { signal }) => new Promise(resolve => {
+      lookups.set(code.value, { resolve, signal });
+    }),
+  });
+  assert.equal(response.tea, tea);
+  assert.deepEqual(shown.map(value => value.id), ['newer']);
+});
+
+test('closing aborts a pending lookup without waiting for its result', async () => {
+  const listeners = {};
+  let signal;
+  let pending;
+  let finish;
+  const response = await openNativeTeaCamera({
+    async addListener(name, callback) {
+      listeners[name] = callback;
+      return { remove: async () => {} };
+    },
+    async open() {
+      pending = listeners.barcode({ id: 'pending', text: '96385074', format: 'EAN8' });
+      return { action: 'close' };
+    },
+    async showBarcodeResult() { assert.fail('Closed camera must not receive late results'); },
+  }, {
+    lookupBarcode: (_, options) => new Promise(resolve => {
+      signal = options.signal;
+      finish = resolve;
+    }),
+  });
+  assert.equal(response.barcode, null);
+  assert.equal(signal.aborted, true);
+  finish(null);
+  await pending;
+});
+
+test('photo navigation uses only the photo ID actually accepted by the camera', async () => {
+  const listeners = {};
+  const tea = { id: 'cloud-photo', rawName: 'Assam Breakfast' };
+  const response = await openNativeTeaCamera({
+    async addListener(name, callback) {
+      listeners[name] = callback;
+      return { remove: async () => {} };
+    },
+    async open() {
+      await listeners.photoText({ id: 'accepted', lines: ['TeeGschwendner', 'Assam Breakfast'] });
+      await listeners.photoText({ id: 'stale', lines: [] });
+      return { action: 'use_photo', photoID: 'accepted' };
+    },
+    async showPhotoResult() {},
+  }, { matchPhoto: lines => matchPhotoText(lines, [{ ...tea, brand: 'TeeGschwendner' }]) });
+  assert.equal(response.photoTea?.id, tea.id);
+  assert.equal(response.tea, null);
+});
+
+test('OCR rejects scattered name tokens and embedded brand fragments', () => {
+  const teas = [{ id: 'one', brand: 'Tea Co', rawName: 'Assam Breakfast' }];
+  assert.equal(matchPhotoText(['Assam origin Breakfast blend', 'Tea Co'], teas), null);
+  assert.equal(matchPhotoText(['Assam Breakfast', 'Great Tea Company'], teas), null);
 });

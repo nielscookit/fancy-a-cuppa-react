@@ -42,8 +42,11 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 self?.notifyListeners("barcode", data: ["id": id, "text": text, "format": format])
             } onPhotoText: { [weak self] id, lines in
                 self?.notifyListeners("photoText", data: ["id": id, "lines": lines])
-            } onClose: { result, photos in
-                call.resolve(["action": result, "photos": photos])
+            } onClose: { result, photos, barcodeID, photoID in
+                var response: [String: Any] = ["action": result, "photos": photos]
+                if let barcodeID { response["barcodeID"] = barcodeID }
+                if let photoID { response["photoID"] = photoID }
+                call.resolve(response)
             }
             camera = controller
             controller.modalPresentationStyle = .fullScreen
@@ -82,7 +85,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     )
     private let onBarcode: (String, String, String) -> Void
     private let onPhotoText: (String, [String]) -> Void
-    private let onClose: (String, [String]) -> Void
+    private let onClose: (String, [String], String?, String?) -> Void
     private let charcoal = UIColor(red: 27/255, green: 39/255, blue: 43/255, alpha: 1)
     private let lime = UIColor(red: 185/255, green: 252/255, blue: 105/255, alpha: 1)
     private let finder = UIView()
@@ -104,6 +107,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private var seen = Set<String>()
     private var visibleBarcodeIDs: [UUID: String] = [:]
     private var candidateID: String?
+    private var acceptedBarcodeID: String?
+    private var acceptedPhotoID: String?
+    private var photoLookupTimeout: Task<Void, Never>?
     private var capture: Task<Void, Never>?
     private var processing: Task<Void, Never>?
     private var toastDismissTask: Task<Void, Never>?
@@ -113,7 +119,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
 
     init(onBarcode: @escaping (String, String, String) -> Void,
          onPhotoText: @escaping (String, [String]) -> Void,
-         onClose: @escaping (String, [String]) -> Void) {
+         onClose: @escaping (String, [String], String?, String?) -> Void) {
         self.onBarcode = onBarcode
         self.onPhotoText = onPhotoText
         self.onClose = onClose
@@ -269,7 +275,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
 
     func dataScanner(_ dataScanner: DataScannerViewController,
                      didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
-        guard !closed, processing == nil, result != .possible, result != .noMatch else { return }
+        guard !closed, processing == nil, photoLookupID == nil, result != .possible, result != .noMatch else { return }
         for item in addedItems {
             guard case .barcode(let barcode) = item else { continue }
             let code = barcode.payloadStringValue ?? ""
@@ -280,6 +286,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             guard seen.insert(key).inserted else { continue }
             let id = UUID().uuidString
             candidateID = id
+            acceptedBarcodeID = nil
+            result = .none
+            toast.isHidden = true
             onBarcode(id, code, format)
             return
         }
@@ -297,6 +306,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     func showBarcodeResult(id: String?, result value: String?, name: String?) {
         guard !closed, let id, id == candidateID, processing == nil else { return }
         candidateID = nil
+        acceptedBarcodeID = value == "known" || value == "unknown" ? id : nil
         result = value == "known" ? .known : .none
         switch value {
         case "known": showToast("Tea Found", name ?? "Tea in catalogue", found: true)
@@ -348,6 +358,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 image.widthAnchor.constraint(equalToConstant: 66).isActive = true
                 strip.addArrangedSubview(image)
                 photoImages.append(photo)
+                acceptedPhotoID = nil
                 if let data = thumbnail.jpegData(compressionQuality: 0.72) {
                     photoPreviews.append("data:image/jpeg;base64," + data.base64EncodedString())
                 }
@@ -393,6 +404,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         if result == .noMatch { addTea(); return }
         guard !photoImages.isEmpty, capture == nil, processing == nil, photoLookupID == nil else { return }
         candidateID = nil
+        acceptedPhotoID = nil
         toast.isHidden = true
         let images = photoImages
         processing = Task { @MainActor in
@@ -410,6 +422,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 let id = UUID().uuidString
                 photoLookupID = id
                 onPhotoText(id, lines)
+                photoLookupTimeout = Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    self?.showPhotoResult(id: id, result: "no_match", name: nil)
+                }
             }
             updateActions()
         }
@@ -419,6 +436,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     func showPhotoResult(id: String?, result value: String?, name: String?) {
         guard !closed, let id, id == photoLookupID else { return }
         photoLookupID = nil
+        photoLookupTimeout?.cancel()
+        photoLookupTimeout = nil
+        acceptedPhotoID = value == "possible" ? id : nil
         if value == "possible" {
             result = .possible
             showToast("Possible match", name ?? "Check this tea", found: true)
@@ -434,7 +454,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         identify.isEnabled = !closed && !strip.arrangedSubviews.isEmpty && capture == nil && processing == nil && photoLookupID == nil
         identify.alpha = identify.isEnabled ? 1 : 0.35
         identify.setTitle(result == .possible ? "USE THIS TEA" : result == .noMatch ? "ADD NEW"
-                          : processing == nil ? "IDENTIFY TEA" : "IDENTIFYING TEA", for: .normal)
+                          : processing == nil && photoLookupID == nil ? "IDENTIFY TEA" : "IDENTIFYING TEA", for: .normal)
         add.isHidden = result != .possible
     }
 
@@ -457,6 +477,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         photoPreviews.removeAll()
         photoImages.removeAll()
         photoLookupID = nil
-        dismiss(animated: true) { [onClose] in onClose(action, photos) }
+        photoLookupTimeout?.cancel()
+        let barcodeID = acceptedBarcodeID
+        let photoID = acceptedPhotoID
+        dismiss(animated: true) { [onClose] in onClose(action, photos, barcodeID, photoID) }
     }
 }

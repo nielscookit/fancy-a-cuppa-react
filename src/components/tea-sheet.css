@@ -205,3 +205,19 @@
   min-width:40px; width:40px; height:40px; position:absolute; top:29px; right:4px;
   border-radius:6px; background:transparent; color:#1B272B; font-size:24px;
 }
+
+.fac-editor-photos__hero--native > img { opacity:1; }
+.fac-editor-photos__hero--native > .fac-editor-photos__empty-icon { width:32px; height:32px; object-fit:contain; }
+.fac-editor-photos__add.MuiIconButton-root,
+.fac-editor-photos__delete.MuiIconButton-root {
+  width:48px; height:48px; flex:0 0 48px;
+  padding:0;
+}
+.fac-editor-photos__add--empty.MuiIconButton-root { position:absolute; right:16px; bottom:30px; }
+.fac-editor-photos__delete.MuiIconButton-root { position:absolute; right:14px; top:14px; }
+.fac-editor-photos__thumbnails--native { align-items:center; }
+.fac-editor-photos__thumbnails--native .fac-editor-photos__thumbnail.MuiIconButton-root { padding:0; border-radius:0; }
+.fac-editor-photos__thumbnails--native .fac-editor-photos__thumbnail img { outline:none; }
+.fac-editor-photos__thumbnails--native .fac-editor-photos__thumbnail[aria-pressed="true"] img {
+  outline:3px solid #1B272B; outline-offset:-3px;
+}

@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
-import { Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import {
   UI_CATEGORY_LABELS, getUiTeaCategory, DOSE_UNITS, LEAF_STYLE_LABELS,
   initialTeaForm, validateTeaForm,
 } from '../features/teaModel.js';
-import { createTea, updateTea } from '../data/teaRepository.js';
+import { createTea, lookupTeaByCode, updateTea } from '../data/teaRepository.js';
+
+const figma = import.meta.env.BASE_URL + 'figma/';
 
 const fieldSx = {
   '& .MuiFilledInput-root': {
@@ -50,7 +52,7 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
 /**
  * V3 editor for tea identity and preparation.
  */
-export default function TeaEditor({ tea, barcode, photos = [], prefill = null, message, onCancel, onSaved }) {
+export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = [], prefill = null, message, onCancel, onSaved }) {
   const [form,setForm]=useState(()=>{
     const next=initialTeaForm(tea || prefill);
     if (!tea) {
@@ -74,6 +76,8 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
   const savingRef=useRef(false);
   const photoInputRef=useRef(null);
   const [previews,setPreviews]=useState(() => Array.isArray(photos) ? photos.filter(photo => typeof photo === 'string' && photo.startsWith('data:image/jpeg;base64,')) : []);
+  const [selectedPhoto, setSelectedPhoto] = useState(0);
+  const photoIndex = Math.min(selectedPhoto, Math.max(0, previews.length - 1));
   const [fieldErrors,setFieldErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
@@ -85,14 +89,24 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
       const image=new Image();
       image.onload=()=>{
         const canvas=document.createElement('canvas');
-        canvas.width=132;
-        canvas.height=132;
-        const size=Math.min(image.naturalWidth,image.naturalHeight);
-        const x=(image.naturalWidth-size)/2;
-        const y=(image.naturalHeight-size)/2;
-        canvas.getContext('2d').drawImage(image,x,y,size,size,0,0,132,132);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg',0.72));
+        try {
+          const scale = Math.min(1, 750 / Math.max(image.naturalWidth, image.naturalHeight));
+          if (nativeIOS) {
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+          } else {
+            canvas.width = canvas.height = 132;
+            const size = Math.min(image.naturalWidth, image.naturalHeight);
+            canvas.getContext('2d').drawImage(image, (image.naturalWidth - size) / 2,
+              (image.naturalHeight - size) / 2, size, size, 0, 0, 132, 132);
+          }
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        } catch {
+          resolve(null);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
       };
       image.onerror=()=>{URL.revokeObjectURL(url);resolve(null);};
       image.src=url;
@@ -128,6 +142,11 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
     }catch(failure){setError(failure.message);return;}
     savingRef.current=true;setSaving(true);setError('');
     try {
+      if (nativeIOS && !payload.id && payload.code && await lookupTeaByCode(payload.code)) {
+        setFieldErrors(previous => ({ ...previous, codeValue: 'This barcode is already linked to a tea.' }));
+        setError('Remove or correct the existing barcode before saving.');
+        return;
+      }
       const result=payload.id ? await updateTea(payload) : await createTea(payload);
       await onSaved({...payload,id:result?.id ? 'cloud-'+String(result.id).replace(/^cloud-/, '') : payload.id});
     }catch(failure){setError(failure?.message||String(failure));}
@@ -150,6 +169,43 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
           <Box className="fac-editor-photos" aria-label="Tea photos">
             <input ref={photoInputRef} type="file" accept="image/*" multiple
               hidden onChange={addLocalPhotos} aria-label="Choose tea photos" />
+            {nativeIOS ? (
+              <>
+                <Box className="fac-editor-photos__hero fac-editor-photos__hero--native">
+                  {previews.length ? (
+                    <>
+                      <img src={previews[photoIndex]} alt={`Tea photo ${photoIndex + 1}`} />
+                      <IconButton type="button" className="fac-editor-photos__delete"
+                        aria-label={`Remove tea photo ${photoIndex + 1}`}
+                        onClick={() => {
+                          setPreviews(current => current.filter((_, index) => index !== photoIndex));
+                          setSelectedPhoto(Math.max(0, photoIndex - 1));
+                        }}><img src={figma + 'uc02-photo-delete.svg'} width="48" height="48" alt="" /></IconButton>
+                    </>
+                  ) : (
+                    <>
+                      <img className="fac-editor-photos__empty-icon" src={figma + 'uc02-photo-empty.svg'} width="32" height="32" alt="" />
+                      <IconButton type="button" className="fac-editor-photos__add fac-editor-photos__add--empty"
+                        onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add-empty.svg'} width="48" height="48" alt="" /></IconButton>
+                    </>
+                  )}
+                </Box>
+                {previews.length > 0 && (
+                  <Box className="fac-editor-photos__thumbnails fac-editor-photos__thumbnails--native">
+                    {previews.map((photo, index) => (
+                      <IconButton type="button" key={index} className="fac-editor-photos__thumbnail"
+                        aria-pressed={photoIndex === index} aria-label={`View tea photo ${index + 1}`}
+                        onClick={() => setSelectedPhoto(index)}>
+                        <img src={photo} alt="" />
+                      </IconButton>
+                    ))}
+                    <IconButton type="button" className="fac-editor-photos__add"
+                      onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add.svg'} width="48" height="48" alt="" /></IconButton>
+                  </Box>
+                )}
+              </>
+            ) : (
+              <>
             {previews.length > 0
               ? <Box className="fac-editor-photos__hero">
                   <img src={previews[0]} alt="First captured tea photo" />
@@ -168,6 +224,8 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
                   </Box>
                 ))}
               </Box>
+            )}
+              </>
             )}
             {previews.length > 0 && <Typography sx={{fontSize:12,color:'#656c70'}}>Photos are previews only and are not saved yet.</Typography>}
           </Box>
