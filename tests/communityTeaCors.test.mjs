@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 
-const source = readFileSync('supabase/functions/community-tea/index.ts','utf8')
-  .replaceAll('body:unknown','body')
-  .replace('let data:Record<string,unknown>;','let data;');
+const source = stripTypeScriptTypes(readFileSync('supabase/functions/community-tea/index.ts','utf8')
+  .replace(/^import .*\n/, ''));
 let handler;
 runInNewContext(source,{
   Deno:{
@@ -51,4 +51,63 @@ test('unapproved POST remains rejected',async()=>{
   }));
   assert.equal(response.status,403);
   assert.deepEqual(await response.json(),{error:'Origin not allowed'});
+});
+
+function mockSave(fetchImpl) {
+  let saveHandler;
+  runInNewContext(source, {
+    Deno: { serve(callback) { saveHandler = callback; }, env: { get: () => 'https://backend.test' } },
+    Response, TextEncoder, crypto: globalThis.crypto,
+    fetch: fetchImpl,
+    uuid: /^[0-9a-f-]{36}$/,
+    photoBucket: 'community-tea-photos',
+    readLimitedText: req => req.text(),
+    parsePhotos: () => [{ bytes: new Uint8Array([1, 2, 3]) }],
+    sanitizePhoto: bytes => bytes,
+  });
+  return saveHandler(new Request(url, {
+    method: 'POST',
+    headers: { Origin: 'capacitor://localhost', 'cf-connecting-ip': '203.0.113.1' },
+    body: JSON.stringify({
+      action: 'update', write_version: 4, expected_revision: 1,
+      id: '00000000-0000-4000-8000-000000000001',
+      save_id: '00000000-0000-4000-8000-000000000002',
+      photos: [{ jpeg: 'test' }],
+      photo_keys: ['foreign-file'],
+      uploaded_photo_keys: ['foreign-file'],
+    }),
+  }));
+}
+
+test('revision conflict removes only staged files, never historic photo objects', async () => {
+  const requests = [];
+  const response = await mockSave(async (target, options) => {
+    requests.push([target, options]);
+    if (target.endsWith('/update_community_tea')) {
+      const { p_data } = JSON.parse(options.body);
+      assert.equal(p_data.photo_keys.length, 1);
+      assert.match(p_data.photo_keys[0], /^community\//);
+      assert.deepEqual(p_data.photo_keys, p_data.uploaded_photo_keys);
+      return Response.json({ message: 'Tea revision conflict' }, { status: 400 });
+    }
+    return Response.json({});
+  });
+  assert.equal(response.status, 409);
+  const [upload] = requests.filter(([target]) => target.includes('/community/'));
+  const deletes = requests.filter(([, options]) => options.method === 'DELETE');
+  assert.equal(deletes.length, 1);
+  assert.deepEqual(JSON.parse(deletes[0][1].body).prefixes,
+    [upload[0].split('/community-tea-photos/')[1]]);
+});
+
+test('an ambiguous database response cannot delete photos of a possibly committed save', async () => {
+  const requests = [];
+  const response = await mockSave(async (target, options) => {
+    requests.push(options.method);
+    if (target.endsWith('/update_community_tea')) throw new Error('Connection lost');
+    return Response.json({});
+  });
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /could not be confirmed/);
+  assert.ok(!requests.includes('DELETE'));
 });

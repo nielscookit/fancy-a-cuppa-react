@@ -1,25 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import { getTeaProductImage } from '../data/teaProductImages.js';
+import { communityTeaV4, listCommunityTeaPhotos } from '../data/teaRepository.js';
 import './tea-image-gallery.css';
 
 /** Mounted per tea: category remains visible until the external image has decoded. */
 export default function TeaImageGallery({tea,children}) {
-  const [image,setImage]=useState(null),[ready,setReady]=useState(false),[page,setPage]=useState(0),[zoom,setZoom]=useState(false);
+  const [images, setImages] = useState([]);
+  const [ready, setReady] = useState(false);
+  const [page, setPage] = useState(0);
+  const [zoom, setZoom] = useState(false);
   const gesture=useRef(null),suppress=useRef(false);
-  useEffect(()=>{
-    const ac=new AbortController();
-    const timeout=setTimeout(()=>ac.abort(),8000);
-    getTeaProductImage(tea.id,{signal:ac.signal}).then(value=>{if(!ac.signal.aborted)setImage(value);}).catch(()=>{}).finally(()=>clearTimeout(timeout));
-    return ()=>{clearTimeout(timeout);ac.abort();};
-  },[tea.id]);
-  useEffect(()=>{
-    if(!image||ready)return;
-    const timer=setTimeout(()=>setImage(null),15000);
-    return ()=>clearTimeout(timer);
-  },[image,ready]);
-  function fail(){setReady(false);setPage(0);setZoom(false);setImage(null);}
-  const zoomImage=zoom&&image&&<img src={image.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" onError={fail} />;
+  const community = communityTeaV4 && tea.origin === 'community';
+  useEffect(() => {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 8000);
+    const request = community ? listCommunityTeaPhotos(tea.id, { signal: ac.signal })
+      : getTeaProductImage(tea.id, { signal: ac.signal }).then(image => image ? [image] : []);
+    request.then(items => {
+      if (!ac.signal.aborted) {
+        setImages(items);
+        setReady(community && items.length > 0);
+      }
+    }).catch(() => {}).finally(() => clearTimeout(timeout));
+    return () => { clearTimeout(timeout); ac.abort(); };
+  }, [tea.id, tea.revision, community]);
+  useEffect(() => {
+    if (!images.length || ready) return;
+    const timer = setTimeout(() => setImages([]), 15000);
+    return () => clearTimeout(timer);
+  }, [images, ready]);
+  function fail(url) {
+    setImages(items => items.filter(item => item.url !== url));
+    if (!community) setReady(false);
+    setPage(0);
+    setZoom(false);
+  }
+  const image = images[page - 1];
+  const zoomImage = zoom && image && <img src={image.url} alt={tea.rawName+' – product packaging'}
+    referrerPolicy="no-referrer" onError={() => fail(image.url)} />;
   return <>
     <div className="fac-image-gallery" onPointerDown={e=>{
       if(!e.isPrimary){gesture.current=null;suppress.current=true;return;}
@@ -31,21 +50,25 @@ export default function TeaImageGallery({tea,children}) {
       const g=gesture.current;if(!g||g.id!==e.pointerId)return;gesture.current=null;
       const dx=e.clientX-g.x,dy=e.clientY-g.y;
       if(Math.hypot(dx,dy)>8)suppress.current=true;
-      if(ready&&Math.abs(dx)>36&&Math.abs(dx)>Math.abs(dy)*1.3)setPage(dx<0?1:0);
+      if (ready && Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy)*1.3)
+        setPage(current => Math.max(0, Math.min(images.length, current + (dx < 0 ? 1 : -1))));
     }} onPointerCancel={()=>{gesture.current=null;suppress.current=true;}}>
       <div className="fac-image-gallery__track" style={{transform:`translateX(-${page*100}%)`}}>
         <div className="fac-image-gallery__category" aria-hidden={page!==0}>{children}</div>
-        {image && <button type="button" className="fac-image-gallery__product" tabIndex={ready&&page===1?0:-1}
-          aria-hidden={!ready||page!==1} aria-label="Enlarge product image" disabled={!ready}
-          onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')suppress.current=false;}}
-          onClick={()=>{if(!suppress.current&&ready&&page===1)setZoom(true);}}>
-          <img src={image.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" draggable="false"
-            onLoad={()=>setReady(true)} onError={fail} />
-        </button>}
+        {images.map((item, index) => {
+          const selected = ready && page === index + 1;
+          return <button key={item.key || item.url} type="button" className="fac-image-gallery__product"
+            tabIndex={selected ? 0 : -1} aria-hidden={!selected} aria-label="Enlarge product image" disabled={!ready}
+            onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')suppress.current=false;}}
+            onClick={()=>{if(!suppress.current && selected)setZoom(true);}}>
+            <img src={item.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" draggable="false"
+              onLoad={()=>setReady(true)} onError={() => fail(item.url)} />
+          </button>;
+        })}
       </div>
     </div>
-    {ready&&<div className="fac-image-gallery__dots" role="group" aria-label="Tea images">
-      {['Category image','Product image'].map((label,index)=><button key={label} type="button" aria-label={label} aria-pressed={page===index}
+    {ready&&images.length > 0 && <div className="fac-image-gallery__dots" role="group" aria-label="Tea images">
+      {['Category image', ...images.map((_, i) => community ? `Product image ${i + 1}` : 'Product image')].map((label,index)=><button key={label} type="button" aria-label={label} aria-pressed={page===index}
         onClick={()=>setPage(index)}><span /></button>)}
     </div>}
     <Dialog open={zoom&&ready} onClose={()=>setZoom(false)} fullWidth maxWidth="md"

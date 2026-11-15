@@ -29,6 +29,20 @@ export function matchPhotoText(lines, teas) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+// Only explicitly labelled, unique OCR values are carried into an unmatched form.
+export function photoPrefillFromText(lines) {
+  if (!Array.isArray(lines)) return null;
+  const field = label => {
+    const pattern = new RegExp('^(?:' + label + ')\\s*:\\s*(.{2,120})$', 'i');
+    const values = new Set(lines.filter(line => typeof line === 'string')
+      .map(line => line.trim().match(pattern)?.[1].trim()).filter(Boolean));
+    return values.size === 1 ? [...values][0] : undefined;
+  };
+  const brand = field('Hersteller|Manufacturer');
+  const rawName = field('Teename|Tea name|Produktname|Product name');
+  return brand || rawName ? { brand, rawName } : null;
+}
+
 // Swift returns only the IDs that were applied to its visible state.
 // A pending or superseded lookup cannot supply data to the selected action.
 export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } = {}) {
@@ -36,6 +50,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } 
   let lookup;
   const barcodes = new Map();
   const photoMatches = new Map();
+  const photoPrefills = new Map();
   const listener = await camera.addListener('barcode', async candidate => {
     if (!active) return;
     lookup?.abort();
@@ -76,11 +91,15 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } 
       try {
         tea = matchPhoto?.(candidate.lines);
         if (tea) photoMatches.set(candidate.id, tea);
+        else {
+          const prefill = photoPrefillFromText(candidate.lines);
+          if (prefill) photoPrefills.set(candidate.id, prefill);
+        }
       } catch (error) {
         console.warn('[Tea Camera] Photo matching failed', error);
       }
       await camera.showPhotoResult({
-        id: candidate.id, result: tea ? 'possible' : 'no_match', name: tea?.rawName,
+        id: candidate.id, result: tea ? 'possible' : 'no_match', name: tea?.rawName, brand: tea?.brand,
       }).catch(error => console.warn('[Tea Camera]', error));
     });
     const { barcodeID, photoID, ...response } = await camera.open();
@@ -89,6 +108,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } 
       ...response,
       tea: response.action === 'use' ? match?.tea ?? null : null,
       barcode: response.action === 'add' && match && !match.tea ? match.code : null,
+      ...(response.action === 'add' && photoPrefills.has(photoID) && { photoPrefill: photoPrefills.get(photoID) }),
       photoTea: ['add', 'use_photo'].includes(response.action) ? photoMatches.get(photoID) ?? null : null,
     };
   } finally {

@@ -68,7 +68,7 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
                 controller.showPhotoResult(id: call.getString("id"),
                                            result: call.getString("result"),
-                                           name: call.getString("name"))
+                                           name: call.getString("name"), brand: call.getString("brand"))
             }
             call.resolve()
         }
@@ -338,7 +338,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
 
     @objc private func takePhoto() {
-        guard !closed, scanner.isScanning, capture == nil, processing == nil else { return }
+        guard !closed, scanner.isScanning, capture == nil, processing == nil, photoImages.count < 3 else { return }
         toastDismissTask?.cancel()
         toastDismissTask = nil
         toast.isHidden = true
@@ -361,8 +361,24 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 strip.addArrangedSubview(image)
                 photoImages.append(photo)
                 acceptedPhotoID = nil
-                if let data = thumbnail.jpegData(compressionQuality: 0.72) {
+                let factor = min(1, 1600 / max(photo.size.width, photo.size.height))
+                let bounds = CGRect(x: 0, y: 0, width: floor(photo.size.width * factor),
+                                    height: floor(photo.size.height * factor))
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                let preview = UIGraphicsImageRenderer(size: bounds.size, format: format).image { _ in
+                    photo.draw(in: bounds)
+                }
+                if let data = preview.jpegData(compressionQuality: 0.72).flatMap({
+                    $0.count <= 1048576 ? $0 : preview.jpegData(compressionQuality: 0.5)
+                }), data.count <= 1048576 {
                     photoPreviews.append("data:image/jpeg;base64," + data.base64EncodedString())
+                } else {
+                    strip.removeArrangedSubview(image)
+                    image.removeFromSuperview()
+                    photoImages.removeLast()
+                    showToast("Photo unavailable", "Try taking the photo again.", found: false)
+                    return
                 }
                 if result == .possible || result == .noMatch {
                     result = .none
@@ -427,7 +443,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 photoLookupTimeout = Task { @MainActor [weak self] in
                     try? await Task.sleep(nanoseconds: 5_000_000_000)
                     guard !Task.isCancelled else { return }
-                    self?.showPhotoResult(id: id, result: "no_match", name: nil)
+                    self?.showPhotoResult(id: id, result: "no_match", name: nil, brand: nil)
                 }
             }
             updateActions()
@@ -435,15 +451,16 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         updateActions()
     }
 
-    func showPhotoResult(id: String?, result value: String?, name: String?) {
+    func showPhotoResult(id: String?, result value: String?, name: String?, brand: String?) {
         guard !closed, let id, id == photoLookupID else { return }
         photoLookupID = nil
         photoLookupTimeout?.cancel()
         photoLookupTimeout = nil
-        acceptedPhotoID = value == "possible" ? id : nil
+        acceptedPhotoID = id
         if value == "possible" {
             result = .possible
-            showToast("Possible match", name ?? "Check this tea", found: true)
+            let label = [brand, name].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " – ")
+            showToast("Possible match", label, found: true)
         } else {
             result = .noMatch
             showToast("No Match Found", "Take more photos or add a new tea.", found: false)
@@ -452,7 +469,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
 
     private func updateActions() {
-        shutter.isEnabled = !closed && scanner.isScanning && capture == nil && processing == nil && photoLookupID == nil
+        shutter.isEnabled = !closed && photoImages.count < 3 && scanner.isScanning && capture == nil && processing == nil && photoLookupID == nil
         identify.isEnabled = !closed && !strip.arrangedSubviews.isEmpty && capture == nil && processing == nil && photoLookupID == nil
         identify.alpha = identify.isEnabled ? 1 : 0.35
         identify.setTitle(result == .possible ? "USE THIS TEA" : result == .noMatch ? "ADD NEW"

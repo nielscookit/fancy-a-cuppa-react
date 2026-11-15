@@ -29,9 +29,9 @@ export default function TeaCard({ tea, onEdit, onClose, pinned = false, onToggle
             className="fac-tea-card__icon fac-tea-card__pin" onClick={onTogglePin} disableRipple>
             <TeaSymbol name="keep" filled={pinned} />
           </IconButton>
-          <IconButton aria-label="Edit tea" className="fac-tea-card__icon" onClick={onEdit} disableRipple>
+          {onEdit && <IconButton aria-label="Edit tea" className="fac-tea-card__icon" onClick={onEdit} disableRipple>
             <img src={iconBase+'tea-edit.svg'} width="48" height="48" alt="" />
-          </IconButton>
+          </IconButton>}
           <IconButton aria-label="Close tea" className="fac-tea-card__icon" onClick={onClose} disableRipple>
             <img src={iconBase+'tea-detail-close.svg'} width="48" height="48" alt="" />
           </IconButton>

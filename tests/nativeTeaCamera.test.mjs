@@ -224,3 +224,11 @@ test('OCR rejects scattered name tokens and embedded brand fragments', () => {
   assert.equal(matchPhotoText(['Assam origin Breakfast blend', 'Tea Co'], teas), null);
   assert.equal(matchPhotoText(['Assam Breakfast', 'Great Tea Company'], teas), null);
 });
+
+test('unmatched photo prefill accepts only unambiguous labelled identity', async () => {
+  const { photoPrefillFromText } = await import('../src/features/nativeTeaCamera.js');
+  assert.deepEqual(photoPrefillFromText(['Hersteller: Lebensbaum', 'Teename: Assam', 'Ziehzeit: 3–5 Minuten']),
+    { brand: 'Lebensbaum', rawName: 'Assam' });
+  assert.equal(photoPrefillFromText(['Hersteller: First', 'Hersteller: Second', 'Assam']), null);
+  assert.equal(photoPrefillFromText(['100 °C', 'Tea brewing time: 3 minutes']), null);
+});

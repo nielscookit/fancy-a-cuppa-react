@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Button, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import {
   UI_CATEGORY_LABELS, getUiTeaCategory, DOSE_UNITS, LEAF_STYLE_LABELS,
   initialTeaForm, validateTeaForm,
 } from '../features/teaModel.js';
-import { createTea, lookupTeaByCode, updateTea } from '../data/teaRepository.js';
+import { communityTeaV4, createTea, listCommunityTeaPhotos, lookupTeaByCode, updateTea } from '../data/teaRepository.js';
 
 const figma = import.meta.env.BASE_URL + 'figma/';
 
@@ -75,22 +75,46 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
   });
   const savingRef=useRef(false);
   const photoInputRef=useRef(null);
-  const [previews,setPreviews]=useState(() => Array.isArray(photos) ? photos.filter(photo => typeof photo === 'string' && photo.startsWith('data:image/jpeg;base64,')) : []);
+  const preparingPhotosRef = useRef(false);
+  const [preparingPhotos, setPreparingPhotos] = useState(false);
+  const [previews,setPreviews]=useState(() => Array.isArray(photos) ? photos.filter(photo => typeof photo === 'string' && photo.startsWith('data:image/jpeg;base64,')).slice(0, communityTeaV4 ? 3 : undefined) : []);
+  const photoEditing = communityTeaV4 || !tea;
+  const [storedPhotos, setStoredPhotos] = useState([]);
+  const [photoLoad, setPhotoLoad] = useState(communityTeaV4 && tea ? 'loading' : 'ready');
+  const saveAttempt = useRef(null);
+  useEffect(() => {
+    if (!communityTeaV4 || !tea) return;
+    const controller = new AbortController();
+    listCommunityTeaPhotos(tea.id, { signal: controller.signal }).then(items => {
+      if (controller.signal.aborted) return;
+      setStoredPhotos(items);
+      setPreviews(items.map(item => item.url));
+      setPhotoLoad('ready');
+    }).catch(() => {
+      if (!controller.signal.aborted) setPhotoLoad('error');
+    });
+    return () => controller.abort();
+  }, [tea?.id]);
   const [selectedPhoto, setSelectedPhoto] = useState(0);
   const photoIndex = Math.min(selectedPhoto, Math.max(0, previews.length - 1));
   const [fieldErrors,setFieldErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
   async function addLocalPhotos(event) {
-    const files=Array.from(event.target.files || []).filter(file => file.type.startsWith('image/'));
+    const picked = Array.from(event.target.files || []).filter(file => file.type.startsWith('image/'));
+    const files = communityTeaV4 ? picked.slice(0, Math.max(0, 3 - previews.length)) : picked;
     event.target.value='';
+    if (!files.length || preparingPhotosRef.current || savingRef.current) return;
+    preparingPhotosRef.current = true;
+    setPreparingPhotos(true);
+    setError('');
     const next=await Promise.all(files.map(file => new Promise(resolve => {
       const url=URL.createObjectURL(file);
       const image=new Image();
       image.onload=()=>{
         const canvas=document.createElement('canvas');
         try {
-          const scale = Math.min(1, 750 / Math.max(image.naturalWidth, image.naturalHeight));
+          const scale = Math.min(1, (communityTeaV4 ? 1600 : 750) / Math.max(image.naturalWidth, image.naturalHeight));
           if (nativeIOS) {
             canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
             canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -101,7 +125,13 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
             canvas.getContext('2d').drawImage(image, (image.naturalWidth - size) / 2,
               (image.naturalHeight - size) / 2, size, size, 0, 0, 132, 132);
           }
-          resolve(canvas.toDataURL('image/jpeg', 0.72));
+          let url = canvas.toDataURL('image/jpeg', 0.72);
+          if (communityTeaV4 && url.split(',')[1]?.length > 1398104) {
+            url = canvas.toDataURL('image/jpeg', 0.55);
+          }
+          const encoded = url.split(',')[1] || '';
+          const bytes = Math.floor(encoded.length * 3 / 4) - (encoded.match(/=+$/)?.[0].length || 0);
+          resolve(!communityTeaV4 || (bytes > 0 && bytes <= 1048576) ? url : null);
         } catch {
           resolve(null);
         } finally {
@@ -110,8 +140,14 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
       };
       image.onerror=()=>{URL.revokeObjectURL(url);resolve(null);};
       image.src=url;
-    })));
-    setPreviews(current=>current.concat(next.filter(Boolean)));
+    }).catch(() => null)));
+    preparingPhotosRef.current = false;
+    setPreparingPhotos(false);
+    if (communityTeaV4 && next.some(photo => !photo)) setError('Some photos could not be prepared for upload.');
+    setPreviews(current => {
+      const combined = current.concat(next.filter(Boolean));
+      return communityTeaV4 ? combined.slice(0, 3) : combined;
+    });
   }
   const set=(field,value)=>{setForm(previous=>({...previous,[field]:value}));setFieldErrors(previous=>({...previous,[field]:''}));};
   const changeUnit=value=>setForm(previous=>({
@@ -124,7 +160,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
   }));
   async function save(event) {
     event.preventDefault();
-    if(savingRef.current)return;
+    if(savingRef.current || preparingPhotosRef.current || photoLoad !== 'ready')return;
     const errors={};
     for(const key of ['name','brand','category','qty','base','mins']) if(!String(form[key]??'').trim()) errors[key]='Required field';
     if(form.codeValue && !form.codeType) errors.codeValue='Enter an EAN-8, UPC-A or EAN-13 barcode.';
@@ -139,10 +175,21 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
     try {
       payload=validateTeaForm(form);
       payload.original=tea||null;
+      if (communityTeaV4) {
+        payload.photos = previews.map(url => {
+          const previous = storedPhotos.find(photo => photo.url === url);
+          return previous ? { key: previous.key } : { jpeg: url.split(',')[1] };
+        });
+        const signature = JSON.stringify(payload);
+        if (saveAttempt.current?.signature !== signature) {
+          saveAttempt.current = { signature, id: crypto.randomUUID() };
+        }
+        payload.saveId = saveAttempt.current.id;
+      }
     }catch(failure){setError(failure.message);return;}
     savingRef.current=true;setSaving(true);setError('');
     try {
-      if (nativeIOS && !payload.id && payload.code && await lookupTeaByCode(payload.code)) {
+      if (!communityTeaV4 && nativeIOS && !payload.id && payload.code && await lookupTeaByCode(payload.code)) {
         setFieldErrors(previous => ({ ...previous, codeValue: 'This barcode is already linked to a tea.' }));
         setError('Remove or correct the existing barcode before saving.');
         return;
@@ -165,17 +212,20 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
       </Box>
       <Box className="fac-sheet-scroll fac-sheet-scroll--editor">
         {message && <Typography role="status">{message}</Typography>}
-        {!tea && (
+        {photoLoad !== 'ready' && <Typography role="status">
+          {photoLoad === 'loading' ? 'Loading tea photos…' : 'Tea photos could not be loaded. Reopen the editor to try again.'}
+        </Typography>}
+        {photoEditing && photoLoad === 'ready' && (
           <Box className="fac-editor-photos" aria-label="Tea photos">
             <input ref={photoInputRef} type="file" accept="image/*" multiple
               hidden onChange={addLocalPhotos} aria-label="Choose tea photos" />
-            {nativeIOS ? (
+            {(nativeIOS || communityTeaV4) ? (
               <>
                 <Box className="fac-editor-photos__hero fac-editor-photos__hero--native">
                   {previews.length ? (
                     <>
                       <img src={previews[photoIndex]} alt={`Tea photo ${photoIndex + 1}`} />
-                      <IconButton type="button" className="fac-editor-photos__delete"
+                      <IconButton type="button" className="fac-editor-photos__delete" disabled={saving || preparingPhotos}
                         aria-label={`Remove tea photo ${photoIndex + 1}`}
                         onClick={() => {
                           setPreviews(current => current.filter((_, index) => index !== photoIndex));
@@ -186,7 +236,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
                     <>
                       <img className="fac-editor-photos__empty-icon" src={figma + 'uc02-photo-empty.svg'} width="32" height="32" alt="" />
                       <IconButton type="button" className="fac-editor-photos__add fac-editor-photos__add--empty"
-                        onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add-empty.svg'} width="48" height="48" alt="" /></IconButton>
+                        disabled={saving || preparingPhotos} onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add-empty.svg'} width="48" height="48" alt="" /></IconButton>
                     </>
                   )}
                 </Box>
@@ -199,8 +249,8 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
                         <img src={photo} alt="" />
                       </IconButton>
                     ))}
-                    <IconButton type="button" className="fac-editor-photos__add"
-                      onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add.svg'} width="48" height="48" alt="" /></IconButton>
+                    {(!communityTeaV4 || previews.length < 3) && <IconButton type="button" className="fac-editor-photos__add"
+                      disabled={saving || preparingPhotos} onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add.svg'} width="48" height="48" alt="" /></IconButton>}
                   </Box>
                 )}
               </>
@@ -211,7 +261,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
                   <img src={previews[0]} alt="First captured tea photo" />
                 </Box>
               : <Button type="button" className="fac-editor-photos__hero" fullWidth
-                  onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo">
+                  disabled={saving || preparingPhotos} onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo">
                   <span className="material-symbols-outlined" aria-hidden="true">add_a_photo</span>
                 </Button>}
             {previews.length > 0 && (
@@ -227,7 +277,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
             )}
               </>
             )}
-            {previews.length > 0 && <Typography sx={{fontSize:12,color:'#656c70'}}>Photos are previews only and are not saved yet.</Typography>}
+            {!communityTeaV4 && previews.length > 0 && <Typography sx={{fontSize:12,color:'#656c70'}}>Photos are previews only and are not saved yet.</Typography>}
           </Box>
         )}
         <Stack gap="24px">
@@ -276,7 +326,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
           {error && <Typography role="alert" color="error" sx={{fontSize:13}}>{error}</Typography>}
           <Button variant="contained" type="button" onClick={onCancel} disabled={saving}
             className="fac-sheet-add fac-sheet-editor-cancel">CANCEL</Button>
-          <Button variant="contained" type="submit" disabled={saving} className="fac-sheet-add">
+          <Button variant="contained" type="submit" disabled={saving || preparingPhotos || photoLoad !== 'ready'} className="fac-sheet-add">
             {saving?'SAVING…':'SAVE'}
           </Button>
         </Box>

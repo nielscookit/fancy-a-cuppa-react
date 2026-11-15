@@ -3,7 +3,9 @@ import { supabaseConfig } from './supabaseConfig.js';
 // Framework-independent V3 adapter, behavior based on app-v2/cloud.js.
 // For later migration: changing backend settings does not require React changes.
 const endpoint = supabaseConfig.url;
-const selectFields = 'id,brand,name,category,subcategory,subcategory_other,leaf_style,photo_url,tea_codes(code_type,code_value),tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c,instructions,source_label)';
+// Keep builds compatible with the existing endpoint until the coordinated cutover.
+export const communityTeaV4 = import.meta.env?.VITE_COMMUNITY_TEA_V4 === 'true';
+const selectFields = (communityTeaV4 ? 'origin,revision,' : '') + 'id,brand,name,category,subcategory,subcategory_other,leaf_style,photo_url,tea_codes(code_type,code_value),tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c,instructions,source_label)';
 const codeSelect = 'tea_id,teas(' + selectFields + ')';
 const unitField = {
   bag: 'dose_bags',
@@ -39,6 +41,8 @@ export function normalizeTea(tea) {
   if (!(qty > 0) || !(base > 0) || !(seconds >= 30)) return null;
   return {
     id: 'cloud-' + tea.id,
+    origin: tea.origin,
+    revision: tea.revision,
     name: tea.brand === 'Unbekannt' ? tea.name : tea.brand + ' · ' + tea.name,
     type: unit === 'bag' ? 'bag' : 'loose',
     unit,
@@ -168,7 +172,7 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
   const id = normalizeCloudId(data.id);
   const payload = {
     action: id ? 'update' : 'create',
-    write_version: 3,
+    write_version: communityTeaV4 ? 4 : 3,
     id,
     brand: data.brand.trim(),
     name: data.name.trim(),
@@ -188,6 +192,11 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
     code_type: data.code?.type || null,
     code_value: data.code?.value || null,
   };
+  if (communityTeaV4) {
+    payload.save_id = data.saveId;
+    if (id) payload.expected_revision = data.original?.revision;
+    if (data.photos !== undefined) payload.photos = data.photos;
+  }
   const response = await fetchImpl(endpoint + '/functions/v1/community-tea', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -195,6 +204,21 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
     signal,
   });
   return readJson(response, 'Cloud saving failed');
+}
+
+export async function listCommunityTeaPhotos(id, { signal, fetchImpl = fetch } = {}) {
+  const response = await fetchImpl(endpoint + '/functions/v1/community-tea', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ write_version: 4, action: 'photos', id: normalizeCloudId(id) }),
+    signal,
+  });
+  const photos = await readJson(response, 'Tea photos unavailable');
+  if (!Array.isArray(photos) || photos.length > 3 ||
+      photos.some(photo => !photo?.key || typeof photo.url !== 'string' || !photo.url.startsWith(endpoint + '/storage/v1/'))) {
+    throw new Error('Invalid tea photos response.');
+  }
+  return photos;
 }
 
 export function createTea(data, options) {

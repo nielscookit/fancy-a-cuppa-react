@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Box, Button, Drawer, Typography } from '@mui/material';
-import { listTeas, lookupTeaByCode } from './data/teaRepository.js';
+import { communityTeaV4, listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
@@ -130,7 +130,7 @@ export default function App() {
     setScannerBusy(true);
     setScanError('');
     try {
-      const { action, tea, barcode, photos, photoTea } = await openNativeTeaCamera(
+      const { action, tea, barcode, photos, photoTea, photoPrefill: recognizedFields } = await openNativeTeaCamera(
         registerPlugin('FACTeaCamera'), {
           lookupBarcode: lookupTeaByCode,
           matchPhoto: lines => matchPhotoText(lines, teas),
@@ -150,7 +150,7 @@ export default function App() {
         else setQuickNotice('No verified tea found in the photos.');
       } else if (action === 'add') {
         setScannedCode(barcode);
-        setPhotoPrefill(photoTea || null);
+        setPhotoPrefill(photoTea || recognizedFields || null);
         setCapturedPhotos(Array.isArray(photos) ? photos : []);
         setMessage('');
         setMode('add');
@@ -199,7 +199,7 @@ export default function App() {
       return;
     }
     setCatalog({status:'ready',teas:updated,error:''});
-    const match = updated.find(tea => payload.id
+    const match = updated.find(tea => payload.id || communityTeaV4
       ? tea.id === payload.id
       : tea.rawName.toLocaleLowerCase('de-DE') === payload.name.toLocaleLowerCase('de-DE') &&
         tea.brand.toLocaleLowerCase('de-DE') === payload.brand.toLocaleLowerCase('de-DE'));
@@ -396,7 +396,7 @@ export default function App() {
               customMl={customMl} onCustomChange={setCustomMl}
               minutes={detailMinutes}
               onMinuteStep={step => setDetailMinutes(previous => stepQuickMinutes(previous,step))}
-              onEdit={() => setMode('edit')}
+              onEdit={!communityTeaV4 || selected.origin === 'community' ? () => setMode('edit') : undefined}
               onClose={openSearch}
               pinned={pinnedIds.includes(selected.id)}
               onTogglePin={() => togglePin(selected.id)}
@@ -404,7 +404,7 @@ export default function App() {
               fixedBrew={nativeIOS}
             />
           )}
-          {(mode === 'add' || mode === 'edit') && (
+          {(mode === 'add' || mode === 'edit' && (!communityTeaV4 || selected?.origin === 'community')) && (
             <TeaEditor key={mode === 'edit' ? selected?.id : 'new'}
               tea={mode === 'edit' ? selected : null}
               nativeIOS={nativeIOS}
