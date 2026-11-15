@@ -57,7 +57,7 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func showBarcodeResult(_ call: CAPPluginCall) {
         Task { @MainActor in
             if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
-                controller.showBarcodeResult(id: call.getString("id"), result: call.getString("result"), name: call.getString("name"))
+                controller.showBarcodeResult(id: call.getString("id"), result: call.getString("result"), name: call.getString("name"), brand: call.getString("brand"))
             }
             call.resolve()
         }
@@ -114,7 +114,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private var processing: Task<Void, Never>?
     private var toastDismissTask: Task<Void, Never>?
     private var closed = false
-    private enum Result { case none, known, possible, noMatch }
+    private enum Result { case none, possible, noMatch }
     private var result = Result.none
 
     init(onBarcode: @escaping (String, String, String) -> Void,
@@ -223,7 +223,6 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         toast.addArrangedSubview(toastIcon)
         toast.addArrangedSubview(labels)
         toast.isHidden = true
-        toast.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(useKnownTea)))
     }
 
     override func viewDidLayoutSubviews() {
@@ -303,13 +302,16 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         }
     }
 
-    func showBarcodeResult(id: String?, result value: String?, name: String?) {
+    func showBarcodeResult(id: String?, result value: String?, name: String?, brand: String?) {
         guard !closed, let id, id == candidateID, processing == nil else { return }
         candidateID = nil
         acceptedBarcodeID = value == "known" || value == "unknown" ? id : nil
-        result = value == "known" ? .known : .none
+        result = .none
         switch value {
-        case "known": showToast("Tea Found", name ?? "Tea in catalogue", found: true)
+        case "known":
+            let label = [brand, name].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " – ")
+            showToast("Tea Found", label, found: true)
+            finish("use")
         case "unknown": showToast("Tea Not Found", "No tea linked to this code.", found: false, autoDismiss: true)
         case "lookup_error": showToast("Catalog Unavailable", "Please try again.", found: false, autoDismiss: true)
         default: showToast("Barcode Not Readable", "Try again or identify by photo.", found: false, autoDismiss: true)
@@ -458,7 +460,6 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         add.isHidden = result != .possible
     }
 
-    @objc private func useKnownTea() { if result == .known { finish("use") } }
     @objc private func addTea() { finish("add") }
     @objc private func closeCamera() { finish("close") }
 

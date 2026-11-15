@@ -53,26 +53,37 @@ test('unknown barcode banner expires and repeat scanning waits for a removal eve
   assert.ok(cameraSwift.includes('toastDismissTask?.cancel()'));
 });
 
-test('production camera barcode lookup returns a real tea and never uses the fixture', async () => {
+test('verified barcode navigates on native acceptance without waiting for a tap', async () => {
   const listeners = {};
-  const notifications = [];
-  const tea = { id:'cloud-123', rawName:'Assam Breakfast' };
+  const tea = { id: 'cloud-123', brand: 'Lebensbaum', rawName: 'Assam - Blatt' };
+  let finish;
   const response = await openNativeTeaCamera({
     async addListener(name, callback) {
       listeners[name] = callback;
-      return { remove:async () => {} };
+      return { remove: async () => {} };
     },
-    async open() {
-      listeners.barcode({id:'first',text:DEMO_TEA_BARCODE,format:'UPC-A'});
-      // Allow the asynchronous lookup to complete before selecting USE.
-      await new Promise(resolve => setImmediate(resolve));
-      return {action:'use',barcodeID:'first'};
+    open() {
+      return new Promise(resolve => {
+        finish = resolve;
+        void listeners.barcode({ id: 'first', text: '4012346527109', format: 'EAN13' });
+      });
     },
-    async showBarcodeResult(result) { notifications.push(result); },
-  }, { lookupBarcode:async () => tea });
+    async showBarcodeResult(result) {
+      assert.deepEqual(result, { id: 'first', result: 'known', name: 'Assam - Blatt', brand: 'Lebensbaum' });
+      finish({ action: 'use', barcodeID: result.id });
+    },
+  }, {
+    lookupBarcode: async code => {
+      assert.deepEqual(code, { type: 'ean_13', value: '4012346527109' });
+      return tea;
+    },
+  });
   assert.equal(response.tea, tea);
-  assert.equal(notifications[0].result,'known');
-  assert.equal(notifications[0].name,'Assam Breakfast');
+});
+
+test('native camera completes a known lookup directly after accepting its ID', () => {
+  assert.match(cameraSwift, /guard !closed, let id, id == candidateID[\s\S]*?acceptedBarcodeID = value[\s\S]*?case "known":[\s\S]*?\[brand, name\][\s\S]*?finish\("use"\)/);
+  assert.doesNotMatch(cameraSwift, /useKnownTea/);
 });
 
 test('unknown barcode is available as add-form metadata', async () => {

@@ -64,7 +64,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } 
     }
     if (active && lookup === controller) {
       await camera.showBarcodeResult({
-        id: candidate.id, result, ...(lookupBarcode && code && { name: tea?.rawName }),
+        id: candidate.id, result, ...(tea && { name: tea.rawName, brand: tea.brand }),
       }).catch(error => console.warn('[Tea Camera]', error));
     }
   });
