@@ -128,13 +128,22 @@ export default function App() {
     setScannerBusy(true);
     setScanError('');
     try {
-      const { action } = await openNativeTeaCamera(registerPlugin('FACTeaCamera'));
+      const { action, tea, barcode } = await openNativeTeaCamera(
+        registerPlugin('FACTeaCamera'), { lookupBarcode: lookupTeaByCode },
+      );
       if (action === 'use') {
-        const demoTea = teas.find(tea => normalizeQuery(tea.name) === 'assam breakfast');
-        if (demoTea) chooseTea(demoTea);
-        else setQuickNotice('Prototype preview: Assam Breakfast.');
+        if (tea) {
+          if (!teas.some(item => item.id === tea.id)) {
+            setCatalog(previous => ({...previous, teas:[tea,...previous.teas]}));
+          }
+          chooseTea(tea);
+        } else {
+          setQuickNotice('Photo identification is not yet connected to the tea catalogue.');
+        }
       } else if (action === 'add') {
-        setQuickNotice('Prototype preview: Add New Tea.');
+        setScannedCode(barcode);
+        setMessage('');
+        setMode('add');
       }
     } catch (error) { setScanError(error?.message || String(error)); }
     finally { setScannerBusy(false); }

@@ -50,7 +50,7 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func showBarcodeResult(_ call: CAPPluginCall) {
         Task { @MainActor in
             if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
-                controller.showBarcodeResult(id: call.getString("id"), result: call.getString("result"))
+                controller.showBarcodeResult(id: call.getString("id"), result: call.getString("result"), name: call.getString("name"))
             }
             call.resolve()
         }
@@ -271,13 +271,14 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         }
     }
 
-    func showBarcodeResult(id: String?, result value: String?) {
+    func showBarcodeResult(id: String?, result value: String?, name: String?) {
         guard !closed, let id, id == candidateID, processing == nil else { return }
         candidateID = nil
         result = value == "known" ? .known : .none
         switch value {
-        case "known": showToast("Tea Found", "Fancy a cuppa", found: true)
+        case "known": showToast("Tea Found", name ?? "Tea in catalogue", found: true)
         case "unknown": showToast("Tea Not Found", "No tea linked to this code.", found: false, autoDismiss: true)
+        case "lookup_error": showToast("Catalog Unavailable", "Please try again.", found: false, autoDismiss: true)
         default: showToast("Barcode Not Readable", "Try again or identify by photo.", found: false, autoDismiss: true)
         }
     }

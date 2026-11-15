@@ -52,3 +52,40 @@ test('unknown barcode banner expires and repeat scanning waits for a removal eve
   assert.ok(cameraSwift.includes('found: false, autoDismiss: true'));
   assert.ok(cameraSwift.includes('toastDismissTask?.cancel()'));
 });
+
+test('production camera barcode lookup returns a real tea and never uses the fixture', async () => {
+  let event;
+  const notifications = [];
+  const tea = { id:'cloud-123', rawName:'Assam Breakfast' };
+  const response = await openNativeTeaCamera({
+    async addListener(name, callback) {
+      event = callback;
+      return { remove:async () => {} };
+    },
+    async open() {
+      event({id:'first',text:DEMO_TEA_BARCODE,format:'UPC-A'});
+      // Allow the asynchronous lookup to complete before selecting USE.
+      await new Promise(resolve => setImmediate(resolve));
+      return {action:'use'};
+    },
+    async showBarcodeResult(result) { notifications.push(result); },
+  }, { lookupBarcode:async () => tea });
+  assert.equal(response.tea, tea);
+  assert.equal(notifications[0].result,'known');
+  assert.equal(notifications[0].name,'Assam Breakfast');
+});
+
+test('unknown barcode is available as add-form metadata', async () => {
+  let event;
+  const response = await openNativeTeaCamera({
+    async addListener(name,callback) { event=callback; return {remove:async()=>{}}; },
+    async open() {
+      event({id:'unknown',text:'96385074',format:'EAN8'});
+      await new Promise(resolve => setImmediate(resolve));
+      return {action:'add'};
+    },
+    async showBarcodeResult() {},
+  }, {lookupBarcode:async()=>null});
+  assert.deepEqual(response.barcode,{type:'ean_8',value:'96385074'});
+  assert.equal(response.tea,null);
+});
