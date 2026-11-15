@@ -122,3 +122,12 @@ test('camera has a native Vision OCR callback instead of photo-count simulation'
   assert.ok(s.includes('notifyListeners("photoText"'));
   assert.ok(!s.includes('if strip.arrangedSubviews.count > 1'));
 });
+
+test('new tea prefill never copies a barcode belonging to an existing catalogue record',()=>{
+  const editor=readFileSync(new URL('../src/components/TeaEditor.jsx',import.meta.url),'utf8');
+  assert.ok(editor.includes("next.codeType='';"));
+  assert.ok(editor.includes("next.codeValue='';"));
+  assert.ok(editor.includes("if(!tea&&barcode)"));
+  assert.ok(editor.includes("Add tea information."));
+  assert.ok(editor.includes('aria-label="Add a tea photo"'));
+});

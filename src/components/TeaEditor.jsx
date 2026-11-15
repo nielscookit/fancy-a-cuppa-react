@@ -55,6 +55,10 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
     const next=initialTeaForm(tea || prefill);
     if (!tea) {
       next.id=null;
+      // A recognized catalogue tea must not copy its registered barcode into
+      // a new tea; only an actually scanned unknown barcode is transferable.
+      next.codeType='';
+      next.codeValue='';
       // Image, notes and source from catalog are not transferable through
       // the community-tea write API; do not silently copy them.
       next.photoUrl='';
@@ -68,10 +72,33 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
     return next;
   });
   const savingRef=useRef(false);
+  const photoInputRef=useRef(null);
   const [previews,setPreviews]=useState(() => Array.isArray(photos) ? photos.filter(photo => typeof photo === 'string' && photo.startsWith('data:image/jpeg;base64,')) : []);
   const [fieldErrors,setFieldErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
+  async function addLocalPhotos(event) {
+    const files=Array.from(event.target.files || []).filter(file => file.type.startsWith('image/'));
+    event.target.value='';
+    const next=await Promise.all(files.map(file => new Promise(resolve => {
+      const url=URL.createObjectURL(file);
+      const image=new Image();
+      image.onload=()=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=132;
+        canvas.height=132;
+        const size=Math.min(image.naturalWidth,image.naturalHeight);
+        const x=(image.naturalWidth-size)/2;
+        const y=(image.naturalHeight-size)/2;
+        canvas.getContext('2d').drawImage(image,x,y,size,size,0,0,132,132);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg',0.72));
+      };
+      image.onerror=()=>{URL.revokeObjectURL(url);resolve(null);};
+      image.src=url;
+    })));
+    setPreviews(current=>current.concat(next.filter(Boolean)));
+  }
   const set=(field,value)=>{setForm(previous=>({...previous,[field]:value}));setFieldErrors(previous=>({...previous,[field]:''}));};
   const changeUnit=value=>setForm(previous=>({
     ...previous,type:value==='bag'?'bag':'loose',
@@ -115,17 +142,22 @@ export default function TeaEditor({ tea, barcode, photos = [], prefill = null, m
     <Box component="form" onSubmit={save} noValidate className="fac-sheet-editor">
       <Box sx={{px:3,pt:"10px",pb:"16px"}}>
         <Typography component="h2" sx={{fontSize:21,fontWeight:700,lineHeight:"28px"}}>{tea?'Edit Tea':'Add New Tea'}</Typography>
-        <Typography sx={{fontSize:12,mt:"2px",color:error?'error.main':'#656c70'}}>{error || (tea?'Update the brewing details for this tea.':'Enter the tea and brewing details.')}</Typography>
+        <Typography sx={{fontSize:12,mt:"2px",color:error?'error.main':'#656c70'}}>{error || (tea?'Update the brewing details for this tea.':'Add tea information.')}</Typography>
       </Box>
       <Box className="fac-sheet-scroll fac-sheet-scroll--editor">
         {message && <Typography role="status">{message}</Typography>}
         {!tea && (
           <Box className="fac-editor-photos" aria-label="Tea photos">
-            <Box className="fac-editor-photos__hero">
-              {previews.length > 0
-                ? <img src={previews[0]} alt="First captured tea photo" />
-                : <span className="material-symbols-outlined" aria-hidden="true">add_a_photo</span>}
-            </Box>
+            <input ref={photoInputRef} type="file" accept="image/*" multiple
+              hidden onChange={addLocalPhotos} aria-label="Choose tea photos" />
+            {previews.length > 0
+              ? <Box className="fac-editor-photos__hero">
+                  <img src={previews[0]} alt="First captured tea photo" />
+                </Box>
+              : <Button type="button" className="fac-editor-photos__hero" fullWidth
+                  onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo">
+                  <span className="material-symbols-outlined" aria-hidden="true">add_a_photo</span>
+                </Button>}
             {previews.length > 0 && (
               <Box className="fac-editor-photos__thumbnails">
                 {previews.map((photo,index) => (
