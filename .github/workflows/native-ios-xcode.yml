@@ -18,6 +18,8 @@ on:
       - ios/App/LiveActivity/**
       - ios/App/App/Info.plist
       - ios/App/App/SceneDelegate.swift
+      - ios/App/App/FACTeaCameraPlugin.swift
+      - tests/nativeTeaCamera.test.mjs
       - tests/nativeLiveActivityPrototype.test.mjs
 
 permissions:
