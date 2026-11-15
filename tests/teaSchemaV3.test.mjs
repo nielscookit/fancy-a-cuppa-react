@@ -124,7 +124,7 @@ test('write API creates a tea without a subtype and rejects changes to hidden me
 test('editor exposes the ten approved fields and retains the guarded write path',()=>{
   const ui=readFileSync('src/components/TeaEditor.jsx','utf8');
   assert.deepEqual([...ui.matchAll(/<Field label="([^"]+)"/g)].map(match=>match[1]), [
-    'Tea name','Manufacturer','Category','Tea subtype (optional)','Leaf style (optional)',
+    'Tea name','Barcode (EAN / UPC)','Manufacturer','Category','Tea subtype (optional)','Leaf style (optional)',
     'Reference quantity','Reference water (ml)','Brewing time (minutes)',
     'Temperature (°C, optional)',
   ]);

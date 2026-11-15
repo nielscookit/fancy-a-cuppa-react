@@ -29,7 +29,7 @@ test('camera bridge attaches before presentation and removes its listener on clo
       async showBarcodeResult(result) { calls.push(result); },
     });
     if (failure) await assert.rejects(operation, /camera unavailable/);
-    else assert.deepEqual(await operation, { action: 'close' });
+    else assert.deepEqual(await operation, { action: 'close', tea:null, barcode:null });
     assert.deepEqual(calls, failure ? ['barcode', 'open', 'remove']
       : ['barcode', 'open', { id: 'scan-1', result: 'known' }, 'remove']);
   }
