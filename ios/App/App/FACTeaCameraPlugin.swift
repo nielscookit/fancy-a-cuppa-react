@@ -2,6 +2,7 @@ import AVFoundation
 import Capacitor
 import UIKit
 import VisionKit
+import Vision
 import CoreText
 
 @objc(FACTeaCameraPlugin)
@@ -10,7 +11,8 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     let jsName = "FACTeaCamera"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "showBarcodeResult", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "showBarcodeResult", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "showPhotoResult", returnType: CAPPluginReturnPromise)
     ]
     private weak var camera: UIViewController?
     private var opening = false
@@ -38,6 +40,8 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             let controller = FACTeaCameraViewController { [weak self] id, text, format in
                 self?.notifyListeners("barcode", data: ["id": id, "text": text, "format": format])
+            } onPhotoText: { [weak self] id, lines in
+                self?.notifyListeners("photoText", data: ["id": id, "lines": lines])
             } onClose: { result, photos in
                 call.resolve(["action": result, "photos": photos])
             }
@@ -55,6 +59,17 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
         }
     }
+
+    @objc func showPhotoResult(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
+                controller.showPhotoResult(id: call.getString("id"),
+                                           result: call.getString("result"),
+                                           name: call.getString("name"))
+            }
+            call.resolve()
+        }
+    }
 }
 
 @available(iOS 16.0, *)
@@ -66,6 +81,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         isGuidanceEnabled: false, isHighlightingEnabled: false
     )
     private let onBarcode: (String, String, String) -> Void
+    private let onPhotoText: (String, [String]) -> Void
     private let onClose: (String, [String]) -> Void
     private let charcoal = UIColor(red: 27/255, green: 39/255, blue: 43/255, alpha: 1)
     private let lime = UIColor(red: 185/255, green: 252/255, blue: 105/255, alpha: 1)
@@ -79,6 +95,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private let strip = UIStackView()
     // In-memory previews only. No photo is written to the catalogue or disk.
     private var photoPreviews: [String] = []
+    private var photoImages: [UIImage] = []
+    private var photoLookupID: String?
     private let toast = UIStackView()
     private let toastIcon = UIImageView()
     private let titleLabel = UILabel()
@@ -93,8 +111,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private enum Result { case none, known, possible, noMatch }
     private var result = Result.none
 
-    init(onBarcode: @escaping (String, String, String) -> Void, onClose: @escaping (String, [String]) -> Void) {
+    init(onBarcode: @escaping (String, String, String) -> Void,
+         onPhotoText: @escaping (String, [String]) -> Void,
+         onClose: @escaping (String, [String]) -> Void) {
         self.onBarcode = onBarcode
+        self.onPhotoText = onPhotoText
         self.onClose = onClose
         super.init(nibName: nil, bundle: nil)
     }
@@ -326,6 +347,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 image.isAccessibilityElement = true
                 image.widthAnchor.constraint(equalToConstant: 66).isActive = true
                 strip.addArrangedSubview(image)
+                photoImages.append(photo)
                 if let data = thumbnail.jpegData(compressionQuality: 0.72) {
                     photoPreviews.append("data:image/jpeg;base64," + data.base64EncodedString())
                 }
@@ -344,31 +366,72 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         updateActions()
     }
 
+    // Vision performs text recognition on the device. Only the extracted
+    // strings are passed to React for matching against the current tea catalogue.
+    private static func recognizeText(in images: [UIImage]) -> [String] {
+        var lines: [String] = []
+        for image in images {
+            guard let cgImage = image.cgImage else { continue }
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = true
+            let handler = VNImageRequestHandler(cgImage: cgImage)
+            do {
+                try handler.perform([request])
+                for observation in request.results ?? [] {
+                    guard let candidate = observation.topCandidates(1).first,
+                          candidate.confidence >= 0.35 else { continue }
+                    lines.append(candidate.string)
+                }
+            } catch { continue }
+        }
+        return lines
+    }
+
     @objc private func identifyTea() {
         if result == .possible { finish("use_photo"); return }
         if result == .noMatch { addTea(); return }
-        guard !strip.arrangedSubviews.isEmpty, capture == nil, processing == nil else { return }
+        guard !photoImages.isEmpty, capture == nil, processing == nil, photoLookupID == nil else { return }
         candidateID = nil
         toast.isHidden = true
+        let images = photoImages
         processing = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 650_000_000)
+            let lines = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    continuation.resume(returning: Self.recognizeText(in: images))
+                }
+            }
             guard !Task.isCancelled, !closed else { return }
             processing = nil
-            if strip.arrangedSubviews.count > 1 {
-                result = .possible
-                showToast("Possible match", "Assam Breakfast TeeGschwendner", found: true)
-            } else {
+            if lines.isEmpty {
                 result = .noMatch
-                showToast("No Match Found", "Take more photos or add a new tea.", found: false)
+                showToast("No Match Found", "No recognizable packaging text found.", found: false)
+            } else {
+                let id = UUID().uuidString
+                photoLookupID = id
+                onPhotoText(id, lines)
             }
             updateActions()
         }
         updateActions()
     }
 
+    func showPhotoResult(id: String?, result value: String?, name: String?) {
+        guard !closed, let id, id == photoLookupID else { return }
+        photoLookupID = nil
+        if value == "possible" {
+            result = .possible
+            showToast("Possible match", name ?? "Check this tea", found: true)
+        } else {
+            result = .noMatch
+            showToast("No Match Found", "Take more photos or add a new tea.", found: false)
+        }
+        updateActions()
+    }
+
     private func updateActions() {
-        shutter.isEnabled = !closed && scanner.isScanning && capture == nil && processing == nil
-        identify.isEnabled = !closed && !strip.arrangedSubviews.isEmpty && capture == nil && processing == nil
+        shutter.isEnabled = !closed && scanner.isScanning && capture == nil && processing == nil && photoLookupID == nil
+        identify.isEnabled = !closed && !strip.arrangedSubviews.isEmpty && capture == nil && processing == nil && photoLookupID == nil
         identify.alpha = identify.isEnabled ? 1 : 0.35
         identify.setTitle(result == .possible ? "USE THIS TEA" : result == .noMatch ? "ADD NEW"
                           : processing == nil ? "IDENTIFY TEA" : "IDENTIFYING TEA", for: .normal)
@@ -392,6 +455,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         // Discard all photo previews when the user closes with X.
         let photos = action == "add" ? photoPreviews : []
         photoPreviews.removeAll()
+        photoImages.removeAll()
+        photoLookupID = nil
         dismiss(animated: true) { [onClose] in onClose(action, photos) }
     }
 }

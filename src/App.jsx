@@ -6,7 +6,7 @@ import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
-import { openNativeTeaCamera } from './features/nativeTeaCamera.js';
+import { openNativeTeaCamera, matchPhotoText } from './features/nativeTeaCamera.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
 import TeaCategoryIcon from './components/TeaCategoryIcon.jsx';
@@ -55,6 +55,7 @@ export default function App() {
   const [scanError, setScanError] = useState('');
   const [scannedCode, setScannedCode] = useState(null);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
+  const [photoPrefill, setPhotoPrefill] = useState(null);
   const [message, setMessage] = useState('');
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
   const [quickNotice, setQuickNotice] = useState('');
@@ -129,8 +130,11 @@ export default function App() {
     setScannerBusy(true);
     setScanError('');
     try {
-      const { action, tea, barcode, photos } = await openNativeTeaCamera(
-        registerPlugin('FACTeaCamera'), { lookupBarcode: lookupTeaByCode },
+      const { action, tea, barcode, photos, photoTea } = await openNativeTeaCamera(
+        registerPlugin('FACTeaCamera'), {
+          lookupBarcode: lookupTeaByCode,
+          matchPhoto: lines => matchPhotoText(lines, teas),
+        },
       );
       if (action === 'use') {
         if (tea) {
@@ -142,9 +146,11 @@ export default function App() {
           setQuickNotice('Photo identification is not yet connected to the tea catalogue.');
         }
       } else if (action === 'use_photo') {
-        setQuickNotice('Photo identification is still a prototype; no tea has been verified.');
+        if (photoTea) chooseTea(photoTea);
+        else setQuickNotice('No verified tea found in the photos.');
       } else if (action === 'add') {
         setScannedCode(barcode);
+        setPhotoPrefill(photoTea || null);
         setCapturedPhotos(Array.isArray(photos) ? photos : []);
         setMessage('');
         setMode('add');
@@ -206,10 +212,12 @@ export default function App() {
   }
   function openAdd() {
     setCapturedPhotos([]);
+    setPhotoPrefill(null);
     setScannedCode(null);
     setMode('add');
   }
   const previousView = () => {
+    setPhotoPrefill(null);
     setCapturedPhotos([]);
     setScannedCode(null);
     setMessage('');
@@ -399,6 +407,7 @@ export default function App() {
               tea={mode === 'edit' ? selected : null}
               barcode={scannedCode}
               photos={mode === 'add' ? capturedPhotos : []}
+              prefill={mode === 'add' ? photoPrefill : null}
               message={message}
               onCancel={previousView}
               onSaved={formSaved} />

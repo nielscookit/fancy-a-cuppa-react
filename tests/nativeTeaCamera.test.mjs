@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { classifyCameraBarcode, DEMO_TEA_BARCODE, openNativeTeaCamera } from '../src/features/nativeTeaCamera.js';
+import { classifyCameraBarcode, DEMO_TEA_BARCODE, openNativeTeaCamera, matchPhotoText } from '../src/features/nativeTeaCamera.js';
 
 test('camera PoC classifies UPC-A and equivalent EAN-13 using existing normalization', () => {
   assert.equal(classifyCameraBarcode({ text: DEMO_TEA_BARCODE, format: 'UPC-A' }), 'known');
@@ -30,8 +30,8 @@ test('camera bridge attaches before presentation and removes its listener on clo
     });
     if (failure) await assert.rejects(operation, /camera unavailable/);
     else assert.deepEqual(await operation, { action: 'close', tea:null, barcode:null });
-    assert.deepEqual(calls, failure ? ['barcode', 'open', 'remove']
-      : ['barcode', 'open', { id: 'scan-1', result: 'known' }, 'remove']);
+    assert.deepEqual(calls, failure ? ['barcode', 'photoText', 'open', 'remove', 'remove']
+      : ['barcode', 'photoText', 'open', { id: 'scan-1', result: 'known' }, 'remove', 'remove']);
   }
 });
 
@@ -103,4 +103,22 @@ test('Add New Tea integrates the captured previews without changing photo_url wr
   assert.ok(app.includes('photos={mode === \'add\' ? capturedPhotos : []}'));
   assert.ok(editor.includes('Photos are previews only and are not saved yet.'));
   assert.ok(editor.includes('Barcode (EAN / UPC)'));
+});
+
+test('Vision OCR matcher accepts only an unambiguous brand and complete product name',()=>{
+  const teas=[
+    {id:'one',brand:'TeeGschwendner',rawName:'Assam Breakfast'},
+    {id:'two',brand:'Other',rawName:'Darjeeling First Flush'},
+  ];
+  assert.equal(matchPhotoText(['Assam Breakfast','TeeGschwendner'],teas)?.id,'one');
+  assert.equal(matchPhotoText(['Assam Breakfast'],teas),null);
+  assert.equal(matchPhotoText(['TeeGschwendner'],teas),null);
+  assert.equal(matchPhotoText(['no readable labels'],teas),null);
+  assert.equal(matchPhotoText(['Assam Breakfast','TeeGschwendner'],[teas[0],{...teas[0],id:'duplicate'}]),null);
+});
+test('camera has a native Vision OCR callback instead of photo-count simulation',()=>{
+  const s=readFileSync(new URL('../ios/App/App/FACTeaCameraPlugin.swift',import.meta.url),'utf8');
+  assert.ok(s.includes('VNRecognizeTextRequest'));
+  assert.ok(s.includes('notifyListeners("photoText"'));
+  assert.ok(!s.includes('if strip.arrangedSubviews.count > 1'));
 });

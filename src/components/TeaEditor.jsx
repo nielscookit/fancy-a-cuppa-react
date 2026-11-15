@@ -50,9 +50,17 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
 /**
  * V3 editor for tea identity and preparation.
  */
-export default function TeaEditor({ tea, barcode, photos = [], message, onCancel, onSaved }) {
+export default function TeaEditor({ tea, barcode, photos = [], prefill = null, message, onCancel, onSaved }) {
   const [form,setForm]=useState(()=>{
-    const next=initialTeaForm(tea);
+    const next=initialTeaForm(tea || prefill);
+    if (!tea) {
+      next.id=null;
+      // Image, notes and source from catalog are not transferable through
+      // the community-tea write API; do not silently copy them.
+      next.photoUrl='';
+      next.instructions='';
+      next.sourceLabel='';
+    }
     if(!tea&&barcode){
       next.codeType=barcode.type||'';
       next.codeValue=barcode.value||'';
