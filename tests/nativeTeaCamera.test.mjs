@@ -13,23 +13,23 @@ test('camera PoC classifies UPC-A and equivalent EAN-13 using existing normaliza
 test('camera bridge attaches before presentation and removes its listener on close and error', async () => {
   for (const failure of [false, true]) {
     const calls = [];
-    let listener;
+    const listeners = {};
     const operation = openNativeTeaCamera({
       async addListener(event, callback) {
         calls.push(event);
-        listener = callback;
+        listeners[event] = callback;
         return { remove: async () => { calls.push('remove'); } };
       },
       async open() {
         calls.push('open');
         if (failure) throw new Error('camera unavailable');
-        listener({ id: 'scan-1', text: DEMO_TEA_BARCODE, format: 'UPC-A' });
+        listeners.barcode({ id: 'scan-1', text: DEMO_TEA_BARCODE, format: 'UPC-A' });
         return { action: 'close' };
       },
       async showBarcodeResult(result) { calls.push(result); },
     });
     if (failure) await assert.rejects(operation, /camera unavailable/);
-    else assert.deepEqual(await operation, { action: 'close', tea:null, barcode:null });
+    else assert.deepEqual(await operation, { action: 'close', tea:null, barcode:null, photoTea:null });
     assert.deepEqual(calls, failure ? ['barcode', 'photoText', 'open', 'remove', 'remove']
       : ['barcode', 'photoText', 'open', { id: 'scan-1', result: 'known' }, 'remove', 'remove']);
   }
@@ -54,16 +54,16 @@ test('unknown barcode banner expires and repeat scanning waits for a removal eve
 });
 
 test('production camera barcode lookup returns a real tea and never uses the fixture', async () => {
-  let event;
+  const listeners = {};
   const notifications = [];
   const tea = { id:'cloud-123', rawName:'Assam Breakfast' };
   const response = await openNativeTeaCamera({
     async addListener(name, callback) {
-      event = callback;
+      listeners[name] = callback;
       return { remove:async () => {} };
     },
     async open() {
-      event({id:'first',text:DEMO_TEA_BARCODE,format:'UPC-A'});
+      listeners.barcode({id:'first',text:DEMO_TEA_BARCODE,format:'UPC-A'});
       // Allow the asynchronous lookup to complete before selecting USE.
       await new Promise(resolve => setImmediate(resolve));
       return {action:'use'};
@@ -76,11 +76,11 @@ test('production camera barcode lookup returns a real tea and never uses the fix
 });
 
 test('unknown barcode is available as add-form metadata', async () => {
-  let event;
+  const listeners = {};
   const response = await openNativeTeaCamera({
-    async addListener(name,callback) { event=callback; return {remove:async()=>{}}; },
+    async addListener(name,callback) { listeners[name]=callback; return {remove:async()=>{}}; },
     async open() {
-      event({id:'unknown',text:'96385074',format:'EAN8'});
+      listeners.barcode({id:'unknown',text:'96385074',format:'EAN8'});
       await new Promise(resolve => setImmediate(resolve));
       return {action:'add'};
     },
