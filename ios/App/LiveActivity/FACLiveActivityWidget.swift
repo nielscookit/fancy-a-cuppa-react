@@ -195,18 +195,16 @@ private struct FACQuickAccessView: View {
             let unit = diameter / 72
             ZStack {
                 Circle()
-                    .fill(Color(red: 50 / 255, green: 54 / 255, blue: 58 / 255))
-                Circle()
-                    .strokeBorder(Color(red: 108 / 255, green: 115 / 255, blue: 119 / 255),
-                                  lineWidth: unit)
+                    .fill(Color.white.opacity(0.15))
                 if let url = Bundle.main.url(forResource: "uc01-" + target.rawValue, withExtension: "png"),
                    let icon = UIImage(contentsOfFile: url.path) {
                     Image(uiImage: icon)
                         .renderingMode(.template)
                         .resizable()
                         .foregroundStyle(.white)
-                        .frame(width: 32 * unit, height: (target == .timer ? 22 : 32) * unit)
-                        .offset(x: -unit, y: -unit)
+                        .frame(width: 48 * unit, height: 33 * unit)
+                        // Figma positions the icon at (13, 19) in a 72 × 72 circle.
+                        .offset(x: unit, y: -0.5 * unit)
                         .widgetAccentable()
                 }
             }
