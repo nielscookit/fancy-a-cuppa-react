@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, realpathSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, readdirSync } from 'node:fs';
 import { homedir, networkInterfaces } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { readUc02Config } from './uc02-ios-config.mjs';
@@ -21,19 +21,42 @@ const testCheckout = join(homedir(),'Documents','fancy-a-cuppa-uc02-ios');
 const env = Object.fromEntries(['PATH','HOME','TMPDIR','USER','LOGNAME','TERM']
   .filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]]));
 env.GIT_OPTIONAL_LOCKS = '0';
+const localBin = join(root, 'node_modules', '.bin');
+const supabaseEnv = { PATH: [localBin, env.PATH].filter(Boolean).join(delimiter) };
 
 class Stop extends Error {}
 
-function exec(file, args, { input, timeout = 30000, extraEnv = {}, cwd = root } = {}) {
+function exec(file, args, { input, timeout = 30000, extraEnv = {}, cwd = root, testDiagnostics = false } = {}) {
   try {
     return execFileSync(file, args, { cwd, env: { ...env, ...extraEnv },
       encoding: 'utf8', stdio: ['pipe','pipe','pipe'], input, timeout, maxBuffer: 16 * 1024 * 1024 }).trim();
   } catch (error) {
     const reason = error.code === 'ENOENT' ? 'Programm fehlt' : error.code === 'ETIMEDOUT'
       ? 'Zeitlimit erreicht' : Number.isInteger(error.status) ? 'Exit ' + error.status : 'Aufruf fehlgeschlagen';
-    // Never print command arguments, environment, or child output from a failure.
-    throw new Stop(file + ': ' + reason);
+    if (file === 'supabase' && error.code === 'ENOENT') {
+      throw new Stop('Supabase-CLI fehlt. Im Fancy-Test-Worktree einmal npm install --no-save --package-lock=false supabase ausführen.');
+    }
+    const diagnostics = testDiagnostics ? safeTestDiagnostics(error.stdout) : '';
+    // Child output can include values from environment files or fixtures.
+    throw new Stop(file + ': ' + reason + (diagnostics ? '\n' + diagnostics : ''));
   }
+}
+
+export function safeTestDiagnostics(stdout) {
+  const failures = String(stdout ?? '').split(/(?=^\s*not ok \d+ - )/m).slice(1);
+  return failures.slice(0, 8).map(failure => {
+    // Only emit source locations that exist in this checkout, and diagnostics
+    // drawn from fixed literals. Never forward test values or free text.
+    const locations = [...failure.matchAll(/(?:^|\/)((?:tests|src)\/[\w./-]+\.m?js):(\d{1,6}):(\d{1,4})/gm)];
+    const location = locations.find(([, path]) =>
+      !path.split('/').includes('..') && existsSync(join(root, path)));
+    const kind = /(?:ERR_ASSERTION|AssertionError)/.test(failure) ? 'AssertionError' : 'Test fehlgeschlagen';
+    const operator = failure.match(/^\s*operator:\s*['"]?(strictEqual|deepStrictEqual|match|doesNotMatch|==|!=|===|!==)['"]?\s*$/m)?.[1];
+    const font = failure.match(/RobotoMono-(Regular|Medium)\.ttf missing from FACLiveActivityExtension resources/)?.[1];
+    return '  ' + kind + (location ? ' · ' + location.slice(1).join(':') : '') +
+      (operator ? ' · ' + operator : '') +
+      (font ? ' · RobotoMono-' + font + '.ttf fehlt in den Extension-Ressourcen' : '');
+  }).join('\n');
 }
 
 function requireCheck(ok, message) {
@@ -89,7 +112,7 @@ export async function checkLocal(report, { runExec = exec, request = fetch } = {
   'Die erwarteten lokalen Supabase-Container laufen nicht unter demselben Projekt.');
   report.pass('Docker · lokale UC02-Container');
 
-  const status = parseStatus(runExec('supabase', ['status','-o','env'], { cwd:mainCheckout }));
+  const status = parseStatus(runExec('supabase', ['status','-o','env'], { cwd:mainCheckout, extraEnv:supabaseEnv }));
   const url = new URL(status.DB_URL);
   requireCheck(url.protocol === 'postgresql:' && ['127.0.0.1','localhost'].includes(url.hostname) &&
     url.pathname === '/postgres' && !url.search && !url.hash &&
@@ -130,7 +153,9 @@ function checkTrackedExecutionInputs() {
 }
 
 function npmStep(report, args, label, extraEnv) {
-  const output = exec('npm', args, { timeout: 180000, extraEnv });
+  const isTest = args[0] === 'test';
+  const command = isTest ? [...args, '--', '--test-reporter=tap'] : args;
+  const output = exec('npm', command, { timeout: 180000, extraEnv, testDiagnostics:isTest });
   const tally = output.match(/^(?:#|ℹ) (?:pass|tests) (\d+)$/gm)?.join(', ');
   report.pass(label + (tally ? ' · ' + tally : ''));
 }
@@ -258,7 +283,7 @@ export async function run(args, { gitCheck = checkGit, localCheck = checkLocal, 
         gitCheck(report);
         await localCheck(report);
         runExec(process.execPath, [join(root,'scripts/verify-community-tea-local.mjs')],
-          { cwd:mainCheckout, timeout:180000 });
+          { cwd:mainCheckout, timeout:180000, extraEnv:supabaseEnv });
         report.pass(step);
       } else report.skip('Integration · separat mit verify --integration starten. Diese Prüfung legt lokale Testdaten an.');
     } else if (action === 'build') {

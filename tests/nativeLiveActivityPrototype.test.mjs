@@ -2,6 +2,33 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
+// Follow the target → resources phase → build file → file reference chain.
+function liveActivityResources(project) {
+  const withoutComments = project.replace(/\/\*[\s\S]*?\*\//g, '');
+  const objects = [...withoutComments.matchAll(/^\s*([A-F0-9]{24})\s*=\s*\{([^{}]*)\};/gm)];
+  const byId = new Map(objects.map(([, id, fields]) => [id, fields]));
+  const target = objects.find(([, , fields]) =>
+    /\bisa\s*=\s*PBXNativeTarget\s*;/.test(fields) &&
+    /\bname\s*=\s*"?FACLiveActivityExtension"?\s*;/.test(fields))?.[2];
+  assert.ok(target, 'FACLiveActivityExtension target missing');
+  const phaseIds = target.match(/\bbuildPhases\s*=\s*\(([^)]*)\)/)?.[1] ?? '';
+  const paths = new Set();
+  for (const id of phaseIds.match(/[A-F0-9]{24}/g) ?? []) {
+    const phase = byId.get(id) ?? '';
+    if (!/\bisa\s*=\s*PBXResourcesBuildPhase\s*;/.test(phase)) continue;
+    const files = phase.match(/\bfiles\s*=\s*\(([^)]*)\)/)?.[1] ?? '';
+    for (const buildId of files.match(/[A-F0-9]{24}/g) ?? []) {
+      const build = byId.get(buildId) ?? '';
+      if (!/\bisa\s*=\s*PBXBuildFile\s*;/.test(build)) continue;
+      const file = byId.get(build.match(/\bfileRef\s*=\s*([A-F0-9]{24})\s*;/)?.[1]) ?? '';
+      if (!/\bisa\s*=\s*PBXFileReference\s*;/.test(file)) continue;
+      const path = file.match(/\bpath\s*=\s*"?([^";]+?)"?\s*;/)?.[1];
+      if (path) paths.add(path);
+    }
+  }
+  return paths;
+}
+
 test('native Live Activity Phase 1 is a separate embedded widget extension', () => {
   const project=readFileSync('ios/App/App.xcodeproj/project.pbxproj','utf8');
   const info=readFileSync('ios/App/App/Info.plist','utf8');
@@ -28,9 +55,10 @@ test('native Live Activity Phase 1 is a separate embedded widget extension', () 
   assert.match(widget, /\.frame\(maxWidth: \.infinity, alignment: \.leading\)/);
   assert.match(widget, /activitySystemActionForegroundColor\(charcoal\)/);
   assert.match(widget, /CTFontManagerRegisterFontsForURL/);
+  const resources = liveActivityResources(project);
   for (const weight of ['Regular', 'Medium']) {
     const font = 'RobotoMono-' + weight + '.ttf';
-    assert.ok(project.includes(font + ' in Activity Resources'));
+    assert.ok(resources.has('Fonts/' + font), font + ' missing from FACLiveActivityExtension resources');
     assert.ok(readFileSync('ios/App/LiveActivity/Fonts/' + font).length > 0);
   }
   assert.doesNotMatch(widget,/Image\(uiImage: appIcon\)/);

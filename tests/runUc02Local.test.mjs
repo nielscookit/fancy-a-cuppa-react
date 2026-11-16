@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { approvedMigration, checkLocal, run } from '../scripts/run-uc02-local.mjs';
+import { approvedMigration, checkLocal, run, safeTestDiagnostics } from '../scripts/run-uc02-local.mjs';
 
 const id = '00000000-0000-4000-8000-000000000001';
 const password = 'private-test-password';
@@ -91,4 +91,17 @@ test('migration plan only accepts the exact approved bytes after the two prerequ
   assert.throws(() => approvedMigration(versions,names,()=>'unapproved SQL'),/nicht freigegeben/);
   assert.throws(() => approvedMigration(versions,[...names,'20261117000000_other.sql'],assert.fail),/nicht freigegeben/);
   assert.throws(() => approvedMigration(versions.slice(1),names,assert.fail),/nicht eindeutig/);
+});
+
+test('npm test reports the assertion location without copying secret values', () => {
+  const report = safeTestDiagnostics([
+    'not ok 1 - rejected value password=secret-fixture',
+    '  location: file:///checkout/tests/nativeLiveActivityPrototype.test.mjs:32:12',
+    '  code: ERR_ASSERTION',
+    '  operator: strictEqual',
+    '  expected: secret-fixture',
+    '  actual: token-fixture',
+  ].join('\n'));
+  assert.match(report, /AssertionError · tests\/nativeLiveActivityPrototype\.test\.mjs:32:12 · strictEqual/);
+  assert.doesNotMatch(report, /secret-fixture|token-fixture|password/);
 });
