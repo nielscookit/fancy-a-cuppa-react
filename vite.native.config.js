@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readUc02Config } from './scripts/uc02-ios-config.mjs';
 
@@ -10,8 +10,7 @@ export default defineConfig(({ mode }) => {
     : null;
 
   return {
-    plugins: [react(), ...(uc02 ? [localOnlyHtml(uc02.url)] : [])],
-    define: { __FAC_UC02_IOS_CONFIG__: JSON.stringify(uc02) },
+    plugins: [react(), ...(uc02 ? [localClient(uc02), localOnlyHtml(uc02.url)] : [])],
     base: './',
     build: {
       outDir: 'dist-native',
@@ -22,6 +21,22 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
+function localClient(config) {
+  const clientPath = normalizePath(resolve(import.meta.dirname, 'src/data/supabaseConfig.js'));
+  return {
+    name: 'fac-uc02-local-client',
+    enforce: 'pre',
+    transform(_source, id) {
+      if (id !== clientPath) return;
+      return {
+        code: `export const uc02IosEnabled = true;
+export const supabaseConfig = Object.freeze(${JSON.stringify(config)});`,
+        map: null,
+      };
+    },
+  };
+}
 
 function localOnlyHtml(url) {
   return {

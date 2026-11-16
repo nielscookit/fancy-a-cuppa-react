@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readUc02Config } from '../scripts/uc02-ios-config.mjs';
-import { supabaseConfig, uc02IosConfig } from '../src/data/supabaseConfig.js';
+import { supabaseConfig, uc02IosEnabled } from '../src/data/supabaseConfig.js';
 import { communityTeaV4 } from '../src/data/teaRepository.js';
 
 const testConfig = {
@@ -34,6 +34,6 @@ test('UC02 refuses implicit activation, remote targets and private credentials',
 
 test('default client has the existing HTTPS endpoint and UC02 is off', () => {
   assert.match(supabaseConfig.url, /^https:\/\/[^/]+\.supabase\.co$/);
-  assert.equal(uc02IosConfig, null);
+  assert.equal(uc02IosEnabled, false);
   assert.equal(communityTeaV4, false);
 });
