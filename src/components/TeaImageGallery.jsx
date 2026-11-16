@@ -61,7 +61,9 @@ export default function TeaImageGallery({tea,children}) {
             tabIndex={selected ? 0 : -1} aria-hidden={!selected} aria-label="Enlarge product image" disabled={!ready}
             onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')suppress.current=false;}}
             onClick={()=>{if(!suppress.current && selected)setZoom(true);}}>
-            <img src={item.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" draggable="false"
+            <img className="fac-image-gallery__backdrop" src={item.url} alt="" aria-hidden="true"
+              referrerPolicy="no-referrer" draggable="false" />
+            <img className="fac-image-gallery__photo" src={item.url} alt={tea.rawName+' – product packaging'} referrerPolicy="no-referrer" draggable="false"
               onLoad={()=>setReady(true)} onError={() => fail(item.url)} />
           </button>;
         })}
