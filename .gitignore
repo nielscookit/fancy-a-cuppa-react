@@ -15,3 +15,5 @@ dist-native/
 /ios/App/Pods/
 /ios/App/build/
 /ios/DerivedData/
+/ios/App/App/Info.UC02Local.generated.plist
+/ios/uc02-local.generated.xcconfig

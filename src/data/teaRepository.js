@@ -1,10 +1,10 @@
-import { supabaseConfig } from './supabaseConfig.js';
+import { supabaseConfig, uc02IosConfig } from './supabaseConfig.js';
 
 // Framework-independent V3 adapter, behavior based on app-v2/cloud.js.
 // For later migration: changing backend settings does not require React changes.
 const endpoint = supabaseConfig.url;
 // Keep builds compatible with the existing endpoint until the coordinated cutover.
-export const communityTeaV4 = import.meta.env?.VITE_COMMUNITY_TEA_V4 === 'true';
+export const communityTeaV4 = Boolean(uc02IosConfig);
 const selectFields = (communityTeaV4 ? 'origin,revision,' : '') + 'id,brand,name,category,subcategory,subcategory_other,leaf_style,photo_url,tea_codes(code_type,code_value),tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c,instructions,source_label)';
 const codeSelect = 'tea_id,teas(' + selectFields + ')';
 const unitField = {

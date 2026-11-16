@@ -21,6 +21,10 @@ on:
       - ios/App/App/FACTeaCameraPlugin.swift
       - tests/nativeTeaCamera.test.mjs
       - tests/nativeLiveActivityPrototype.test.mjs
+      - scripts/build-ios-uc02-local.mjs
+      - scripts/uc02-ios-config.mjs
+      - vite.native.config.js
+      - ios/debug.xcconfig
 
 permissions:
   contents: write # Only commit native ios/ source files after successful build
@@ -95,6 +99,37 @@ jobs:
         run: |
           APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")" = AppIcon
+      - name: Compile isolated UC02 Debug app and validate its network settings
+        env:
+          VITE_COMMUNITY_TEA_V4: 'true'
+          FAC_UC02_SUPABASE_URL: http://127.0.0.1:54321
+          FAC_UC02_SUPABASE_PUBLIC_KEY: sb_publishable_ci_fixture
+        run: |
+          set -euo pipefail
+          NORMAL="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+          if /usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity' "$NORMAL/Info.plist" ||
+             grep -q 'fac-uc02-local' "$NORMAL/public/index.html"; then
+            echo 'Normal Debug build contains UC02 test settings.' >&2
+            exit 1
+          fi
+          npm run build:ios-uc02-local
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
+            -derivedDataPath "$RUNNER_TEMP/fancy-ios-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          test -d "$NORMAL/PlugIns/FACLiveActivityExtension.appex"
+          grep -q 'fac-uc02-local' "$NORMAL/public/index.html"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSExceptionDomains:127.0.0.1:NSExceptionAllowsInsecureHTTPLoads' "$NORMAL/Info.plist")" = true
+          /usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$NORMAL/Info.plist"
+          if grep -R -q 'zfkiiqqyapahxirguxgj.supabase.co' "$NORMAL/public/assets"; then
+            echo 'Production Supabase endpoint in the isolated bundle.' >&2
+            exit 1
+          fi
       - name: Commit Capacitor-synced iOS source files
         run: |
           git add ios/

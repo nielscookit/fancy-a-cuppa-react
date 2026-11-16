@@ -128,6 +128,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
 			buildPhases = (
+				FAC022000000000000000001 /* Check UC02 debug assets */,
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
@@ -212,6 +213,20 @@
 
         FACA1A00000000000000001A /* Activity Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (FACA2B000000000000000001 /* RobotoMono-Regular.ttf in Activity Resources */, FACA1A000000000000000005 /* AppIcon PNG in Activity Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FAC022000000000000000001 /* Check UC02 debug assets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/App/public/index.html",);
+			name = "Check UC02 debug assets";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nif grep -q 'name=\"fac-uc02-local\"' \"$SCRIPT_INPUT_FILE_0\"; then\n  if [ \"$CONFIGURATION\" != Debug ] || [ \"$INFOPLIST_FILE\" != App/Info.UC02Local.generated.plist ]; then\n    echo 'error: UC02 local assets require the generated plist and Debug. Resync the normal bundle for Release.' >&2\n    exit 1\n  fi\nelif [ \"$INFOPLIST_FILE\" = App/Info.UC02Local.generated.plist ]; then\n  echo 'error: Remove ios/uc02-local.generated.xcconfig before building normal Debug assets.' >&2\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		504EC3001FED79650016851F /* Sources */ = {
@@ -366,7 +381,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_FILE = "$(FAC_UC02_DEBUG_PLIST)";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

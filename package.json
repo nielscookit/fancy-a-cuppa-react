@@ -13,6 +13,7 @@
     "verify:pages": "node scripts/verify-pages.mjs",
     "test": "node --test",
     "build:native": "vite build --config vite.native.config.js --mode native",
+    "build:ios-uc02-local": "node scripts/build-ios-uc02-local.mjs",
     "build:ios-fill": "vite build --config vite.ios-fill.config.js"
   },
   "dependencies": {

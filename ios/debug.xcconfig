@@ -1,1 +1,3 @@
 CAPACITOR_DEBUG = true
+FAC_UC02_DEBUG_PLIST = App/Info.plist
+#include? "uc02-local.generated.xcconfig"
