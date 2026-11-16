@@ -69,13 +69,15 @@ Deno.serve(async (req) => {
     }
   }
   if (!version4 && data.action === undefined) data.action = "create";
-  if (data.action !== "create" && data.action !== "update") return reply({error:"Invalid action"},400);
+  const updateBarcode = version4 && data.action === "update_barcode";
+  const isUpdate = data.action === "update" || updateBarcode;
+  if (data.action !== "create" && !isUpdate) return reply({error:"Invalid action"},400);
   // These fields are exclusively constructed by the server.
   delete data.photo_keys;
   delete data.uploaded_photo_keys;
   delete data.request_fingerprint;
   if (version4 && (typeof data.save_id !== "string" || !uuid.test(data.save_id)
-      || (data.action === "update" && (!Number.isSafeInteger(data.expected_revision)
+      || (isUpdate && (!Number.isSafeInteger(data.expected_revision)
         || Number(data.expected_revision) < 1 || typeof data.id !== "string" || !uuid.test(data.id))))) {
     return reply({error:"Invalid save ID or revision"},400);
   }
@@ -142,7 +144,9 @@ Deno.serve(async (req) => {
   delete data.photos;
   let result: Response;
   try {
-    result = await rpc(data.action === "update" ? "update_community_tea" : "add_community_tea", {
+    const name = updateBarcode ? "update_community_tea_barcode"
+      : isUpdate ? "update_community_tea" : "add_community_tea";
+    result = await rpc(name, {
       p_data: data, p_client_hash: clientHash,
     });
   } catch {
@@ -158,7 +162,7 @@ Deno.serve(async (req) => {
   if(!result.ok){
     const msg=String(payload.message||"Could not save tea");
     if(msg.includes("Curated tea is read-only")) return reply({error:"This editorial tea is read-only."},403);
-    if(msg.includes("Tea revision conflict")) return reply({error:"This tea was updated elsewhere. Reopen it before saving."},409);
+    if(msg.includes("Tea revision conflict") || msg.includes("Tea barcode conflict")) return reply({error:"This tea was updated elsewhere. Reopen it before saving."},409);
     if(msg.includes("save identity conflict")) return reply({error:"This save ID was already used for different changes."},409);
     if(msg.includes("Daily submission limit")) return reply({error:"Today's entry limit reached. Try again tomorrow."},429);
     if(msg.includes("duplicate key")) return reply({error:"Product code already exists."},409);

@@ -144,17 +144,18 @@ function requireTeaIdentity(data) {
 
 function assertSupportedMetadata(data) {
   const old = data.original || null;
-  const message = 'The tea’s photo, notes, source, or existing barcode cannot be changed here.';
   const originalPhoto = old?.photoUrl || null;
   const originalInstructions = old?.instructions || null;
   const originalSource = old?.sourceLabel || null;
   if ((data.photoUrl || null) !== originalPhoto ||
     (data.instructions || null) !== originalInstructions ||
-    (data.sourceLabel || null) !== originalSource) throw new Error(message);
-  // An existing barcode cannot be removed or changed by the legacy RPC.
-  if (data.id && old?.code &&
-    (old.code.type !== data.code?.type ||
-     old.code.value !== data.code?.value)) throw new Error(message);
+    (data.sourceLabel || null) !== originalSource) {
+    throw new Error('The tea’s photo, notes or source cannot be changed here.');
+  }
+}
+
+function barcodeChanged(code, previous) {
+  return code?.type !== previous?.type || code?.value !== previous?.value;
 }
 
 function normalizeCloudId(id) {
@@ -170,8 +171,14 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
   requireTeaIdentity(data);
   assertSupportedMetadata(data);
   const id = normalizeCloudId(data.id);
+  const previousCode = data.original?.code;
+  const changedCode = id && barcodeChanged(data.code, previousCode);
+  if (changedCode && previousCode && (!communityTeaV4 || !data.code)) {
+    throw new Error('The existing barcode cannot be removed or changed here.');
+  }
+  const updateBarcode = communityTeaV4 && changedCode;
   const payload = {
-    action: id ? 'update' : 'create',
+    action: updateBarcode ? 'update_barcode' : id ? 'update' : 'create',
     write_version: communityTeaV4 ? 4 : 3,
     id,
     brand: data.brand.trim(),
@@ -195,6 +202,10 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
   if (communityTeaV4) {
     payload.save_id = data.saveId;
     if (id) payload.expected_revision = data.original?.revision;
+    if (updateBarcode) {
+      payload.previous_code_type = previousCode?.type ?? null;
+      payload.previous_code_value = previousCode?.value ?? null;
+    }
     if (data.photos !== undefined) payload.photos = data.photos;
   }
   const response = await fetchImpl(endpoint + '/functions/v1/community-tea', {

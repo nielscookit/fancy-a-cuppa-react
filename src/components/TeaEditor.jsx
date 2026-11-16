@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, Button, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { registerPlugin } from '@capacitor/core';
+import { Box, Button, IconButton, InputAdornment, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import {
   UI_CATEGORY_LABELS, getUiTeaCategory, DOSE_UNITS, LEAF_STYLE_LABELS,
   initialTeaForm, validateTeaForm,
 } from '../features/teaModel.js';
+import { captureNativeTeaBarcode } from '../features/nativeTeaCamera.js';
 import { communityTeaV4, createTea, listCommunityTeaPhotos, lookupTeaByCode, updateTea } from '../data/teaRepository.js';
 
 const figma = import.meta.env.BASE_URL + 'figma/';
@@ -21,11 +23,11 @@ const fieldSx = {
 };
 const options = values => Object.entries(values).map(([value,label])=>({value,label}));
 
-function Field({ label, value, onChange, choices, type='text', required=false, helper='', error='', placeholder='' }) {
+function Field({ label, value, onChange, choices, type='text', required=false, helper='', error='', placeholder='', endAdornment, inputMode }) {
   const props={
     variant:'filled',fullWidth:true,hiddenLabel:true,size:'small',
     value,onChange,required,error:Boolean(error),placeholder,
-    slotProps:{input:{disableUnderline:true},htmlInput:{'aria-label':label}},
+    slotProps:{input:{disableUnderline:true,endAdornment},htmlInput:{'aria-label':label,inputMode}},
     sx:fieldSx,
   };
   return (
@@ -74,6 +76,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
     return next;
   });
   const savingRef=useRef(false);
+  const scanningBarcode = useRef(false);
   const photoInputRef=useRef(null);
   const preparingPhotosRef = useRef(false);
   const [preparingPhotos, setPreparingPhotos] = useState(false);
@@ -150,6 +153,22 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
     });
   }
   const set=(field,value)=>{setForm(previous=>({...previous,[field]:value}));setFieldErrors(previous=>({...previous,[field]:''}));};
+  function setBarcode(value, type) {
+    setForm(previous => ({ ...previous, codeValue: value, codeType: type }));
+    setFieldErrors(previous => ({ ...previous, codeValue: '' }));
+  }
+  async function scanBarcode() {
+    if (scanningBarcode.current || savingRef.current) return;
+    scanningBarcode.current = true;
+    try {
+      const code = await captureNativeTeaBarcode(registerPlugin('FACTeaCamera'));
+      if (code) setBarcode(code.value, code.type);
+    } catch (failure) {
+      setFieldErrors(previous => ({ ...previous, codeValue: failure.message || 'Camera unavailable.' }));
+    } finally {
+      scanningBarcode.current = false;
+    }
+  }
   const changeUnit=value=>setForm(previous=>({
     ...previous,type:value==='bag'?'bag':'loose',
     unit:value,
@@ -160,9 +179,10 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
   }));
   async function save(event) {
     event.preventDefault();
-    if(savingRef.current || preparingPhotosRef.current || photoLoad !== 'ready')return;
+    if(savingRef.current || scanningBarcode.current || preparingPhotosRef.current || photoLoad !== 'ready')return;
     const errors={};
     for(const key of ['name','brand','category','qty','base','mins']) if(!String(form[key]??'').trim()) errors[key]='Required field';
+    if(tea?.code && !form.codeValue) errors.codeValue='Enter a replacement barcode to keep this tea linked.';
     if(form.codeValue && !form.codeType) errors.codeValue='Enter an EAN-8, UPC-A or EAN-13 barcode.';
     for(const [key,min,max] of [['qty',0.01,100],['base',50,10000],['mins',1,30],['temperature',40,100]]) {
       if(form[key]!=='' && (!Number.isFinite(Number(form[key])) || Number(form[key])<min || Number(form[key])>max)) errors[key]=`Enter a value from ${min} to ${max}.`;
@@ -282,18 +302,19 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
         )}
         <Stack gap="24px">
           <Field label="Tea name" placeholder="Enter tea name" error={fieldErrors.name} value={form.name} onChange={e=>set('name',e.target.value)} required />
-          {!tea && (
-            <Box className="fac-editor-barcode">
-              <Field label="Barcode (EAN / UPC)" placeholder="Scan or enter barcode" value={form.codeValue}
-                onChange={e=> {
-                  const value=e.target.value.replace(/[^0-9]/g,'').slice(0,13);
-                  setForm(previous=>({...previous,codeValue:value,
-                    codeType:value.length===8?'ean_8':value.length===12?'upc_a':value.length===13?'ean_13':''}));
-                }} error={fieldErrors.codeValue} />
-              {form.codeValue && <Button type="button" aria-label="Clear barcode"
-                className="fac-editor-barcode__clear" onClick={() =>
-                  setForm(previous=>({...previous,codeValue:'',codeType:''}))}>×</Button>}
-            </Box>
+          {(!tea || communityTeaV4) && (
+            <Field label="Barcode (EAN / UPC)" placeholder="Scan or enter barcode" value={form.codeValue}
+              inputMode="numeric"
+              onChange={e => {
+                const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
+                setBarcode(value, { 8: 'ean_8', 12: 'upc_a', 13: 'ean_13' }[value.length] || '');
+              }}
+              error={fieldErrors.codeValue}
+              endAdornment={nativeIOS && <InputAdornment position="end">
+                <IconButton type="button" aria-label="Scan barcode" disabled={saving} onClick={scanBarcode}>
+                  <img src={figma+'tea-scanner.svg'} width="24" height="24" alt="" />
+                </IconButton>
+              </InputAdornment>} />
           )}
           <Field label="Manufacturer" placeholder="Enter manufacturer" error={fieldErrors.brand} value={form.brand} onChange={e=>set('brand',e.target.value)} required />
           <Field label="Category" error={fieldErrors.category} value={form.category ? getUiTeaCategory(form.category) : ''} onChange={e=>changeCategory(e.target.value)}

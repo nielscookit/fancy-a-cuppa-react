@@ -11,6 +11,7 @@ alter role service_role bypassrls;
 `);
 await db.exec(readFileSync('tests/fixtures/community-tea-local-schema.sql','utf8'));
 await db.exec(readFileSync('supabase/migrations/20261115220827_community_tea_catalog.sql','utf8'));
+await db.exec(readFileSync('supabase/migrations/20261116122401_community_tea_barcode_update.sql','utf8'));
 const old = '00000000-0000-4000-8000-000000000001';
 const key = 'community/00000000-0000-4000-8000-000000000002.jpg';
 const client = 'a'.repeat(64);
@@ -46,5 +47,42 @@ const history=(await db.query('select snapshot from tea_community_private.tea_ed
 assert.equal(history.length,1);
 assert.equal(history[0].snapshot.photos[0].object_key,key);
 assert.equal(history[0].snapshot.tea.revision,1);
+await db.exec('set role service_role');
+const owner = await call('add',{...base,save_id:id(),code_type:'upc_a',code_value:'123456789012'});
+const missing = await call('add',{...base,save_id:id()});
+const barcodeEdit = async data => (await db.query(
+  'select public.update_community_tea_barcode($1::jsonb,$2) result',[JSON.stringify(data),client],
+)).rows[0].result;
+const codes = async tea => (await db.query(
+  'select code_type,code_value from tea_codes where tea_id=$1 order by code_type',[tea],
+)).rows;
+await db.exec('set role anon');
+await assert.rejects(barcodeEdit({...base,save_id:id()}),/permission denied/);
+await db.exec('set role service_role');
+const patch = {...base,id:created.id,expected_revision:2,
+  previous_code_type:'ean_13',previous_code_value:'0850045678906'};
+await assert.rejects(barcodeEdit({...patch,save_id:id(),id:old,expected_revision:1,
+  code_type:'ean_8',code_value:'96385074'}),/read-only/);
+await assert.rejects(barcodeEdit({...patch,save_id:id(),code_type:'ean_13',code_value:'0123456789012'}),/unique/);
+assert.deepEqual(await codes(created.id),[{code_type:'ean_13',code_value:'0850045678906'}]);
+assert.deepEqual(await codes(owner.id),[{code_type:'upc_a',code_value:'123456789012'}]);
+await assert.rejects(barcodeEdit({...patch,save_id:id(),code_type:null,code_value:null}),/Invalid barcode/);
+await assert.rejects(barcodeEdit({...patch,save_id:id(),previous_code_value:'9999999999999',
+  code_type:'ean_8',code_value:'96385074'}),/barcode conflict/);
+assert.equal((await db.query('select revision from teas where id=$1',[created.id])).rows[0].revision,2);
+const replacement = {...patch, save_id:id(),code_type:'ean_8',code_value:'96385074'};
+assert.equal((await barcodeEdit(replacement)).revision,3);
+assert.equal((await barcodeEdit(replacement)).replayed,true);
+assert.deepEqual(await codes(created.id),[{code_type:'ean_8',code_value:'96385074'}]);
+await assert.rejects(barcodeEdit({...replacement,save_id:id()}),/revision conflict/);
+assert.equal((await barcodeEdit({...base,save_id:id(),id:missing.id,expected_revision:1,
+  previous_code_type:null,previous_code_value:null,code_type:'upc_a',code_value:'850045678906'})).revision,2);
+assert.deepEqual(await codes(missing.id),[{code_type:'upc_a',code_value:'850045678906'}]);
+await db.exec('reset role');
+const previousCode = (await db.query(
+  'select snapshot from tea_community_private.tea_edit_history where tea_id=$1 and revision=2',[created.id],
+)).rows[0].snapshot.codes[0];
+assert.equal(previousCode.code_value,'0850045678906');
+console.log('Isolated PostgreSQL: barcode addition, atomic replacement, UPC/EAN conflict rollback, protection, replay and code history passed.');
 await db.close();
 console.log('Isolated PostgreSQL: cutover, permissions, equal names, deduplication, replay, revision conflict, photo rollback and historical snapshot passed.');

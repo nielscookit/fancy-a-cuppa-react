@@ -45,6 +45,16 @@ export function photoPrefillFromText(lines) {
 
 // Swift returns only the IDs that were applied to its visible state.
 // A pending or superseded lookup cannot supply data to the selected action.
+/** Scan a form value without starting catalogue lookup or photo recognition. */
+export async function captureNativeTeaBarcode(camera) {
+  const response = await camera.open({ mode: 'barcode' });
+  if (response.action !== 'barcode') return null;
+  const code = normalizeBarcode(response.barcode);
+  const length = { ean_8: 8, upc_a: 12, ean_13: 13 }[code?.type];
+  if (!length || code.value.length !== length) throw new Error('No valid EAN or UPC barcode was read.');
+  return code;
+}
+
 export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } = {}) {
   let active = true;
   let lookup;

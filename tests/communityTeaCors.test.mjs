@@ -53,7 +53,7 @@ test('unapproved POST remains rejected',async()=>{
   assert.deepEqual(await response.json(),{error:'Origin not allowed'});
 });
 
-function mockSave(fetchImpl) {
+function mockSave(fetchImpl, overrides = {}) {
   let saveHandler;
   runInNewContext(source, {
     Deno: { serve(callback) { saveHandler = callback; }, env: { get: () => 'https://backend.test' } },
@@ -75,6 +75,7 @@ function mockSave(fetchImpl) {
       photos: [{ jpeg: 'test' }],
       photo_keys: ['foreign-file'],
       uploaded_photo_keys: ['foreign-file'],
+      ...overrides,
     }),
   }));
 }
@@ -138,4 +139,21 @@ test('local signed photo links use the configured public URL instead of the runt
   assert.equal(response.status, 200);
   const [photo] = await response.json();
   assert.match(photo.url, /^http:\/\/127\.0\.0\.1:54321\/storage\/v1\/object\/sign\//);
+});
+
+test('barcode edits use the dedicated version-4 RPC and conflicts return 409', async () => {
+  const payload = { action: 'update_barcode', photos: undefined, code_type: 'upc_a',
+    code_value: '850045678906', previous_code_type: 'ean_8', previous_code_value: '96385074' };
+  const response = await mockSave(async (target, options) => {
+    assert.match(target, /\/rpc\/update_community_tea_barcode$/);
+    const { p_data } = JSON.parse(options.body);
+    assert.equal(p_data.expected_revision, 1);
+    assert.equal(p_data.previous_code_value, payload.previous_code_value);
+    return Response.json({ message: 'duplicate key value violates unique constraint' }, { status: 409 });
+  }, payload);
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), { error: 'Product code already exists.' });
+  const legacy = await mockSave(() => assert.fail('Old clients may not use barcode edits'),
+    { ...payload, write_version: 3 });
+  assert.equal(legacy.status, 400);
 });

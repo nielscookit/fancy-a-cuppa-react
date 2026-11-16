@@ -115,3 +115,26 @@ try {
 assert.equal(objectCount(), beforeFailure);
 assert.deepEqual(await gallery(id), updated);
 console.log('PASS actual Storage write rejection preserves existing photos and restores the fixture bucket limit');
+
+const eanStem = String(random[0] % 10000000).padStart(7,'0');
+const eanCheck = (10 - [...eanStem].reduce((sum,digit,index)=>sum+Number(digit)*(index%2?1:3),0)%10)%10;
+const ean = eanStem + eanCheck;
+const withoutCode = await expect(await send({ ...base, action: 'create' }), 200);
+const replaceCode = { ...base, action: 'update_barcode', id, expected_revision: 2,
+  previous_code_type: 'ean_13', previous_code_value: '0' + barcode };
+await expect(await send({ ...replaceCode, code_type: null, code_value: null }), 400);
+await expect(await send({ ...replaceCode, code_type: 'ean_8', code_value: ean }), 200);
+await expect(await send({ ...base, action: 'update_barcode', id: withoutCode.id, expected_revision: 1,
+  previous_code_type: null, previous_code_value: null, code_type: 'ean_13', code_value: '0' + barcode }), 200);
+const rejected = await expect(await send({ ...replaceCode, expected_revision: 3,
+  previous_code_type: 'ean_8', previous_code_value: ean,
+  code_type: 'upc_a', code_value: barcode }), 409);
+assert.match(rejected.error, /Product code already exists/);
+const findCode = async (type,value) => {
+  const lookup = new URL('/rest/v1/tea_codes',url);
+  lookup.search = new URLSearchParams({ select:'tea_id', code_type:'eq.'+type, code_value:'eq.'+value });
+  return expect(await fetch(lookup,{headers:publicHeaders,redirect:'error'}),200);
+};
+assert.deepEqual(await findCode('ean_8',ean),[{tea_id:id}]);
+assert.deepEqual(await findCode('ean_13','0'+barcode),[{tea_id:withoutCode.id}]);
+console.log('PASS native API barcode addition, replacement, alias conflict and public lookup');

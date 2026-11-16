@@ -1,13 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { classifyCameraBarcode, DEMO_TEA_BARCODE, openNativeTeaCamera, matchPhotoText } from '../src/features/nativeTeaCamera.js';
+import { classifyCameraBarcode, DEMO_TEA_BARCODE, openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoText } from '../src/features/nativeTeaCamera.js';
 
 test('camera PoC classifies UPC-A and equivalent EAN-13 using existing normalization', () => {
   assert.equal(classifyCameraBarcode({ text: DEMO_TEA_BARCODE, format: 'UPC-A' }), 'known');
   assert.equal(classifyCameraBarcode({ text: '0' + DEMO_TEA_BARCODE, format: 'EAN-13' }), 'known');
   assert.equal(classifyCameraBarcode({ text: '96385074', format: 'EAN8' }), 'unknown');
   assert.equal(classifyCameraBarcode({ text: '', format: 'EAN13' }), 'unreadable');
+});
+
+test('form scanning only opens the barcode mode and returns a normalized code or cancellation', async () => {
+  for (const [response, expected] of [
+    [{ action: 'barcode', barcode: { format: 'EAN13', text: '0' + DEMO_TEA_BARCODE } }, { type: 'upc_a', value: DEMO_TEA_BARCODE }],
+    [{ action: 'close', barcode: { format: 'EAN8', text: '96385074' } }, null],
+  ]) {
+    const camera = { open: async options => {
+      assert.deepEqual(options, { mode: 'barcode' });
+      return response;
+    } };
+    assert.deepEqual(await captureNativeTeaBarcode(camera), expected);
+  }
+  await assert.rejects(captureNativeTeaBarcode({
+    open: async () => ({ action: 'barcode', barcode: { format: 'EAN8', text: '123' } }),
+  }), /No valid EAN or UPC/);
 });
 
 test('camera bridge attaches before presentation and removes its listener on close and error', async () => {

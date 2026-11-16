@@ -38,12 +38,19 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("The camera is currently unavailable.")
                 return
             }
-            let controller = FACTeaCameraViewController { [weak self] id, text, format in
-                self?.notifyListeners("barcode", data: ["id": id, "text": text, "format": format])
+            let barcodeOnly = call.getString("mode") == "barcode"
+            var capturedBarcode: [String: String]?
+            let controller = FACTeaCameraViewController(barcodeOnly: barcodeOnly) { [weak self] id, text, format in
+                if barcodeOnly {
+                    capturedBarcode = ["text": text, "format": format]
+                } else {
+                    self?.notifyListeners("barcode", data: ["id": id, "text": text, "format": format])
+                }
             } onPhotoText: { [weak self] id, lines in
                 self?.notifyListeners("photoText", data: ["id": id, "lines": lines])
             } onClose: { result, photos, barcodeID, photoID in
                 var response: [String: Any] = ["action": result, "photos": photos]
+                if result == "barcode", let capturedBarcode { response["barcode"] = capturedBarcode }
                 if let barcodeID { response["barcodeID"] = barcodeID }
                 if let photoID { response["photoID"] = photoID }
                 call.resolve(response)
@@ -83,6 +90,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         isHighFrameRateTrackingEnabled: false, isPinchToZoomEnabled: true,
         isGuidanceEnabled: false, isHighlightingEnabled: false
     )
+    private let barcodeOnly: Bool
     private let onBarcode: (String, String, String) -> Void
     private let onPhotoText: (String, [String]) -> Void
     private let onClose: (String, [String], String?, String?) -> Void
@@ -117,9 +125,10 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private enum Result { case none, possible, noMatch }
     private var result = Result.none
 
-    init(onBarcode: @escaping (String, String, String) -> Void,
+    init(barcodeOnly: Bool, onBarcode: @escaping (String, String, String) -> Void,
          onPhotoText: @escaping (String, [String]) -> Void,
          onClose: @escaping (String, [String], String?, String?) -> Void) {
+        self.barcodeOnly = barcodeOnly
         self.onBarcode = onBarcode
         self.onPhotoText = onPhotoText
         self.onClose = onClose
@@ -193,6 +202,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                                                name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(startScanner),
                                                name: UIApplication.didBecomeActiveNotification, object: nil)
+        if barcodeOnly {
+            shutter.isHidden = true
+            identify.isHidden = true
+            thumbnails.isHidden = true
+        }
         updateActions()
     }
 
@@ -230,7 +244,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         let width = view.bounds.width
         let height = view.bounds.height
         let top = max(52, view.safeAreaInsets.top)
-        let cameraHeight = max(120, height - top - 264)
+        let cameraHeight = max(120, height - top - (barcodeOnly ? view.safeAreaInsets.bottom : 264))
         scanner.view.frame = CGRect(x: 0, y: top, width: width, height: cameraHeight)
         finder.frame = CGRect(x: (width - 189) / 2, y: cameraHeight * 152 / 496, width: 189, height: 116)
         scanner.regionOfInterest = finder.frame
@@ -279,6 +293,13 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             guard case .barcode(let barcode) = item else { continue }
             let code = barcode.payloadStringValue ?? ""
             let format = barcode.observation.symbology == .ean8 ? "EAN8" : "EAN13"
+            if barcodeOnly {
+                guard code.utf8.count == (format == "EAN8" ? 8 : 13),
+                      code.utf8.allSatisfy({ (48...57).contains($0) }) else { continue }
+                onBarcode(barcode.id.uuidString, code, format)
+                finish("barcode")
+                return
+            }
             // Vision presents UPC-A as zero-prefixed EAN-13.
             let key = code.isEmpty ? barcode.id.uuidString : code
             visibleBarcodeIDs[barcode.id] = key
