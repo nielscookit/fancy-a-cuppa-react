@@ -55,7 +55,7 @@ export async function captureNativeTeaBarcode(camera) {
   return code;
 }
 
-export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } = {}) {
+export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, shouldOpen } = {}) {
   let active = true;
   let lookup;
   const barcodes = new Map();
@@ -99,7 +99,8 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } 
       if (!active) return;
       let tea;
       try {
-        tea = matchPhoto?.(candidate.lines);
+        tea = await matchPhoto?.(candidate.lines);
+        if (!active) return;
         if (tea) photoMatches.set(candidate.id, tea);
         else {
           const prefill = photoPrefillFromText(candidate.lines);
@@ -108,10 +109,12 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto } 
       } catch (error) {
         console.warn('[Tea Camera] Photo matching failed', error);
       }
+      if (!active) return;
       await camera.showPhotoResult({
         id: candidate.id, result: tea ? 'possible' : 'no_match', name: tea?.rawName, brand: tea?.brand,
       }).catch(error => console.warn('[Tea Camera]', error));
     });
+    if (shouldOpen && !shouldOpen()) return { action: 'close' };
     const { barcodeID, photoID, ...response } = await camera.open();
     const match = barcodes.get(barcodeID);
     return {

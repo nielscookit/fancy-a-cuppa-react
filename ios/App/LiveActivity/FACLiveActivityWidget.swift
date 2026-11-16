@@ -1,5 +1,6 @@
 import ActivityKit
 import SwiftUI
+import UIKit
 import CoreText
 import ImageIO
 import WidgetKit
@@ -141,11 +142,84 @@ struct FACLiveActivityWidget: Widget {
 struct FACLiveActivityWidgetBundle: WidgetBundle {
     var body: some Widget {
         FACLiveActivityWidget()
+        FACQuickAccessWidget(target: .timer)
+        FACQuickAccessWidget(target: .scanner)
         #if canImport(AlarmKit)
         if #available(iOS 26.0, *) {
             FACAlarmPrototypeWidget()
         }
         #endif
+    }
+}
+
+private struct FACQuickAccessEntry: TimelineEntry {
+    let date = Date()
+}
+
+private struct FACQuickAccessProvider: TimelineProvider {
+    func placeholder(in context: Context) -> FACQuickAccessEntry { FACQuickAccessEntry() }
+
+    func getSnapshot(in context: Context, completion: @escaping (FACQuickAccessEntry) -> Void) {
+        completion(FACQuickAccessEntry())
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<FACQuickAccessEntry>) -> Void) {
+        completion(Timeline(entries: [FACQuickAccessEntry()], policy: .never))
+    }
+}
+
+private struct FACQuickAccessWidget: Widget {
+    let target: FACQuickAccessTarget
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "FACQuickAccess." + target.rawValue, provider: FACQuickAccessProvider()) { _ in
+            FACQuickAccessView(target: target)
+        }
+        .supportedFamilies([.accessoryCircular])
+        .configurationDisplayName(target == .timer ? "Tea Timer" : "Tea Scanner")
+        .description(target == .timer ? "Open the timer." : "Open the tea camera.")
+
+        .contentMarginsDisabled()
+    }
+}
+
+private struct FACQuickAccessView: View {
+    let target: FACQuickAccessTarget
+
+    private var face: some View {
+        GeometryReader { geometry in
+            let diameter = min(geometry.size.width, geometry.size.height)
+            let unit = diameter / 72
+            ZStack {
+                Circle()
+                    .fill(Color(red: 50 / 255, green: 54 / 255, blue: 58 / 255))
+                Circle()
+                    .strokeBorder(Color(red: 108 / 255, green: 115 / 255, blue: 119 / 255),
+                                  lineWidth: unit)
+                if let url = Bundle.main.url(forResource: "uc01-" + target.rawValue, withExtension: "png"),
+                   let icon = UIImage(contentsOfFile: url.path) {
+                    Image(uiImage: icon)
+                        .renderingMode(.template)
+                        .resizable()
+                        .foregroundStyle(.white)
+                        .frame(width: 32 * unit, height: (target == .timer ? 22 : 32) * unit)
+                        .offset(x: -unit, y: -unit)
+                        .widgetAccentable()
+                }
+            }
+            .frame(width: diameter, height: diameter)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .accessibilityLabel(target == .timer ? "Tea Timer" : "Tea Scanner")
+        .widgetURL(FACQuickAccessTarget.widgetURL(for: target, extensionID: Bundle.main.bundleIdentifier))
+    }
+
+    var body: some View {
+        if #available(iOS 17.0, *) {
+            face.containerBackground(.clear, for: .widget)
+        } else {
+            face
+        }
     }
 }
 

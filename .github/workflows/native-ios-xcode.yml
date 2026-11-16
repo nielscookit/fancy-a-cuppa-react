@@ -115,6 +115,7 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NORMAL/Info.plist")" = com.fancyacuppa.app
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$NORMAL/Info.plist")" = 'Fancy a Cuppa'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NORMAL/PlugIns/FACLiveActivityExtension.appex/Info.plist")" = com.fancyacuppa.app.liveactivity
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$NORMAL/Info.plist")" = com.fancyacuppa.app.quick-access
           npm run build:ios-uc02-local
           if grep -R -F -l 'zfkiiqqyapahxirguxgj.supabase.co' ios/App/App/public/assets; then
             echo 'Production Supabase endpoint in the synced UC02 web assets.' >&2
@@ -133,6 +134,10 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TEST_APP/Info.plist")" = com.fancyacuppa.test
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$TEST_APP/Info.plist")" = 'Fancy Test'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TEST_APP/PlugIns/FACLiveActivityExtension.appex/Info.plist")" = com.fancyacuppa.test.liveactivity
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$TEST_APP/Info.plist")" = com.fancyacuppa.test.quick-access
+          for icon in timer scanner; do
+            test -s "$TEST_APP/PlugIns/FACLiveActivityExtension.appex/uc01-$icon.png"
+          done
           grep -q 'fac-uc02-local' "$TEST_APP/public/index.html"
           test "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSExceptionDomains:127.0.0.1:NSExceptionAllowsInsecureHTTPLoads' "$TEST_APP/Info.plist")" = true
           /usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$TEST_APP/Info.plist"

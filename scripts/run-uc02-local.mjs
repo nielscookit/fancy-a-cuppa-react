@@ -43,7 +43,7 @@ function exec(file, args, { input, timeout = 30000, extraEnv = {}, cwd = root, t
 }
 
 export function safeTestDiagnostics(stdout) {
-  const failures = String(stdout ?? '').split(/(?=^\s*not ok \d+ - )/m).slice(1);
+  const failures = (`TAP\n${stdout ?? ''}`).split(/\r?\n(?=[ \t]*not ok \d+ - )/).slice(1);
   return failures.slice(0, 8).map(failure => {
     // Only emit source locations that exist in this checkout, and diagnostics
     // drawn from fixed literals. Never forward test values or free text.

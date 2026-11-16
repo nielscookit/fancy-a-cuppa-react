@@ -21,6 +21,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             return
         }
         #endif
+        deliverQuickAccess(connectionOptions.urlContexts)
         // Match the white native launch screen before Capacitor's WebView paints.
         window?.backgroundColor = .white
         window?.overrideUserInterfaceStyle = .light
@@ -39,6 +40,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         guard window?.rootViewController is FACBridgeViewController else { return }
+        FACQuickAccessPlugin.signalIfPending()
         resumeWebMedia(in: scene)
         if #available(iOS 16.2, *) {
             Task { @MainActor in
@@ -66,11 +68,72 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        deliverQuickAccess(URLContexts)
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
+    }
+
+    private func deliverQuickAccess(_ contexts: Set<UIOpenURLContext>) {
+        let targets = Set(contexts.compactMap {
+            FACQuickAccessTarget(url: $0.url, hostID: Bundle.main.bundleIdentifier)
+        })
+        // UIKit provides an unordered set. Prefer the less invasive timer
+        // destination if two different quick links arrive in one callback.
+        if let target = targets.contains(.timer) ? .timer : targets.first {
+            FACQuickAccessPlugin.enqueue(target)
+        }
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
+    }
+}
+
+@objc(FACQuickAccessPlugin)
+final class FACQuickAccessPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "FACQuickAccessPlugin"
+    let jsName = "FACQuickAccess"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "takePending", returnType: CAPPluginReturnPromise)
+    ]
+
+    private static let changed = Notification.Name("FACQuickAccessChanged")
+    @MainActor private static var pending: FACQuickAccessTarget?
+    @MainActor private static var lastDelivery: (FACQuickAccessTarget, TimeInterval)?
+
+    @MainActor static func enqueue(_ target: FACQuickAccessTarget) {
+        let now = ProcessInfo.processInfo.systemUptime
+        if let (previous, time) = lastDelivery, previous == target, now - time < 1 { return }
+        lastDelivery = (target, now)
+        pending = target
+        signalIfPending()
+    }
+
+    @MainActor static func signalIfPending() {
+        guard pending != nil else { return }
+        NotificationCenter.default.post(name: changed, object: nil)
+    }
+
+    override func load() {
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(signalPending), name: Self.changed, object: nil
+        )
+    }
+
+    @objc private func signalPending(_ notification: Notification) {
+        notifyListeners("pending", data: [:])
+    }
+
+    @objc func takePending(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            guard self.bridge?.viewController?.viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive else {
+                call.resolve()
+                return
+            }
+            let target = Self.pending
+            Self.pending = nil
+            if let target { call.resolve(["target": target.rawValue]) }
+            else { call.resolve() }
+        }
     }
 }
 

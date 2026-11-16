@@ -11,11 +11,13 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     let jsName = "FACTeaCamera"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "closeForQuickAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showBarcodeResult", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showPhotoResult", returnType: CAPPluginReturnPromise)
     ]
     private weak var camera: UIViewController?
     private var opening = false
+    private var cancelOpening = false
 
     @objc func open(_ call: CAPPluginCall) {
         Task { @MainActor in
@@ -28,8 +30,14 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             opening = true
+            cancelOpening = false
             defer { opening = false }
-            guard await AVCaptureDevice.requestAccess(for: .video) else {
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            if cancelOpening {
+                call.resolve(["action": "close", "photos": []])
+                return
+            }
+            guard granted else {
                 call.reject("Allow camera access for Fancy a Cuppa in Settings.")
                 return
             }
@@ -58,6 +66,16 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             camera = controller
             controller.modalPresentationStyle = .fullScreen
             presenter.present(controller, animated: true)
+        }
+    }
+
+    @objc func closeForQuickAccess(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            cancelOpening = opening
+            if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
+                controller.closeForQuickAccess()
+            }
+            call.resolve()
         }
     }
 
@@ -500,6 +518,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
 
     @objc private func addTea() { finish("add") }
     @objc private func closeCamera() { finish("close") }
+    func closeForQuickAccess() { closeCamera() }
 
     private func finish(_ action: String) {
         guard !closed else { return }

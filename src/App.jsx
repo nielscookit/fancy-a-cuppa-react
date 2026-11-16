@@ -7,6 +7,7 @@ import {
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoText } from './features/nativeTeaCamera.js';
+import { observeNativeQuickAccess, routeNativeQuickAccess, waitForCameraCatalog } from './features/nativeQuickAccess.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
 import TeaCategoryIcon from './components/TeaCategoryIcon.jsx';
@@ -27,6 +28,7 @@ const SHEET_EASING = {
   exit: 'cubic-bezier(0.4, 0, 0.6, 1)',
 };
 let nativeTeaCamera;
+let nativeQuickAccess;
 function getNativeTeaCamera() {
   return nativeTeaCamera ??= registerPlugin('FACTeaCamera');
 }
@@ -57,6 +59,10 @@ export default function App() {
   const [customMl, setCustomMl] = useState('900');
   const [detailMinutes, setDetailMinutes] = useState(4);
   const [scannerBusy, setScannerBusy] = useState(false);
+  const nativeCameraBusy = useRef(false);
+  const catalogRequest = useRef(null);
+  const quickAccessHandler = useRef(null);
+  const cameraResultGeneration = useRef(0);
   const [scanError, setScanError] = useState('');
   const [scannedCode, setScannedCode] = useState(null);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
@@ -97,11 +103,18 @@ export default function App() {
 
   useEffect(() => {
     const ac = new AbortController();
-    listTeas({ signal:ac.signal })
-      .then(teas => { if (!ac.signal.aborted) setCatalog({status:'ready',teas,error:''}); })
-      .catch(error => { if (!ac.signal.aborted) setCatalog({
-        status:'error',teas:[],error:error.message,
-      }); });
+    catalogRequest.current = listTeas({ signal:ac.signal })
+      .then(teas => {
+        if (!ac.signal.aborted) setCatalog(previous => ({
+          status:'ready',error:'',
+          teas: teas.concat(previous.teas.filter(item => !teas.some(tea => tea.id === item.id))),
+        }));
+        return teas;
+      })
+      .catch(error => {
+        if (!ac.signal.aborted) setCatalog(previous => ({...previous,status:'error',error:error.message}));
+        return [];
+      });
     return () => ac.abort();
   }, []);
 
@@ -130,22 +143,56 @@ export default function App() {
     setScanError('');
     setMessage('');
   }
-  async function openCamera() {
-    if (scannerBusy) return;
+  function showQuickAccessHome() {
+    cameraResultGeneration.current++;
+    setMode('closed');
+    setSelectedId(null);
+    setClosing(false);
+    setDrag({offset:0, active:false});
+    setCapturedPhotos([]);
+    setPhotoPrefill(null);
+    setScannedCode(null);
+    setQuickNotice('');
+  }
+
+  quickAccessHandler.current = target => routeNativeQuickAccess(target, {
+    showHome: showQuickAccessHome,
+    cameraBusy: () => nativeCameraBusy.current || scannerBusy,
+    openCamera,
+    closeCamera: () => getNativeTeaCamera().closeForQuickAccess()
+      .catch(error => console.warn('[Quick Access]', error)),
+  });
+  useEffect(() => {
+    if (!nativeIOS) return;
+    nativeQuickAccess ??= registerPlugin('FACQuickAccess');
+    return observeNativeQuickAccess(nativeQuickAccess, target => quickAccessHandler.current(target),
+      error => console.warn('[Quick Access]', error));
+  }, [nativeIOS]);
+
+  async function openCamera({ fromQuickAccess = false } = {}) {
+    if (scannerBusy || nativeCameraBusy.current) return;
+    nativeCameraBusy.current = true;
+    const generation = cameraResultGeneration.current;
     setScannerBusy(true);
     setScanError('');
     try {
       const { action, tea, barcode, photos, photoTea, photoPrefill: recognizedFields } = await openNativeTeaCamera(
         getNativeTeaCamera(), {
+          shouldOpen: () => generation === cameraResultGeneration.current,
           lookupBarcode: lookupTeaByCode,
-          matchPhoto: lines => matchPhotoText(lines, teas),
+          matchPhoto: async lines => {
+            const available = fromQuickAccess && catalog.status === 'loading'
+              ? await waitForCameraCatalog(catalogRequest.current ?? Promise.resolve(teas))
+              : teas;
+            return matchPhotoText(lines, available);
+          },
         },
       );
+      if (generation !== cameraResultGeneration.current) return;
       if (action === 'use') {
         if (tea) {
-          if (!teas.some(item => item.id === tea.id)) {
-            setCatalog(previous => ({...previous, teas:[tea,...previous.teas]}));
-          }
+          setCatalog(previous => previous.teas.some(item => item.id === tea.id)
+            ? previous : {...previous, teas:[tea,...previous.teas]});
           chooseTea(tea);
         } else {
           setQuickNotice('No verified tea found for this barcode.');
@@ -160,8 +207,25 @@ export default function App() {
         setMessage('');
         setMode('add');
       }
-    } catch (error) { setScanError(error?.message || String(error)); }
-    finally { setScannerBusy(false); }
+    } catch (error) {
+      if (generation === cameraResultGeneration.current) {
+        const message = error?.message || String(error);
+        if (fromQuickAccess) setQuickNotice(message);
+        else setScanError(message);
+      }
+    } finally {
+      nativeCameraBusy.current = false;
+      setScannerBusy(false);
+    }
+  }
+  async function scanEditorBarcode() {
+    if (nativeCameraBusy.current) return null;
+    nativeCameraBusy.current = true;
+    try {
+      return await captureNativeTeaBarcode(getNativeTeaCamera());
+    } finally {
+      nativeCameraBusy.current = false;
+    }
   }
   async function scanPhoto(event) {
     const file = event.target.files?.[0];
@@ -317,6 +381,7 @@ export default function App() {
         ModalProps={{ keepMounted:true, BackdropProps:{ sx:{backgroundColor:'#fff'} } }}
         transitionDuration={SHEET_DURATION}
         slotProps={{ transition:{ easing:SHEET_EASING, onExited:() => {
+          if (!closing) return;
           setMode('closed');
           setSelectedId(null);
           setClosing(false);
@@ -414,7 +479,7 @@ export default function App() {
               tea={mode === 'edit' ? selected : null}
               nativeIOS={nativeIOS}
               barcode={scannedCode}
-              onScanBarcode={nativeIOS ? () => captureNativeTeaBarcode(getNativeTeaCamera()) : undefined}
+              onScanBarcode={nativeIOS ? scanEditorBarcode : undefined}
               photos={mode === 'add' ? capturedPhotos : []}
               prefill={mode === 'add' ? photoPrefill : null}
               message={message}
