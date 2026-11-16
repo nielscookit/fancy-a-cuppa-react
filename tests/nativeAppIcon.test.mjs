@@ -16,7 +16,10 @@ test('native iOS app icon is configured and 1024px image exists', () => {
   assert.equal(png.readUInt32BE(20),1024);
   const project=readFileSync('ios/App/App.xcodeproj/project.pbxproj','utf8');
   assert.equal((project.match(/ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;/g)||[]).length,2);
-  assert.equal((project.match(/PRODUCT_BUNDLE_IDENTIFIER = com\.fancyacuppa\.app;/g)||[]).length,2);
+  assert.match(project,/PRODUCT_BUNDLE_IDENTIFIER = com\.fancyacuppa\.app;/);
+  assert.match(project,/PRODUCT_BUNDLE_IDENTIFIER = "\$\(FAC_APP_BUNDLE_ID\)";/);
+  const debug=readFileSync('ios/debug.xcconfig','utf8');
+  assert.match(debug,/^FAC_APP_BUNDLE_ID = com\.fancyacuppa\.app$/m);
   const controller=readFileSync('src/push/nativeNotificationController.js','utf8');
   assert.match(controller,/notifications\.schedule\(/);
   assert.doesNotMatch(controller,/smallIcon:|largeIcon:/);

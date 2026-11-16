@@ -1,3 +1,5 @@
 CAPACITOR_DEBUG = true
 FAC_UC02_DEBUG_PLIST = App/Info.plist
+FAC_APP_BUNDLE_ID = com.fancyacuppa.app
+FAC_ACTIVITY_BUNDLE_ID = com.fancyacuppa.app.liveactivity
 #include? "uc02-local.generated.xcconfig"

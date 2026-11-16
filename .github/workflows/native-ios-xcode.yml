@@ -99,7 +99,7 @@ jobs:
         run: |
           APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")" = AppIcon
-      - name: Compile isolated UC02 Debug app and validate its network settings
+      - name: Compile isolated UC02 Debug app and validate its identity and network settings
         env:
           VITE_COMMUNITY_TEA_V4: 'true'
           FAC_UC02_SUPABASE_URL: http://127.0.0.1:54321
@@ -112,6 +112,9 @@ jobs:
             echo 'Normal Debug build contains UC02 test settings.' >&2
             exit 1
           fi
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NORMAL/Info.plist")" = com.fancyacuppa.app
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$NORMAL/Info.plist")" = 'Fancy a Cuppa'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NORMAL/PlugIns/FACLiveActivityExtension.appex/Info.plist")" = com.fancyacuppa.app.liveactivity
           npm run build:ios-uc02-local
           if grep -R -F -l 'zfkiiqqyapahxirguxgj.supabase.co' ios/App/App/public/assets; then
             echo 'Production Supabase endpoint in the synced UC02 web assets.' >&2
@@ -127,7 +130,9 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/fancy-uc02-derived" \
             CODE_SIGNING_ALLOWED=NO \
             build
-          test -d "$TEST_APP/PlugIns/FACLiveActivityExtension.appex"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TEST_APP/Info.plist")" = com.fancyacuppa.test
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$TEST_APP/Info.plist")" = 'Fancy Test'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TEST_APP/PlugIns/FACLiveActivityExtension.appex/Info.plist")" = com.fancyacuppa.test.liveactivity
           grep -q 'fac-uc02-local' "$TEST_APP/public/index.html"
           test "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSExceptionDomains:127.0.0.1:NSExceptionAllowsInsecureHTTPLoads' "$TEST_APP/Info.plist")" = true
           /usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$TEST_APP/Info.plist"
