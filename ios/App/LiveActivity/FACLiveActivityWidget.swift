@@ -142,8 +142,8 @@ struct FACLiveActivityWidget: Widget {
 struct FACLiveActivityWidgetBundle: WidgetBundle {
     var body: some Widget {
         FACLiveActivityWidget()
-        FACQuickAccessWidget(target: .timer)
-        FACQuickAccessWidget(target: .scanner)
+        FACTimerQuickAccessWidget()
+        FACScannerQuickAccessWidget()
         #if canImport(AlarmKit)
         if #available(iOS 26.0, *) {
             FACAlarmPrototypeWidget()
@@ -168,19 +168,22 @@ private struct FACQuickAccessProvider: TimelineProvider {
     }
 }
 
-private struct FACQuickAccessWidget: Widget {
-    let target: FACQuickAccessTarget
+private struct FACTimerQuickAccessWidget: Widget {
+    var body: some WidgetConfiguration { quickAccessConfiguration(for: .timer) }
+}
 
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "FACQuickAccess." + target.rawValue, provider: FACQuickAccessProvider()) { _ in
-            FACQuickAccessView(target: target)
-        }
-        .supportedFamilies([.accessoryCircular])
-        .configurationDisplayName(target == .timer ? "Tea Timer" : "Tea Scanner")
-        .description(target == .timer ? "Open the timer." : "Open the tea camera.")
+private struct FACScannerQuickAccessWidget: Widget {
+    var body: some WidgetConfiguration { quickAccessConfiguration(for: .scanner) }
+}
 
-        .contentMarginsDisabled()
+private func quickAccessConfiguration(for target: FACQuickAccessTarget) -> some WidgetConfiguration {
+    StaticConfiguration(kind: "FACQuickAccess." + target.rawValue, provider: FACQuickAccessProvider()) { _ in
+        FACQuickAccessView(target: target)
     }
+    .supportedFamilies([.accessoryCircular])
+    .configurationDisplayName(target == .timer ? "Tea Timer" : "Tea Scanner")
+    .description(target == .timer ? "Open the timer." : "Open the tea camera.")
+    .contentMarginsDisabled()
 }
 
 private struct FACQuickAccessView: View {

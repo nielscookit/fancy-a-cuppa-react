@@ -134,6 +134,9 @@ test('native scene integrates cold and warm URLs and retains Capacitor forwardin
   assert.match(scene, /deliverQuickAccess\(connectionOptions\.urlContexts\)/);
   assert.match(scene, /deliverQuickAccess\(URLContexts\)[\s\S]*?SceneDelegateProxy\.shared\.scene\(scene, openURLContexts: URLContexts\)/);
   assert.match(scene, /\.activationState == \.foregroundActive/);
-  for (const target of ['timer', 'scanner']) assert.ok(widget.includes('FACQuickAccessWidget(target: .' + target + ')'));
+  for (const target of ['Timer', 'Scanner']) {
+    assert.ok(widget.includes('FAC' + target + 'QuickAccessWidget()'));
+    assert.ok(widget.includes('quickAccessConfiguration(for: .' + target.toLowerCase() + ')'));
+  }
   assert.match(widget, /supportedFamilies\(\[\.accessoryCircular\]\)/);
 });
