@@ -6,7 +6,7 @@ import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
-import { openNativeTeaCamera, matchPhotoText } from './features/nativeTeaCamera.js';
+import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoText } from './features/nativeTeaCamera.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
 import TeaCategoryIcon from './components/TeaCategoryIcon.jsx';
@@ -26,6 +26,11 @@ const SHEET_EASING = {
   enter: 'cubic-bezier(0, 0, 0.2, 1)',
   exit: 'cubic-bezier(0.4, 0, 0.6, 1)',
 };
+let nativeTeaCamera;
+function getNativeTeaCamera() {
+  return nativeTeaCamera ??= registerPlugin('FACTeaCamera');
+}
+
 const RECENTS_KEY = 'fancy-a-cuppa-v3-recent-teas';
 function readRecents() {
   try {
@@ -131,7 +136,7 @@ export default function App() {
     setScanError('');
     try {
       const { action, tea, barcode, photos, photoTea, photoPrefill: recognizedFields } = await openNativeTeaCamera(
-        registerPlugin('FACTeaCamera'), {
+        getNativeTeaCamera(), {
           lookupBarcode: lookupTeaByCode,
           matchPhoto: lines => matchPhotoText(lines, teas),
         },
@@ -409,6 +414,7 @@ export default function App() {
               tea={mode === 'edit' ? selected : null}
               nativeIOS={nativeIOS}
               barcode={scannedCode}
+              onScanBarcode={nativeIOS ? () => captureNativeTeaBarcode(getNativeTeaCamera()) : undefined}
               photos={mode === 'add' ? capturedPhotos : []}
               prefill={mode === 'add' ? photoPrefill : null}
               message={message}

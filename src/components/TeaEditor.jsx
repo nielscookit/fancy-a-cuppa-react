@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { registerPlugin } from '@capacitor/core';
 import { Box, Button, IconButton, InputAdornment, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import {
   UI_CATEGORY_LABELS, getUiTeaCategory, DOSE_UNITS, LEAF_STYLE_LABELS,
   initialTeaForm, validateTeaForm,
 } from '../features/teaModel.js';
-import { captureNativeTeaBarcode } from '../features/nativeTeaCamera.js';
 import { communityTeaV4, createTea, listCommunityTeaPhotos, lookupTeaByCode, updateTea } from '../data/teaRepository.js';
 
 const figma = import.meta.env.BASE_URL + 'figma/';
@@ -54,7 +52,7 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
 /**
  * V3 editor for tea identity and preparation.
  */
-export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = [], prefill = null, message, onCancel, onSaved }) {
+export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = [], prefill = null, message, onCancel, onSaved, onScanBarcode }) {
   const [form,setForm]=useState(()=>{
     const next=initialTeaForm(tea || prefill);
     if (!tea) {
@@ -161,7 +159,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
     if (scanningBarcode.current || savingRef.current) return;
     scanningBarcode.current = true;
     try {
-      const code = await captureNativeTeaBarcode(registerPlugin('FACTeaCamera'));
+      const code = await onScanBarcode();
       if (code) setBarcode(code.value, code.type);
     } catch (failure) {
       setFieldErrors(previous => ({ ...previous, codeValue: failure.message || 'Camera unavailable.' }));
@@ -310,7 +308,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
                 setBarcode(value, { 8: 'ean_8', 12: 'upc_a', 13: 'ean_13' }[value.length] || '');
               }}
               error={fieldErrors.codeValue}
-              endAdornment={nativeIOS && <InputAdornment position="end">
+              endAdornment={onScanBarcode && <InputAdornment position="end">
                 <IconButton type="button" aria-label="Scan barcode" disabled={saving} onClick={scanBarcode}>
                   <img src={figma+'tea-scanner.svg'} width="24" height="24" alt="" />
                 </IconButton>
