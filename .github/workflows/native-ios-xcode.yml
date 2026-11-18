@@ -20,6 +20,14 @@ on:
       - ios/App/App/SceneDelegate.swift
       - ios/App/App/FACTeaCameraPlugin.swift
       - tests/nativeTeaCamera.test.mjs
+      - tests/nativeTeaEditorRendering.test.mjs
+      - src/features/nativeTeaCamera.js
+      - src/features/nativeQuickAccess.js
+      - src/features/teaModel.js
+      - src/components/TeaEditor.jsx
+      - src/components/tea-sheet.css
+      - src/App.jsx
+      - public/figma/uc02-*
       - tests/nativeLiveActivityPrototype.test.mjs
       - scripts/build-ios-uc02-local.mjs
       - scripts/uc02-ios-config.mjs

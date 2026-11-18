@@ -31,6 +31,7 @@ test('Fancy Test EMPTY uses barcode-first layout, three units and a 1 MIN editab
   }
   assert.match(html, /aria-label="Brewing time in minutes"[^>]*min="1"[^>]*max="30"[^>]*value="1"/);
   assert.match(html, /fac-editor-photo-button/);
+  assert.match(html, /figma\/uc02-barcode-add\.svg/);
   assert.doesNotMatch(html, />measures<|USE THIS TEA|IDENTIFY TEA/);
   assert.ok(html.indexOf('Temperature') < html.indexOf('fac-editor-time'));
   assert.ok(html.indexOf('CANCEL') < html.indexOf('>SAVE<'));

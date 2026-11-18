@@ -56,8 +56,9 @@ const cameraSwift = readFileSync(new URL('../ios/App/App/FACTeaCameraPlugin.swif
 test('camera Close remains an interactive root control in the approved camera shell', () => {
   assert.match(cameraSwift, /roundControl\(close, icon: "uc02-close"/);
   assert.match(cameraSwift, /view\.addSubview\(button\)/);
-  assert.match(cameraSwift, /close\.frame = CGRect\(x: width - 64, y: 16, width: 48, height: 48\)/);
+  assert.match(cameraSwift, /close\.frame = CGRect\(x: width - 64, y: controlsTop, width: 48, height: 48\)/);
   assert.ok(cameraSwift.includes('closeCamera() { finish("close") }'));
+  assert.match(cameraSwift, /let controlsTop = max\(16, view\.safeAreaInsets\.top \+ 8\)/);
 });
 
 test('unknown barcode persists until capture; scanning again is impossible after any successful photo', () => {

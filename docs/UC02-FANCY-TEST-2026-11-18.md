@@ -24,9 +24,10 @@ Die neue React-Formulargestaltung ist an `nativeIOS && communityTeaV4` gebunden.
 - Neue Auswahl nur `g`, `tsp`, `bags`. Bestehende `measure`-Dosierungen bleiben unverändert erhalten; ein Hinweis erklärt, dass bei manueller Auswahl einer anderen Einheit auch die Menge angepasst werden muss. Keine automatische Umrechnung.
 - Native Standardziehzeit 1 MIN; bestehende EDIT-Ziehzeit bleibt erhalten. Editierbarer Stepper 1–30 Minuten nach Temperature. Eindeutige, ausdrücklich beschriftete OCR-Ziehzeit wird übernommen, Intervalle/mehrdeutige Werte nicht.
 - CANCEL/SAVE bleiben im Formular-Scrollbereich. Bestehende Validierung, Save-Sperre, Konfliktbehandlung und Foto-Persistenz unverändert weiterverwendet.
+- Das Plus im Barcode-Feld ist ebenfalls ein lokales Figma-Asset und benötigt keine externe Icon-Schrift.
 - Transparente PNGs aus den freigegebenen Figma-Vektoren, @3x; liegen unter `public/figma/uc02-*.png`. Capacitor kopiert sie ohne Änderungen am Xcode-Projekt. Native Kategorie-Marker verwenden das bereits gebündelte Material-Symbols-Sharp-Font und die bestehende Kategoriezuordnung.
 
-Figma-Assetquellen: Info `547:3193`, Close `493:366`, Manual `543:2943`, Check `547:3338`, Offline `578:833`, Open `554:4700`, Add photo `578:1860`, Delete `582:3227`, Error `548:3447`, Cancel `578:806`, Progress `578:785`.
+Figma-Assetquellen: Info `547:3193`, Close `493:366`, Manual `543:2943`, Check `547:3338`, Offline `578:833`, Open `554:4700`, Add photo `578:1860`, Delete `582:3227`, Error `548:3447`, Cancel `578:806`, Progress `578:785`, Barcode Add `578:1897`.
 
 ## Tatsächliche Prüfungen in der Entwicklungsumgebung
 
@@ -37,13 +38,14 @@ Figma-Assetquellen: Info `547:3193`, Close `493:366`, Manual `543:2943`, Check `
 - `npm run build:native`: erfolgreich.
 - `npm run build:ios-uc02-local`: mit ausschließlich lokalen CI-Fixture-Einstellungen erfolgreich; Capacitor-Sync enthalten. Der öffentliche Fixture-Key ist keine reale Backend-Testverbindung.
 - Persönliche Signing-Einstellungen, Bundle-IDs, Projektdatei, Timer-, Audio-, Video-, AlarmKit-, Widget- und Backend-Dateien nicht geändert.
-- Xcode steht in der Linux-Entwicklungsumgebung nicht zur Verfügung. Der bestehende macOS-/Xcode-26.2-GitHub-Workflow wird durch die Änderung der Kamera-Datei ausgelöst. Sein tatsächliches Ergebnis muss nach Veröffentlichung separat geprüft und in der Übergabe genannt werden.
+- Der bestehende Simulator-Workflow berücksichtigt künftig auch die betroffenen UC02-Frontend-/Asset-/Testdateien.
+- Xcode steht in der Linux-Entwicklungsumgebung nicht zur Verfügung. Der bestehende macOS-/Xcode-26.2-GitHub-Workflow wird durch die Änderung der Kamera-Datei ausgelöst. Der erste Implementierungsstand `846e8a8` wurde im [Workflow 44402039968](https://github.com/nielscookit/fancy-a-cuppa-react/actions/runs/44402039968) erfolgreich als normale App und als isolierte Fancy-Test-App einschließlich Extension gebaut. Die abschließende Safe-Area-/Asset-Korrektur wird erneut durch denselben Workflow geprüft; dessen Ergebnis wird in der Übergabe genannt.
 
 ## Offene Prüfungen / Grenzen
 
 - `http://127.0.0.1:54321/rest/v1/` war hier nicht erreichbar (HTTP 000 / Verbindungsfehler). Kein echter Supabase-, Storage- oder End-to-End-Test durchgeführt. Keine Aussage, dass die zuletzt gemeldete Backend-Erreichbarkeit auf dem iPhone behoben sei.
 - Interaktiver Chromium-Test konnte wegen einer Ausführungsbeschränkung (`socket() failed: Operation not permitted`) nicht starten. SSR-Tests bestätigen gerenderte Elemente, keine Pixelpositionen oder Touch-/Keyboard-Interaktionen.
-- Kein physischer iPhone-Test. Native VisionKit-Kamera, OCR-Qualität, Hintergrund/Rückkehr, Netzwerkwechsel, Safe Area und tatsächliche Figma-Übereinstimmung müssen auf dem iPhone geprüft werden. Ein Simulator-Build ersetzt diese Abnahme nicht.
+- Kein physischer iPhone-Test. Die oberen Kamera-Bedienelemente berücksichtigen die vorhandene Safe Area/Notch; Figma-Koordinaten gelten für die unbeschnittene Canvas. Native VisionKit-Kamera, OCR-Qualität, Hintergrund/Rückkehr, Netzwerkwechsel, Safe Area und tatsächliche Figma-Übereinstimmung müssen auf dem iPhone geprüft werden. Ein Simulator-Build ersetzt diese Abnahme nicht.
 - Ohne extern messbaren Verbindungswechsel kann ein JavaScript-`online`-Ereignis ausbleiben, etwa wenn nur der lokale Supabase-Prozess wieder startet. Die automatische einmalige Wiederholung bei einem echten Netzwerkwechsel ist automatisiert geprüft; das WKWebView-Verhalten bleibt ein Gerätetest.
 - Keine gemessenen Time-to-Brew-Werte vom iPhone vorhanden.
 

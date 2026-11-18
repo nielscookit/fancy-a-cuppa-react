@@ -288,11 +288,15 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         scanner?.view.frame = cameraSurface.bounds
         let matching = state == .matches
         let hasPhotos = !photos.isEmpty
-        let finderHeight = cameraHeight - (hasPhotos ? (matching ? 158 : 214) : 140)
-        let finderRect = CGRect(x: 8, y: 72, width: width - 24, height: max(80, finderHeight))
+        // Figma coordinates describe the unobstructed canvas. Keep the three
+        // real controls below the iPhone cutout; only the camera image is full bleed.
+        let controlsTop = max(16, view.safeAreaInsets.top + 8)
+        let finderTop = controlsTop + 56
+        let finderBottom = cameraHeight - (hasPhotos ? (matching ? 86 : 142) : 68)
+        let finderRect = CGRect(x: 8, y: finderTop, width: width - 24, height: max(80, finderBottom - finderTop))
         finder.path = UIBezierPath(roundedRect: finderRect, cornerRadius: 30).cgPath
         scanner?.regionOfInterest = finderRect
-        close.frame = CGRect(x: width - 64, y: 16, width: 48, height: 48)
+        close.frame = CGRect(x: width - 64, y: controlsTop, width: 48, height: 48)
         manual.frame = close.frame.offsetBy(dx: -60, dy: 0)
         trash.frame = manual.frame.offsetBy(dx: -60, dy: 0)
         let thumbsY = cameraHeight - (matching ? 70 : 126)

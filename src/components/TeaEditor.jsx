@@ -225,7 +225,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
   const subtype=form.subcategory==='other' ? form.subcategory_other : form.subcategory;
   const barcodeField = (!tea || communityTeaV4) && (
             <Field label="Barcode (EAN / UPC)" placeholder={uc02Design ? "Scan barcode" : "Scan or enter barcode"} compact={uc02Design}
-              startAdornment={uc02Design && <InputAdornment position="start"><span className="material-symbols-outlined" aria-hidden="true">add</span></InputAdornment>} value={form.codeValue}
+              startAdornment={uc02Design && <InputAdornment position="start"><img src={figma + 'uc02-barcode-add.svg'} width="24" height="24" alt="" /></InputAdornment>} value={form.codeValue}
               inputMode="numeric"
               onChange={e => {
                 const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
