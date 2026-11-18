@@ -215,3 +215,43 @@
 .fac-editor-photos__thumbnails--native .fac-editor-photos__thumbnail[aria-pressed="true"] img {
   outline:3px solid #1B272B; outline-offset:-3px;
 }
+
+/* UC02 08A EMPTY / PREFILLED (578:1523 / 579:3036).
+   Class is emitted only by native Fancy Test; Web/PWA keeps its existing form. */
+.fac-sheet-editor--uc02 .fac-editor-photos { margin:0 -4px 32px; }
+.fac-sheet-editor--uc02 .fac-editor-photos__hero { height:264px; border-radius:30px; }
+.fac-sheet-editor--uc02 .fac-editor-photos--empty { margin:8px 0 16px; }
+.fac-sheet-editor--uc02 .fac-editor-photos--empty .fac-editor-photos__hero { height:66px; background:transparent; }
+.fac-editor-photo-button.MuiButton-root {
+  height:66px; border-radius:100px; background:#1B272B; padding:0;
+}
+.fac-editor-photo-button.MuiButton-root:hover { background:#1B272B; }
+.fac-sheet-editor--uc02 .fac-editor-photos__thumbnails { margin:4px 4px 0; height:66px; }
+.fac-sheet-editor--uc02 .fac-editor-photos__thumbnail { border-radius:13px !important; overflow:hidden; }
+.fac-sheet-editor--uc02 .fac-editor-field { min-height:84px; }
+.fac-sheet-editor--uc02 .fac-uc02-barcode .MuiFilledInput-root { border-radius:30px; padding-right:0; }
+.fac-sheet-editor--uc02 .fac-uc02-barcode .MuiInputAdornment-positionEnd { margin:0; }
+.fac-sheet-editor--uc02 .fac-uc02-barcode .MuiIconButton-root {
+  width:48px; height:48px; background:#1B272B; border-radius:50%;
+}
+.fac-sheet-editor--uc02 .fac-uc02-barcode .MuiIconButton-root img { filter:brightness(0) invert(1); }
+.fac-editor-divider { height:1px; border:0; background:#D9D9D9; margin:24px 0 32px; }
+.fac-sheet-editor--uc02 .fac-editor-divider--preparation { flex-shrink:0; margin:16px 0; }
+.fac-sheet-editor--uc02 .fac-editor-dosage { margin-bottom:11px; }
+.fac-editor-time {
+  display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+  gap:0; margin:48px auto 0; width:267px; max-width:100%; min-height:66px;
+}
+.fac-editor-time .MuiIconButton-root { width:66px; height:66px; padding:0; flex:0 0 66px; }
+.fac-editor-time__value { display:flex; width:135px; align-items:center; justify-content:center; gap:8px; font-size:34px; }
+.fac-editor-time__value input {
+  width:2ch; min-width:0; border:0; padding:0; font:inherit; color:inherit;
+  text-align:right; appearance:textfield; background:transparent;
+}
+.fac-editor-time__value input::-webkit-inner-spin-button,
+.fac-editor-time__value input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.fac-editor-time__value input[aria-invalid="true"] { outline:2px solid #EF493B; }
+.fac-editor-time__value span { font-size:34px; }
+.fac-sheet-paper[data-native-expanded-gap="true"] .fac-sheet-editor--uc02 .fac-sheet-editor-actions {
+  margin-top:64px; gap:18px;
+}

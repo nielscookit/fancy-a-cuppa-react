@@ -21,7 +21,7 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func open(_ call: CAPPluginCall) {
         Task { @MainActor in
-            guard #available(iOS 16.0, *), DataScannerViewController.isSupported else {
+            guard #available(iOS 16.0, *) else {
                 call.reject("Live scanning is unavailable on this iPhone.")
                 return
             }
@@ -37,18 +37,13 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["action": "close", "photos": []])
                 return
             }
-            guard granted else {
-                call.reject("Allow camera access for Fancy a Cuppa in Settings.")
-                return
-            }
-            guard DataScannerViewController.isAvailable,
-                  let presenter = bridge?.viewController, presenter.presentedViewController == nil else {
+            guard let presenter = bridge?.viewController, presenter.presentedViewController == nil else {
                 call.reject("The camera is currently unavailable.")
                 return
             }
             let barcodeOnly = call.getString("mode") == "barcode"
             var capturedBarcode: [String: String]?
-            let controller = FACTeaCameraViewController(barcodeOnly: barcodeOnly) { [weak self] id, text, format in
+            let controller = FACTeaCameraViewController(barcodeOnly: barcodeOnly, cameraAvailable: granted && DataScannerViewController.isSupported && DataScannerViewController.isAvailable) { [weak self] id, text, format in
                 if barcodeOnly {
                     capturedBarcode = ["text": text, "format": format]
                 } else {
@@ -56,11 +51,14 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             } onPhotoText: { [weak self] id, lines in
                 self?.notifyListeners("photoText", data: ["id": id, "lines": lines])
-            } onClose: { result, photos, barcodeID, photoID in
+            } onState: { [weak self] reason in
+                self?.notifyListeners("cameraState", data: ["reason": reason])
+            } onClose: { result, photos, barcodeID, photoID, teaID in
                 var response: [String: Any] = ["action": result, "photos": photos]
                 if result == "barcode", let capturedBarcode { response["barcode"] = capturedBarcode }
                 if let barcodeID { response["barcodeID"] = barcodeID }
                 if let photoID { response["photoID"] = photoID }
+                if let teaID { response["teaID"] = teaID }
                 call.resolve(response)
             }
             camera = controller
@@ -93,108 +91,169 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
                 controller.showPhotoResult(id: call.getString("id"),
                                            result: call.getString("result"),
-                                           name: call.getString("name"), brand: call.getString("brand"))
+                                           candidates: (call.getArray("candidates") as? [[String: String]]) ?? [])
             }
             call.resolve()
         }
     }
 }
 
+// The native session owns accepted lookup IDs. React may return late results,
+// but only a result for the current revision can change navigation or form data.
 @available(iOS 16.0, *)
 private final class FACTeaCameraViewController: UIViewController, DataScannerViewControllerDelegate {
-    private let scanner = DataScannerViewController(
-        recognizedDataTypes: [.barcode(symbologies: [.ean13, .ean8])],
-        qualityLevel: .balanced, recognizesMultipleItems: true,
-        isHighFrameRateTrackingEnabled: false, isPinchToZoomEnabled: true,
-        isGuidanceEnabled: false, isHighlightingEnabled: false
-    )
+    private let scanner: DataScannerViewController?
     private let barcodeOnly: Bool
     private let onBarcode: (String, String, String) -> Void
     private let onPhotoText: (String, [String]) -> Void
-    private let onClose: (String, [String], String?, String?) -> Void
+    private let onState: (String) -> Void
+    private let onClose: (String, [String], String?, String?, String?) -> Void
     private let charcoal = UIColor(red: 27/255, green: 39/255, blue: 43/255, alpha: 1)
     private let lime = UIColor(red: 185/255, green: 252/255, blue: 105/255, alpha: 1)
-    private let finder = UIView()
+    private let finder = CAShapeLayer()
     private let close = UIButton(type: .custom)
+    private let manual = UIButton(type: .custom)
     private let shutter = UIButton(type: .custom)
     private let shutterDisc = UIView()
-    private let identify = UIButton(type: .custom)
-    private let add = UIButton(type: .custom)
+    private let action = UIButton(type: .custom)
+    private let trash = UIButton(type: .custom)
     private let thumbnails = UIScrollView()
     private let strip = UIStackView()
-    // In-memory previews only. No photo is written to the catalogue or disk.
-    private var photoPreviews: [String] = []
-    private var photoImages: [UIImage] = []
-    private var photoLookupID: String?
+    private let candidateScroll = UIScrollView()
+    private let candidateRows = UIStackView()
     private let toast = UIStackView()
     private let toastIcon = UIImageView()
     private let titleLabel = UILabel()
     private let detailLabel = UILabel()
+    private let hint = UIStackView()
+    private let hintIcon = UIImageView()
+    private let hintLabel = UILabel()
+    private let cameraSurface = UIView()
+    private var photos: [(image: UIImage, preview: String)] = []
+    private var selectedPhoto = 0
+    private var hasCapturedPhoto = false
+    private var photoRevision = 0
+    private var photoLookupID: String?
+    private var acceptedPhotoID: String?
+    private var acceptedBarcodeID: String?
+    private var selectedTeaID: String?
+    private var candidateID: String?
+    private var candidates: [[String: String]] = []
     private var seen = Set<String>()
     private var visibleBarcodeIDs: [UUID: String] = [:]
-    private var candidateID: String?
-    private var acceptedBarcodeID: String?
-    private var acceptedPhotoID: String?
-    private var photoLookupTimeout: Task<Void, Never>?
     private var capture: Task<Void, Never>?
     private var processing: Task<Void, Never>?
-    private var toastDismissTask: Task<Void, Never>?
+    private var photoLookupTimeout: Task<Void, Never>?
     private var closed = false
-    private enum Result { case none, possible, noMatch }
-    private var result = Result.none
+    private var cameraUnavailable: Bool
+    private enum State { case barcode, unknownBarcode, unreadableBarcode, photo, identifying, unreadablePhoto, matches, noMatch, networkError }
+    private var state = State.barcode
 
-    init(barcodeOnly: Bool, onBarcode: @escaping (String, String, String) -> Void,
-         onPhotoText: @escaping (String, [String]) -> Void,
-         onClose: @escaping (String, [String], String?, String?) -> Void) {
+    init(barcodeOnly: Bool, cameraAvailable: Bool,
+         onBarcode: @escaping (String, String, String) -> Void,
+         onPhotoText: @escaping (String, [String]) -> Void, onState: @escaping (String) -> Void,
+         onClose: @escaping (String, [String], String?, String?, String?) -> Void) {
         self.barcodeOnly = barcodeOnly
         self.onBarcode = onBarcode
         self.onPhotoText = onPhotoText
+        self.onState = onState
         self.onClose = onClose
+        self.cameraUnavailable = !cameraAvailable
+        self.scanner = cameraAvailable ? DataScannerViewController(
+            recognizedDataTypes: [.barcode(symbologies: [.ean13, .ean8])],
+            qualityLevel: .balanced, recognizesMultipleItems: true,
+            isHighFrameRateTrackingEnabled: false, isPinchToZoomEnabled: true,
+            isGuidanceEnabled: false, isHighlightingEnabled: false
+        ) : nil
         super.init(nibName: nil, bundle: nil)
     }
-
     required init?(coder: NSCoder) { return nil }
+    override var prefersStatusBarHidden: Bool { true }
 
+    // These PNGs are transparent @3x exports of the approved Figma vectors.
+    // Capacitor copies public/figma; no personal Xcode project edit is needed.
+    private func icon(_ name: String) -> UIImage? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "public/figma"),
+              let image = UIImage(contentsOfFile: url.path), let cgImage = image.cgImage else { return nil }
+        return UIImage(cgImage: cgImage, scale: 3, orientation: .up)
+    }
+    private func mono(_ size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        let name = weight == .regular ? "RobotoMono-Regular" : "RobotoMono-Medium"
+        if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }
+        return UIFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: weight)
+    }
+    private func roundControl(_ button: UIButton, icon name: String, label: String, selector: Selector) {
+        button.backgroundColor = name == "uc02-close" ? .clear : name == "uc02-delete" ? UIColor(red: 243/255, green: 242/255, blue: 240/255, alpha: 1) : charcoal.withAlphaComponent(0.8)
+        button.layer.cornerRadius = 24
+        button.setImage(icon(name), for: .normal)
+        button.accessibilityLabel = label
+        button.addTarget(self, action: selector, for: .touchUpInside)
+        view.addSubview(button)
+    }
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor(red: 10/255, green: 14/255, blue: 16/255, alpha: 1)
-        addChild(scanner)
-        view.addSubview(scanner.view)
-        scanner.didMove(toParent: self)
-        scanner.delegate = self
-        scanner.view.layer.cornerRadius = 30
-        scanner.view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        scanner.view.clipsToBounds = true
-
-        let overlay = scanner.overlayContainerView
-        finder.layer.borderColor = lime.cgColor
-        finder.layer.borderWidth = 3
-        finder.layer.cornerRadius = 12
-        finder.isUserInteractionEnabled = false
-        overlay.addSubview(finder)
-        close.backgroundColor = charcoal.withAlphaComponent(0.8)
-        close.tintColor = .white
-        close.setImage(UIImage(systemName: "xmark"), for: .normal)
-        close.accessibilityLabel = "Close camera"
-        close.layer.cornerRadius = 24
-        close.addTarget(self, action: #selector(closeCamera), for: .touchUpInside)
-        // The native close button must receive touches above the VisionKit view.
-        view.addSubview(close)
-
-        strip.spacing = 16
-        strip.translatesAutoresizingMaskIntoConstraints = false
+        cameraSurface.backgroundColor = UIColor(red: 16/255, green: 23/255, blue: 25/255, alpha: 1)
+        cameraSurface.layer.cornerRadius = 30
+        cameraSurface.clipsToBounds = true
+        view.addSubview(cameraSurface)
+        if let scanner {
+            addChild(scanner)
+            cameraSurface.addSubview(scanner.view)
+            scanner.didMove(toParent: self)
+            scanner.delegate = self
+        }
+        finder.strokeColor = lime.cgColor
+        finder.fillColor = UIColor.clear.cgColor
+        finder.lineWidth = 3
+        finder.lineDashPattern = [8, 6]
+        cameraSurface.layer.addSublayer(finder)
+        roundControl(close, icon: "uc02-close", label: "Close camera", selector: #selector(closeCamera))
+        roundControl(manual, icon: "uc02-manual", label: "Add tea manually", selector: #selector(addTea))
+        roundControl(trash, icon: "uc02-delete", label: "Delete selected photo", selector: #selector(deletePhoto))
+        strip.spacing = 8
         thumbnails.addSubview(strip)
-        NSLayoutConstraint.activate([
-            strip.leadingAnchor.constraint(equalTo: thumbnails.contentLayoutGuide.leadingAnchor),
-            strip.trailingAnchor.constraint(equalTo: thumbnails.contentLayoutGuide.trailingAnchor),
-            strip.topAnchor.constraint(equalTo: thumbnails.contentLayoutGuide.topAnchor),
-            strip.bottomAnchor.constraint(equalTo: thumbnails.contentLayoutGuide.bottomAnchor),
-            strip.heightAnchor.constraint(equalTo: thumbnails.frameLayoutGuide.heightAnchor)
-        ])
-        overlay.addSubview(thumbnails)
-        configureToast()
-        overlay.addSubview(toast)
-
+        view.addSubview(thumbnails)
+        candidateRows.axis = .vertical
+        candidateRows.layer.cornerRadius = 30
+        candidateRows.clipsToBounds = true
+        candidateScroll.addSubview(candidateRows)
+        view.addSubview(candidateScroll)
+        toast.spacing = 8
+        toast.alignment = .center
+        toast.backgroundColor = charcoal.withAlphaComponent(0.8)
+        toast.layer.cornerRadius = 24
+        toast.isLayoutMarginsRelativeArrangement = true
+        toast.layoutMargins = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        toastIcon.contentMode = .scaleAspectFit
+        toastIcon.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        toastIcon.heightAnchor.constraint(equalToConstant: 24).isActive = true
+        let labels = UIStackView(arrangedSubviews: [titleLabel, detailLabel])
+        labels.axis = .vertical
+        titleLabel.font = mono(12)
+        detailLabel.font = mono(12)
+        for label in [titleLabel, detailLabel] { label.textColor = .white; label.numberOfLines = 0 }
+        toast.addArrangedSubview(toastIcon)
+        toast.addArrangedSubview(labels)
+        view.addSubview(toast)
+        hint.spacing = 8
+        hint.alignment = .center
+        hint.isLayoutMarginsRelativeArrangement = true
+        hint.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+        hintIcon.contentMode = .scaleAspectFit
+        hintIcon.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        hintIcon.heightAnchor.constraint(equalToConstant: 24).isActive = true
+        hint.addArrangedSubview(hintIcon)
+        hint.addArrangedSubview(hintLabel)
+        hintLabel.font = mono(15, weight: .medium)
+        hintLabel.textColor = .white
+        hint.backgroundColor = charcoal.withAlphaComponent(0.8)
+        hint.layer.cornerRadius = 24
+        hint.clipsToBounds = true
+        hintLabel.adjustsFontSizeToFitWidth = true
+        view.addSubview(hint)
         shutter.layer.borderWidth = 1
         shutter.layer.borderColor = UIColor.white.cgColor
         shutter.layer.cornerRadius = 35
@@ -206,107 +265,72 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         shutter.accessibilityLabel = "Take photo"
         shutter.addTarget(self, action: #selector(takePhoto), for: .touchUpInside)
         view.addSubview(shutter)
-        for button in [identify, add] {
-            button.backgroundColor = UIColor(red: 243/255, green: 242/255, blue: 240/255, alpha: 1)
-            button.setTitleColor(charcoal, for: .normal)
-            button.titleLabel?.font = mono(16, weight: .semibold)
-            button.layer.cornerRadius = 33
-            view.addSubview(button)
-        }
-        identify.addTarget(self, action: #selector(identifyTea), for: .touchUpInside)
-        add.setTitle("ADD NEW", for: .normal)
-        add.addTarget(self, action: #selector(addTea), for: .touchUpInside)
+        action.backgroundColor = charcoal
+        action.setTitleColor(.white, for: .normal)
+        action.titleLabel?.font = mono(16, weight: .semibold)
+        action.layer.cornerRadius = 33
+        action.addTarget(self, action: #selector(primaryAction), for: .touchUpInside)
+        view.addSubview(action)
         NotificationCenter.default.addObserver(self, selector: #selector(stopScanner),
                                                name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(startScanner),
                                                name: UIApplication.didBecomeActiveNotification, object: nil)
-        if barcodeOnly {
-            shutter.isHidden = true
-            identify.isHidden = true
-            thumbnails.isHidden = true
-        }
-        updateActions()
+        render()
     }
-
-    private func mono(_ size: CGFloat, weight: UIFont.Weight) -> UIFont {
-        let name = weight == .regular ? "RobotoMono-Regular" : "RobotoMono-Medium"
-        if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-        }
-        return UIFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: weight)
-    }
-
-    private func configureToast() {
-        toast.spacing = 16
-        toast.alignment = .center
-        toast.backgroundColor = charcoal.withAlphaComponent(0.8)
-        toast.layer.cornerRadius = 15
-        toast.isLayoutMarginsRelativeArrangement = true
-        toast.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
-        toastIcon.tintColor = lime
-        toastIcon.contentMode = .scaleAspectFit
-        toastIcon.widthAnchor.constraint(equalToConstant: 24).isActive = true
-        let labels = UIStackView(arrangedSubviews: [titleLabel, detailLabel])
-        labels.axis = .vertical
-        labels.spacing = 3
-        titleLabel.font = mono(12, weight: .medium)
-        detailLabel.font = mono(10, weight: .regular)
-        for label in [titleLabel, detailLabel] { label.textColor = .white }
-        toast.addArrangedSubview(toastIcon)
-        toast.addArrangedSubview(labels)
-        toast.isHidden = true
-    }
-
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let width = view.bounds.width
         let height = view.bounds.height
-        let top = max(52, view.safeAreaInsets.top)
-        let cameraHeight = max(120, height - top - (barcodeOnly ? view.safeAreaInsets.bottom : 264))
-        scanner.view.frame = CGRect(x: 0, y: top, width: width, height: cameraHeight)
-        finder.frame = CGRect(x: (width - 189) / 2, y: cameraHeight * 152 / 496, width: 189, height: 116)
-        scanner.regionOfInterest = finder.frame
-        close.frame = CGRect(x: width - 62, y: top + 14, width: 48, height: 48)
-        thumbnails.frame = CGRect(x: 16, y: cameraHeight - 73, width: width - 32, height: 66)
-        let toastBottom: CGFloat = strip.arrangedSubviews.isEmpty ? 16 : 96
-        toast.frame = CGRect(x: 12, y: cameraHeight - toastBottom - 56, width: width - 24, height: 56)
-        shutter.frame = CGRect(x: (width - 70) / 2, y: top + cameraHeight + 16, width: 70, height: 70)
-        identify.frame = CGRect(x: 8, y: height - 80, width: width - 16, height: 66)
-        add.frame = identify.frame.offsetBy(dx: 0, dy: -82)
+        // Figma 375x812: camera 4/4/367/548; shutter y566;
+        // result rows y556; primary action y732, bottom14. Compact heights scroll rows.
+        let cameraHeight = max(220, height - 264)
+        cameraSurface.frame = CGRect(x: 4, y: 4, width: width - 8, height: cameraHeight)
+        scanner?.view.frame = cameraSurface.bounds
+        let matching = state == .matches
+        let hasPhotos = !photos.isEmpty
+        let finderHeight = cameraHeight - (hasPhotos ? (matching ? 158 : 214) : 140)
+        let finderRect = CGRect(x: 8, y: 72, width: width - 24, height: max(80, finderHeight))
+        finder.path = UIBezierPath(roundedRect: finderRect, cornerRadius: 30).cgPath
+        scanner?.regionOfInterest = finderRect
+        close.frame = CGRect(x: width - 64, y: 16, width: 48, height: 48)
+        manual.frame = close.frame.offsetBy(dx: -60, dy: 0)
+        trash.frame = manual.frame.offsetBy(dx: -60, dy: 0)
+        let thumbsY = cameraHeight - (matching ? 70 : 126)
+        thumbnails.frame = CGRect(x: 12, y: thumbsY, width: width - 24, height: 66)
+        strip.frame = CGRect(x: 0, y: 0, width: CGFloat(photos.count) * 74 - (hasPhotos ? 8 : 0), height: 66)
+        thumbnails.contentSize = strip.bounds.size
+        hint.frame = CGRect(x: 12, y: cameraHeight - 52, width: width - 24, height: 48)
+        toast.frame = CGRect(x: max(12, (width - 247) / 2), y: cameraHeight * 0.45,
+                             width: min(247, width - 24), height: detailLabel.isHidden ? 48 : 58)
+        shutter.frame = CGRect(x: (width - 70) / 2, y: cameraHeight + 18, width: 70, height: 70)
+        action.frame = CGRect(x: 8, y: height - 80, width: width - 16, height: 66)
+        candidateScroll.frame = CGRect(x: 4, y: cameraHeight + 8, width: width - 8,
+                                       height: max(0, height - 92 - cameraHeight))
+        candidateRows.frame = CGRect(x: 0, y: 0, width: width - 8, height: CGFloat(candidates.count) * 82)
+        candidateScroll.contentSize = candidateRows.bounds.size
     }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        startScanner()
-    }
-
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        stopScanner()
-    }
-
+    override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); startScanner() }
+    override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); stopScanner() }
     @objc private func startScanner() {
-        guard !closed, view.window != nil, !scanner.isScanning else { return }
-        do { try scanner.startScanning() }
-        catch { showToast("Camera unavailable", error.localizedDescription, found: false) }
-        updateActions()
+        guard !closed, view.window != nil, let scanner, !scanner.isScanning else { return }
+        do { try scanner.startScanning(); cameraUnavailable = false }
+        catch { cameraUnavailable = true }
+        render()
     }
-
     @objc private func stopScanner() {
-        scanner.stopScanning()
+        scanner?.stopScanning()
         capture?.cancel()
-        updateActions()
+        render()
     }
-
     func dataScanner(_ dataScanner: DataScannerViewController,
                      becameUnavailableWithError error: DataScannerViewController.ScanningUnavailable) {
-        showToast("Camera unavailable", "Close and reopen the camera to try again.", found: false)
+        cameraUnavailable = true
         stopScanner()
     }
-
     func dataScanner(_ dataScanner: DataScannerViewController,
                      didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
-        guard !closed, processing == nil, photoLookupID == nil, result != .possible, result != .noMatch else { return }
+        guard !closed, state == .barcode || state == .unreadableBarcode,
+              candidateID == nil, capture == nil, processing == nil else { return }
         for item in addedItems {
             guard case .barcode(let barcode) = item else { continue }
             let code = barcode.payloadStringValue ?? ""
@@ -318,226 +342,331 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 finish("barcode")
                 return
             }
-            // Vision presents UPC-A as zero-prefixed EAN-13.
             let key = code.isEmpty ? barcode.id.uuidString : code
             visibleBarcodeIDs[barcode.id] = key
             guard seen.insert(key).inserted else { continue }
             let id = UUID().uuidString
             candidateID = id
             acceptedBarcodeID = nil
-            result = .none
-            toast.isHidden = true
             onBarcode(id, code, format)
+            render()
             return
         }
     }
-
     func dataScanner(_ dataScanner: DataScannerViewController,
                      didRemove removedItems: [RecognizedItem], allItems: [RecognizedItem]) {
-        // Re-enable a barcode only after its last visible instance has left.
         for item in removedItems {
             guard let key = visibleBarcodeIDs.removeValue(forKey: item.id) else { continue }
             if !visibleBarcodeIDs.values.contains(key) { seen.remove(key) }
         }
     }
-
     func showBarcodeResult(id: String?, result value: String?, name: String?, brand: String?) {
         guard !closed, let id, id == candidateID, processing == nil else { return }
-        candidateID = nil
+        // Retain the ID during an offline failure so its one online retry can be accepted.
+        if value != "lookup_error" { candidateID = nil }
         acceptedBarcodeID = value == "known" || value == "unknown" ? id : nil
-        result = .none
         switch value {
-        case "known":
-            let label = [brand, name].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " – ")
-            showToast("Tea Found", label, found: true)
-            finish("use")
-        case "unknown": showToast("Tea Not Found", "No tea linked to this code.", found: false, autoDismiss: true)
-        case "lookup_error": showToast("Catalog Unavailable", "Please try again.", found: false, autoDismiss: true)
-        default: showToast("Barcode Not Readable", "Try again or identify by photo.", found: false, autoDismiss: true)
+        case "known": finish("use")
+        case "unknown": state = .unknownBarcode
+        case "lookup_error": state = .networkError
+        default: state = .unreadableBarcode
         }
+        render()
     }
-
-    private func showToast(_ title: String, _ detail: String, found: Bool, autoDismiss: Bool = false) {
-        toastDismissTask?.cancel()
-        toastDismissTask = nil
-        titleLabel.text = title
-        detailLabel.text = detail
-        toastIcon.tintColor = found ? lime : UIColor(red: 1, green: 145/255, blue: 83/255, alpha: 1)
-        toastIcon.image = UIImage(systemName: found ? "checkmark" : "exclamationmark.triangle")
-        toast.isHidden = false
-        view.setNeedsLayout()
-        if autoDismiss {
-            toastDismissTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 2_500_000_000)
-                guard !Task.isCancelled, let self, !self.closed else { return }
-                self.toast.isHidden = true
-                self.toastDismissTask = nil
-            }
+    private func invalidatePhotoLookup() {
+        photoRevision += 1
+        processing?.cancel()
+        processing = nil
+        photoLookupTimeout?.cancel()
+        photoLookupTimeout = nil
+        photoLookupID = nil
+        acceptedPhotoID = nil
+        selectedTeaID = nil
+        candidates = []
+        onState("photos_changed")
+    }
+    @objc private func primaryAction() {
+        guard !closed, capture == nil, processing == nil, photoLookupID == nil else { return }
+        switch state {
+        case .barcode, .unreadableBarcode:
+            candidateID = nil
+            onState("mode_changed")
+            state = .photo
+        case .unknownBarcode, .photo, .unreadablePhoto:
+            guard !hasCapturedPhoto else { return }
+            candidateID = nil
+            acceptedBarcodeID = nil
+            seen.removeAll()
+            visibleBarcodeIDs.removeAll()
+            onState("mode_changed")
+            state = .barcode
+        case .matches:
+            // Rejection is a decision, not a confirmed product prefill.
+            invalidatePhotoLookup()
+            state = .noMatch
+        case .noMatch: addTea()
+        default: return
         }
+        render()
     }
-
     @objc private func takePhoto() {
-        guard !closed, scanner.isScanning, capture == nil, processing == nil, photoImages.count < 3 else { return }
-        toastDismissTask?.cancel()
-        toastDismissTask = nil
-        toast.isHidden = true
+        guard !closed, let scanner, scanner.isScanning, capture == nil,
+              processing == nil, photoLookupID == nil, photos.count < 3, state != .matches, candidateID == nil || state == .networkError else { return }
         capture = Task { @MainActor in
-            defer { capture = nil; updateActions() }
+            defer { capture = nil; render() }
             do {
                 let photo = try await scanner.capturePhoto()
                 guard !Task.isCancelled, !closed else { return }
-                let size = CGSize(width: 132, height: 132)
-                let thumbnail = UIGraphicsImageRenderer(size: size).image { _ in
-                    let scale = max(size.width / photo.size.width, size.height / photo.size.height)
-                    let w = photo.size.width * scale
-                    let h = photo.size.height * scale
-                    photo.draw(in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
-                }
-                let image = UIImageView(image: thumbnail)
-                image.accessibilityLabel = "Photo \(strip.arrangedSubviews.count + 1)"
-                image.isAccessibilityElement = true
-                image.widthAnchor.constraint(equalToConstant: 66).isActive = true
-                strip.addArrangedSubview(image)
-                photoImages.append(photo)
-                acceptedPhotoID = nil
                 let factor = min(1, 1600 / max(photo.size.width, photo.size.height))
-                let bounds = CGRect(x: 0, y: 0, width: floor(photo.size.width * factor),
-                                    height: floor(photo.size.height * factor))
+                let bounds = CGRect(x: 0, y: 0, width: floor(photo.size.width * factor), height: floor(photo.size.height * factor))
                 let format = UIGraphicsImageRendererFormat()
                 format.scale = 1
-                let preview = UIGraphicsImageRenderer(size: bounds.size, format: format).image { _ in
-                    photo.draw(in: bounds)
-                }
-                if let data = preview.jpegData(compressionQuality: 0.72).flatMap({
+                let preview = UIGraphicsImageRenderer(size: bounds.size, format: format).image { _ in photo.draw(in: bounds) }
+                guard let data = preview.jpegData(compressionQuality: 0.72).flatMap({
                     $0.count <= 1048576 ? $0 : preview.jpegData(compressionQuality: 0.5)
-                }), data.count <= 1048576 {
-                    photoPreviews.append("data:image/jpeg;base64," + data.base64EncodedString())
-                } else {
-                    strip.removeArrangedSubview(image)
-                    image.removeFromSuperview()
-                    photoImages.removeLast()
-                    showToast("Photo unavailable", "Try taking the photo again.", found: false)
+                }), data.count <= 1048576 else {
+                    showHint("Photo unavailable", "Try another photo")
                     return
                 }
-                if result == .possible || result == .noMatch {
-                    result = .none
-                    toast.isHidden = true
-                }
-                view.setNeedsLayout()
-                view.layoutIfNeeded()
-                thumbnails.setContentOffset(CGPoint(x: max(0, thumbnails.contentSize.width - thumbnails.bounds.width), y: 0), animated: true)
+                candidateID = nil
+                hasCapturedPhoto = true // Intentionally never cleared by deleting a photo.
+                photos.append((preview, "data:image/jpeg;base64," + data.base64EncodedString()))
+                selectedPhoto = photos.count - 1
+                rebuildThumbnails()
+                identifyPhotos()
             } catch {
                 guard !Task.isCancelled, !closed else { return }
-                showToast("Photo unavailable", "Try taking the photo again.", found: false)
+                showHint("Photo unavailable", "Try another photo")
             }
         }
-        updateActions()
+        render()
     }
-
-    // Vision performs text recognition on the device. Only the extracted
-    // strings are passed to React for matching against the current tea catalogue.
-    private static func recognizeText(in images: [UIImage]) -> [String] {
-        var lines: [String] = []
-        for image in images {
-            guard let cgImage = image.cgImage else { continue }
+    private func rebuildThumbnails() {
+        strip.arrangedSubviews.forEach { strip.removeArrangedSubview($0); $0.removeFromSuperview() }
+        for (index, photo) in photos.enumerated() {
+            let button = UIButton(type: .custom)
+            button.setImage(photo.image, for: .normal)
+            button.imageView?.contentMode = .scaleAspectFill
+            button.clipsToBounds = true
+            button.layer.cornerRadius = 13
+            button.layer.borderWidth = index == selectedPhoto ? 3 : 2
+            button.layer.borderColor = index == selectedPhoto ? lime.cgColor : UIColor(red: 232/255, green: 251/255, blue: 203/255, alpha: 1).cgColor
+            button.widthAnchor.constraint(equalToConstant: 66).isActive = true
+            button.tag = index
+            button.accessibilityLabel = "Select photo \(index + 1)"
+            button.accessibilityTraits = index == selectedPhoto ? [.button, .selected] : .button
+            button.addTarget(self, action: #selector(selectPhoto(_:)), for: .touchUpInside)
+            strip.addArrangedSubview(button)
+        }
+    }
+    @objc private func selectPhoto(_ sender: UIButton) {
+        guard photos.indices.contains(sender.tag) else { return }
+        selectedPhoto = sender.tag
+        rebuildThumbnails()
+    }
+    @objc private func deletePhoto() {
+        guard !closed, capture == nil, photos.indices.contains(selectedPhoto) else { return }
+        invalidatePhotoLookup()
+        photos.remove(at: selectedPhoto)
+        selectedPhoto = max(0, min(selectedPhoto, photos.count - 1))
+        rebuildThumbnails()
+        if photos.isEmpty { state = .photo; render() }
+        else { identifyPhotos() }
+    }
+    // Apple Vision stays on-device. Work off an immutable snapshot and reject
+    // results for deleted photos, old snapshots or a dismissed camera.
+    private static func recognizeText(in images: [UIImage]) -> [[String]] {
+        return images.map { image in
+            var lines: [String] = []
+            guard let cgImage = image.cgImage else { return [] }
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
-            let handler = VNImageRequestHandler(cgImage: cgImage)
             do {
-                try handler.perform([request])
+                try VNImageRequestHandler(cgImage: cgImage).perform([request])
                 for observation in request.results ?? [] {
-                    guard let candidate = observation.topCandidates(1).first,
-                          candidate.confidence >= 0.35 else { continue }
+                    guard let candidate = observation.topCandidates(1).first, candidate.confidence >= 0.35 else { continue }
                     lines.append(candidate.string)
                 }
-            } catch { continue }
+            } catch { return [] }
+            return lines
         }
-        return lines
     }
-
-    @objc private func identifyTea() {
-        if result == .possible { finish("use_photo"); return }
-        if result == .noMatch { addTea(); return }
-        guard !photoImages.isEmpty, capture == nil, processing == nil, photoLookupID == nil else { return }
-        candidateID = nil
-        acceptedPhotoID = nil
-        toast.isHidden = true
-        let images = photoImages
+    private func identifyPhotos() {
+        invalidatePhotoLookup()
+        guard !photos.isEmpty else { state = .photo; render(); return }
+        let revision = photoRevision
+        let images = photos.map { $0.image }
+        state = .identifying
         processing = Task { @MainActor in
-            let lines = await withCheckedContinuation { continuation in
+            let recognized = await withCheckedContinuation { continuation in
                 DispatchQueue.global(qos: .userInitiated).async {
                     continuation.resume(returning: Self.recognizeText(in: images))
                 }
             }
-            guard !Task.isCancelled, !closed else { return }
+            guard !Task.isCancelled, !closed, revision == photoRevision else { return }
             processing = nil
-            if lines.isEmpty {
-                result = .noMatch
-                showToast("No Match Found", "No recognizable packaging text found.", found: false)
+            if recognized.last?.isEmpty != false {
+                state = .unreadablePhoto
             } else {
+                let lines = recognized.flatMap { $0 }
                 let id = UUID().uuidString
                 photoLookupID = id
                 onPhotoText(id, lines)
                 photoLookupTimeout = Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    try? await Task.sleep(nanoseconds: 8_000_000_000)
                     guard !Task.isCancelled else { return }
-                    self?.showPhotoResult(id: id, result: "no_match", name: nil, brand: nil)
+                    self?.showPhotoResult(id: id, result: "lookup_error", candidates: [])
                 }
             }
-            updateActions()
+            render()
         }
-        updateActions()
+        render()
     }
-
-    func showPhotoResult(id: String?, result value: String?, name: String?, brand: String?) {
+    func showPhotoResult(id: String?, result value: String?, candidates values: [[String: String]]) {
         guard !closed, let id, id == photoLookupID else { return }
         photoLookupID = nil
         photoLookupTimeout?.cancel()
         photoLookupTimeout = nil
         acceptedPhotoID = id
-        if value == "possible" {
-            result = .possible
-            let label = [brand, name].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " – ")
-            showToast("Possible match", label, found: true)
-        } else {
-            result = .noMatch
-            showToast("No Match Found", "Take more photos or add a new tea.", found: false)
+        candidates = values.filter { !($0["id"] ?? "").isEmpty }
+        if value == "possible", !candidates.isEmpty { state = .matches }
+        else { state = value == "lookup_error" ? .networkError : .noMatch }
+        rebuildCandidates()
+        render()
+    }
+    private func rebuildCandidates() {
+        candidateRows.arrangedSubviews.forEach { candidateRows.removeArrangedSubview($0); $0.removeFromSuperview() }
+        for (index, tea) in candidates.enumerated() {
+            let row = UIButton(type: .custom)
+            row.backgroundColor = .white
+            row.tag = index
+            row.accessibilityLabel = [tea["name"], tea["brand"]].compactMap { $0 }.joined(separator: ", ")
+            row.heightAnchor.constraint(equalToConstant: 82).isActive = true
+            let marker = UILabel()
+            marker.backgroundColor = charcoal
+            marker.textColor = lime
+            marker.textAlignment = .center
+            marker.layer.cornerRadius = 24
+            marker.clipsToBounds = true
+            if let url = Bundle.main.url(forResource: "tea-symbols-sharp", withExtension: "ttf", subdirectory: "public/fonts") {
+                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            }
+            marker.font = UIFont(name: "MaterialSymbolsSharp-Regular", size: 24)
+            marker.text = tea["symbol"] ?? "category"
+            marker.frame = CGRect(x: 16, y: 17, width: 48, height: 48)
+            row.addSubview(marker)
+            let arrow = UIImageView(image: icon("uc02-open"))
+            arrow.frame = CGRect(x: view.bounds.width - 72, y: 17, width: 48, height: 48)
+            row.addSubview(arrow)
+            for (offset, key) in ["name", "brand"].enumerated() {
+                let label = UILabel(frame: CGRect(x: 76, y: CGFloat(18 + offset * 23), width: max(0, view.bounds.width - 156), height: 23))
+                label.font = mono(16, weight: offset == 0 ? .semibold : .regular)
+                label.text = tea[key]
+                label.textColor = charcoal
+                label.isUserInteractionEnabled = false
+                row.addSubview(label)
+            }
+            row.addTarget(self, action: #selector(selectCandidate(_:)), for: .touchUpInside)
+            candidateRows.addArrangedSubview(row)
         }
-        updateActions()
     }
-
-    private func updateActions() {
-        shutter.isEnabled = !closed && photoImages.count < 3 && scanner.isScanning && capture == nil && processing == nil && photoLookupID == nil
-        identify.isEnabled = !closed && !strip.arrangedSubviews.isEmpty && capture == nil && processing == nil && photoLookupID == nil
-        identify.alpha = identify.isEnabled ? 1 : 0.35
-        identify.setTitle(result == .possible ? "USE THIS TEA" : result == .noMatch ? "ADD NEW"
-                          : processing == nil && photoLookupID == nil ? "IDENTIFY TEA" : "IDENTIFYING TEA", for: .normal)
-        add.isHidden = result != .possible
+    @objc private func selectCandidate(_ sender: UIButton) {
+        guard state == .matches, candidates.indices.contains(sender.tag), acceptedPhotoID != nil else { return }
+        selectedTeaID = candidates[sender.tag]["id"]
+        finish("use_photo")
     }
-
-    @objc private func addTea() { finish("add") }
+    private func showHint(_ title: String, _ detail: String) {
+        titleLabel.text = title
+        detailLabel.text = detail
+        detailLabel.isHidden = detail.isEmpty
+        toastIcon.image = icon("uc02-info")
+        toast.isHidden = false
+        view.setNeedsLayout()
+    }
+    private func render() {
+        guard isViewLoaded else { return }
+        var title = "Looking for a barcode…"
+        var detail = ""
+        var instruction = "Show your tea pack"
+        var buttonTitle = "No barcode · Continue"
+        switch state {
+        case .barcode: if candidateID != nil { title = "Checking the catalogue…" }
+        case .unknownBarcode:
+            title = "Barcode captured"; detail = "No tea linked yet"
+            instruction = "Take a photo of the front"; buttonTitle = "SCAN BARCODE AGAIN"
+        case .unreadableBarcode:
+            title = "Couldn't read the barcode"; instruction = "Try again or take a photo"
+        case .photo:
+            title = ""; instruction = hasCapturedPhoto ? "Try another photo" : "Take a photo of the front"
+            buttonTitle = "SCAN BARCODE AGAIN"
+        case .identifying:
+            title = "Looking for your tea…"; instruction = ""; buttonTitle = "SCAN BARCODE AGAIN"
+        case .unreadablePhoto:
+            title = "Couldn't read the details"; instruction = "Try another photo"; buttonTitle = "SCAN BARCODE AGAIN"
+        case .matches:
+            title = "We found possible matches"; instruction = ""
+            buttonTitle = candidates.count == 1 ? "NOT MY TEA" : "NONE OF THESE"
+        case .noMatch:
+            title = "No match found"; instruction = "Scan brewing details"; buttonTitle = "ADD NEW TEA"
+        case .networkError:
+            title = "Can’t check the catalogue"; instruction = "Check your connection"; buttonTitle = "SCAN BARCODE AGAIN"
+        }
+        if cameraUnavailable {
+            title = "Camera access is off"; instruction = "Allow camera access to continue"
+        }
+        showHint(title, detail)
+        toast.isHidden = title.isEmpty
+        toastIcon.image = icon(state == .networkError ? "uc02-offline" : state == .unknownBarcode || state == .matches ? "uc02-check" : "uc02-info")
+        if state == .identifying || state == .barcode {
+            toastIcon.image = icon("uc02-progress")
+        } else if state == .unreadableBarcode || state == .unreadablePhoto {
+            toastIcon.image = icon("uc02-error")
+        }
+        hintIcon.image = icon(cameraUnavailable || state == .networkError ? "uc02-cancel" : "uc02-info")
+        hintLabel.text = instruction
+        hint.isHidden = instruction.isEmpty || barcodeOnly
+        action.setTitle(buttonTitle, for: .normal)
+        let busy = capture != nil || processing != nil || photoLookupID != nil
+        action.isEnabled = !closed && !busy && state != .networkError && !cameraUnavailable
+            && !(hasCapturedPhoto && (state == .photo || state == .unreadablePhoto))
+        action.alpha = action.isEnabled ? 1 : 0.3
+        action.isHidden = barcodeOnly || cameraUnavailable
+        shutter.isHidden = barcodeOnly || state == .matches || cameraUnavailable
+        shutter.isEnabled = !closed && !busy && photos.count < 3 && scanner?.isScanning == true
+            && (candidateID == nil || state == .networkError)
+        shutter.alpha = shutter.isEnabled ? 1 : 0.3
+        manual.isHidden = barcodeOnly || cameraUnavailable
+        manual.isEnabled = !closed && !busy
+        trash.isHidden = photos.isEmpty
+        trash.isEnabled = capture == nil && !closed
+        candidateScroll.isHidden = state != .matches
+        thumbnails.isHidden = photos.isEmpty
+        finder.isHidden = cameraUnavailable
+        view.setNeedsLayout()
+    }
+    @objc private func addTea() {
+        guard !closed, capture == nil, processing == nil, photoLookupID == nil else { return }
+        if state == .matches { acceptedPhotoID = nil }
+        finish("add")
+    }
     @objc private func closeCamera() { finish("close") }
     func closeForQuickAccess() { closeCamera() }
-
     private func finish(_ action: String) {
         guard !closed else { return }
         closed = true
-        toastDismissTask?.cancel()
-        toastDismissTask = nil
         stopScanner()
         processing?.cancel()
-        scanner.delegate = nil
-        NotificationCenter.default.removeObserver(self)
-        strip.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        // Discard all photo previews when the user closes with X.
-        let photos = action == "add" ? photoPreviews : []
-        photoPreviews.removeAll()
-        photoImages.removeAll()
-        photoLookupID = nil
         photoLookupTimeout?.cancel()
+        scanner?.delegate = nil
+        NotificationCenter.default.removeObserver(self)
+        let photoPreviews = self.photos.map { $0.preview }
+        let photos = action == "add" ? photoPreviews : []
         let barcodeID = acceptedBarcodeID
         let photoID = acceptedPhotoID
-        dismiss(animated: true) { [onClose] in onClose(action, photos, barcodeID, photoID) }
+        let teaID = selectedTeaID
+        self.photos.removeAll()
+        onState("closed")
+        dismiss(animated: true) { [onClose] in onClose(action, photos, barcodeID, photoID, teaID) }
     }
 }

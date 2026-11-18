@@ -98,7 +98,7 @@ test('camera permission rejection and X both keep the quick-access return route 
     if (denied) await assert.rejects(task, /Allow camera access/);
     else assert.deepEqual((await task).photos, []);
     assert.equal(sheet, 'closed');
-    assert.equal(removed, 2);
+    assert.equal(removed, 3);
   }
 });
 

@@ -123,12 +123,14 @@ test('write API creates a tea without a subtype and rejects changes to hidden me
 
 test('editor exposes the ten approved fields and retains the guarded write path',()=>{
   const ui=readFileSync('src/components/TeaEditor.jsx','utf8');
-  assert.deepEqual([...ui.matchAll(/<Field label="([^"]+)"/g)].map(match=>match[1]), [
-    'Tea name','Barcode (EAN / UPC)','Manufacturer','Category','Tea subtype (optional)','Leaf style (optional)',
-    'Reference quantity','Reference water (ml)','Brewing time (minutes)',
-    'Temperature (°C, optional)',
-  ]);
-  assert.match(ui,/initialTeaForm\(tea \|\| prefill\)/);
+  for (const label of ['Tea name', 'Barcode (EAN / UPC)', 'Manufacturer', 'Category',
+    'Tea subtype (optional)', 'Leaf style (optional)', 'Reference quantity',
+    'Reference water (ml)', 'Brewing time (minutes)', 'Temperature (°C, optional)']) {
+    assert.ok(ui.includes(label), 'Retain Web/PWA field: ' + label);
+  }
+  assert.match(ui, /const uc02Design = nativeIOS && communityTeaV4/);
+  assert.match(ui, /!uc02Design && barcodeField/);
+  assert.match(ui,/initialTeaForm\(tea \|\| prefill, \{ defaultMinutes: uc02Design \? 1 : '' \}\)/);
   assert.match(ui,/payload.original=tea/);
   assert.match(ui,/validateTeaForm/);
   assert.match(ui,/createTea/);
@@ -179,7 +181,7 @@ test('Tea Card and Edit dropdown use Other for legacy categories but retain raw 
   assert.match(card,/<TeaCategoryIcon category=\{tea.category\}/);
   assert.match(card,/getCategoryVisual\(uiCategory\)/);
   assert.match(editor,/getUiTeaCategory\(form.category\)/);
-  assert.match(editor,/const next=initialTeaForm\(tea \|\| prefill\)/);
+  assert.match(editor,/const next=initialTeaForm\(tea \|\| prefill, \{ defaultMinutes: uc02Design \? 1 : '' \}\)/);
   assert.doesNotMatch(editor,/form.category=getUiTeaCategory/);
 });
 

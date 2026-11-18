@@ -50,13 +50,13 @@ export function routeNativeQuickAccess(target, { showHome, cameraBusy, openCamer
   }
 }
 
-// The existing native photo lookup expires after five seconds. Keep room for
-// the bridge round trip while giving an in-progress catalogue request a chance.
+// Do not turn a slow/unavailable catalogue into a false negative OCR match.
+// Keep room for the native bridge round trip within the photo lookup budget.
 export async function waitForCameraCatalog(request) {
   let timeout;
   try {
-    return await Promise.race([request, new Promise(resolve => {
-      timeout = setTimeout(() => resolve([]), 4000);
+    return await Promise.race([request, new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('Catalogue unavailable')), 4000);
     })]);
   } finally {
     clearTimeout(timeout);

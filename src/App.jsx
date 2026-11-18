@@ -6,7 +6,7 @@ import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
-import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoText } from './features/nativeTeaCamera.js';
+import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoCandidates } from './features/nativeTeaCamera.js';
 import { observeNativeQuickAccess, routeNativeQuickAccess, waitForCameraCatalog } from './features/nativeQuickAccess.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
@@ -61,6 +61,7 @@ export default function App() {
   const [scannerBusy, setScannerBusy] = useState(false);
   const nativeCameraBusy = useRef(false);
   const catalogRequest = useRef(null);
+  const cameraCatalogFailed = useRef(false);
   const quickAccessHandler = useRef(null);
   const cameraResultGeneration = useRef(0);
   const [scanError, setScanError] = useState('');
@@ -105,6 +106,7 @@ export default function App() {
     const ac = new AbortController();
     catalogRequest.current = listTeas({ signal:ac.signal })
       .then(teas => {
+        if (!ac.signal.aborted) cameraCatalogFailed.current = false;
         if (!ac.signal.aborted) setCatalog(previous => ({
           status:'ready',error:'',
           teas: teas.concat(previous.teas.filter(item => !teas.some(tea => tea.id === item.id))),
@@ -112,6 +114,7 @@ export default function App() {
         return teas;
       })
       .catch(error => {
+        if (!ac.signal.aborted) cameraCatalogFailed.current = true;
         if (!ac.signal.aborted) setCatalog(previous => ({...previous,status:'error',error:error.message}));
         return [];
       });
@@ -180,11 +183,19 @@ export default function App() {
         getNativeTeaCamera(), {
           shouldOpen: () => generation === cameraResultGeneration.current,
           lookupBarcode: lookupTeaByCode,
-          matchPhoto: async lines => {
-            const available = fromQuickAccess && catalog.status === 'loading'
+          matchPhoto: async (lines, { signal }) => {
+            let available = catalog.status === 'loading'
               ? await waitForCameraCatalog(catalogRequest.current ?? Promise.resolve(teas))
               : teas;
-            return matchPhotoText(lines, available);
+            if (cameraCatalogFailed.current) {
+              available = await listTeas({ signal });
+              if (signal.aborted) throw new Error('Catalogue request cancelled');
+              cameraCatalogFailed.current = false;
+              catalogRequest.current = Promise.resolve(available);
+              setCatalog(previous => ({ status:'ready', error:'',
+                teas: available.concat(previous.teas.filter(item => !available.some(tea => tea.id === item.id))) }));
+            }
+            return matchPhotoCandidates(lines, available);
           },
         },
       );
@@ -202,7 +213,7 @@ export default function App() {
         else setQuickNotice('No verified tea found in the photos.');
       } else if (action === 'add') {
         setScannedCode(barcode);
-        setPhotoPrefill(photoTea || recognizedFields || null);
+        setPhotoPrefill(recognizedFields || null);
         setCapturedPhotos(Array.isArray(photos) ? photos : []);
         setMessage('');
         setMode('add');

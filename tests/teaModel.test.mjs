@@ -61,3 +61,22 @@ test('tea bags use a 250ml cup and round custom amounts up to whole bags', () =>
     assert.equal(calculateDose(bag,water),count);
   }
 });
+
+test('UC02 native default is 1 MIN without inventing packaging data; other clients retain empty default', () => {
+  const native = initialTeaForm(null, { defaultMinutes: 1 });
+  assert.equal(native.mins, '1');
+  for (const field of ['name', 'brand', 'category', 'qty', 'base', 'temperature']) assert.equal(native[field], '');
+  assert.equal(initialTeaForm().mins, '');
+  assert.equal(initialTeaForm({ brewSeconds: 360 }, { defaultMinutes: 1 }).mins, '6');
+  assert.equal(initialTeaForm({ brewSeconds: 1800 }, { defaultMinutes: 1 }).mins, '30');
+});
+
+test('editing legacy measures never implicitly converts unit or quantity', () => {
+  const original = { id:'old', rawName:'Tea', brand:'Fancy', category:'black',
+    unit:'measure', type:'loose', qty:2, base:250, brewSeconds:240 };
+  const form = initialTeaForm(original, { defaultMinutes:1 });
+  assert.equal(form.unit, 'measure');
+  assert.equal(form.qty, '2');
+  assert.equal(validateTeaForm(form).unit, 'measure');
+  assert.equal(validateTeaForm(form).qty, 2);
+});

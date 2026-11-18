@@ -21,19 +21,19 @@ const fieldSx = {
 };
 const options = values => Object.entries(values).map(([value,label])=>({value,label}));
 
-function Field({ label, value, onChange, choices, type='text', required=false, helper='', error='', placeholder='', endAdornment, inputMode }) {
+function Field({ label, value, onChange, choices, type='text', required=false, helper='', error='', placeholder='', endAdornment, startAdornment, inputMode, compact = false }) {
   const props={
     variant:'filled',fullWidth:true,hiddenLabel:true,size:'small',
     value,onChange,required,error:Boolean(error),placeholder,
-    slotProps:{input:{disableUnderline:true,endAdornment},htmlInput:{'aria-label':label,inputMode}},
+    slotProps:{input:{disableUnderline:true,endAdornment,startAdornment},htmlInput:{'aria-label':label,inputMode}},
     sx:fieldSx,
   };
   return (
-    <Box>
-      <Typography component="label"
+    <Box className={compact ? 'fac-uc02-barcode' : 'fac-editor-field'}>
+      {!compact && <Typography component="label"
         sx={{display:'block',fontSize:16,fontWeight:500,lineHeight:'21px',mb:'10px'}}>
         {label}{required?' *':''}
-      </Typography>
+      </Typography>}
       {choices
         ? <TextField {...props} select SelectProps={{displayEmpty:true,IconComponent:()=>(
             <span className="material-symbols-outlined" style={{pointerEvents:'none',marginRight:8}}>
@@ -53,8 +53,9 @@ function Field({ label, value, onChange, choices, type='text', required=false, h
  * V3 editor for tea identity and preparation.
  */
 export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = [], prefill = null, message, onCancel, onSaved, onScanBarcode }) {
+  const uc02Design = nativeIOS && communityTeaV4;
   const [form,setForm]=useState(()=>{
-    const next=initialTeaForm(tea || prefill);
+    const next=initialTeaForm(tea || prefill, { defaultMinutes: uc02Design ? 1 : '' });
     if (!tea) {
       next.id=null;
       // A recognized catalogue tea must not copy its registered barcode into
@@ -222,9 +223,24 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
   const leaves=[{value:'',label:'Not specified'},...options(LEAF_STYLE_LABELS).filter(x=>
     form.type==='bag'?x.value==='bag':x.value!=='bag')];
   const subtype=form.subcategory==='other' ? form.subcategory_other : form.subcategory;
+  const barcodeField = (!tea || communityTeaV4) && (
+            <Field label="Barcode (EAN / UPC)" placeholder={uc02Design ? "Scan barcode" : "Scan or enter barcode"} compact={uc02Design}
+              startAdornment={uc02Design && <InputAdornment position="start"><span className="material-symbols-outlined" aria-hidden="true">add</span></InputAdornment>} value={form.codeValue}
+              inputMode="numeric"
+              onChange={e => {
+                const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
+                setBarcode(value, { 8: 'ean_8', 12: 'upc_a', 13: 'ean_13' }[value.length] || '');
+              }}
+              error={fieldErrors.codeValue}
+              endAdornment={onScanBarcode && <InputAdornment position="end">
+                <IconButton type="button" aria-label="Scan barcode" disabled={saving} onClick={scanBarcode}>
+                  <img src={figma+'tea-scanner.svg'} width="24" height="24" alt="" />
+                </IconButton>
+              </InputAdornment>} />
+  );
   return (
-    <Box component="form" onSubmit={save} noValidate className="fac-sheet-editor">
-      <Box sx={{px:3,pt:"10px",pb:"16px"}}>
+    <Box component="form" onSubmit={save} noValidate className={'fac-sheet-editor' + (uc02Design ? ' fac-sheet-editor--uc02' : '')}>
+      <Box className="fac-editor-heading" sx={{px:3,pt:uc02Design ? 0 : "10px",pb:uc02Design ? "24px" : "16px"}}>
         <Typography component="h2" sx={{fontSize:21,fontWeight:700,lineHeight:"28px"}}>{tea?'Edit Tea':'Add New Tea'}</Typography>
         <Typography sx={{fontSize:12,mt:"2px",color:error?'error.main':'#656c70'}}>{error || (tea?'Update the brewing details for this tea.':'Add tea information.')}</Typography>
       </Box>
@@ -234,7 +250,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
           {photoLoad === 'loading' ? 'Loading tea photos…' : 'Tea photos could not be loaded. Reopen the editor to try again.'}
         </Typography>}
         {photoEditing && photoLoad === 'ready' && (
-          <Box className="fac-editor-photos" aria-label="Tea photos">
+          <Box className={'fac-editor-photos' + (uc02Design && !previews.length ? ' fac-editor-photos--empty' : '')} aria-label="Tea photos">
             <input ref={photoInputRef} type="file" accept="image/*" multiple
               hidden onChange={addLocalPhotos} aria-label="Choose tea photos" />
             {(nativeIOS || communityTeaV4) ? (
@@ -251,7 +267,10 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
                         }}><img src={figma + 'uc02-photo-delete.svg'} width="48" height="48" alt="" /></IconButton>
                     </>
                   ) : (
-                    <>
+                    uc02Design ? <Button type="button" className="fac-editor-photo-button" fullWidth
+                      disabled={saving || preparingPhotos} onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo">
+                      <img src={figma + 'uc02-add-photo.png'} width="24" height="24" alt="" />
+                    </Button> : <>
                       <img className="fac-editor-photos__empty-icon" src={figma + 'uc02-photo-empty.svg'} width="32" height="32" alt="" />
                       <IconButton type="button" className="fac-editor-photos__add fac-editor-photos__add--empty"
                         disabled={saving || preparingPhotos} onClick={() => photoInputRef.current?.click()} aria-label="Add a tea photo"><img src={figma + 'uc02-photo-add-empty.svg'} width="48" height="48" alt="" /></IconButton>
@@ -298,49 +317,61 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
             {!communityTeaV4 && previews.length > 0 && <Typography sx={{fontSize:12,color:'#656c70'}}>Photos are previews only and are not saved yet.</Typography>}
           </Box>
         )}
-        <Stack gap="24px">
-          <Field label="Tea name" placeholder="Enter tea name" error={fieldErrors.name} value={form.name} onChange={e=>set('name',e.target.value)} required />
-          {(!tea || communityTeaV4) && (
-            <Field label="Barcode (EAN / UPC)" placeholder="Scan or enter barcode" value={form.codeValue}
-              inputMode="numeric"
-              onChange={e => {
-                const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
-                setBarcode(value, { 8: 'ean_8', 12: 'upc_a', 13: 'ean_13' }[value.length] || '');
-              }}
-              error={fieldErrors.codeValue}
-              endAdornment={onScanBarcode && <InputAdornment position="end">
-                <IconButton type="button" aria-label="Scan barcode" disabled={saving} onClick={scanBarcode}>
-                  <img src={figma+'tea-scanner.svg'} width="24" height="24" alt="" />
-                </IconButton>
-              </InputAdornment>} />
-          )}
+        {uc02Design && <>{barcodeField}<hr className="fac-editor-divider" /></>}
+        <Stack gap={uc02Design ? '16px' : '24px'}>
+          <Field label={uc02Design ? 'Tea Name' : 'Tea name'} placeholder="Enter tea name" error={fieldErrors.name} value={form.name} onChange={e=>set('name',e.target.value)} required />
+          {!uc02Design && barcodeField}
           <Field label="Manufacturer" placeholder="Enter manufacturer" error={fieldErrors.brand} value={form.brand} onChange={e=>set('brand',e.target.value)} required />
+          {uc02Design && <Box sx={{height:16}} />}
           <Field label="Category" error={fieldErrors.category} value={form.category ? getUiTeaCategory(form.category) : ''} onChange={e=>changeCategory(e.target.value)}
             choices={cats} required />
-          <Field label="Tea subtype (optional)" error={fieldErrors.subcategory || fieldErrors.subcategory_other} value={subtype}
+          <Field label={uc02Design ? "Subtype" : "Tea subtype (optional)"} error={fieldErrors.subcategory || fieldErrors.subcategory_other} value={subtype}
             onChange={e=>setForm(previous=>({...previous,
               subcategory: previous.subcategory === 'other' && e.target.value ? 'other' : e.target.value,
               subcategory_other: (previous.subcategory === 'other' || e.target.value === 'other')
                 ? e.target.value : '',
             }))}
             placeholder="e.g. Assam" />
-          <Field label="Leaf style (optional)" value={form.leafStyle||''}
+          <Field label={uc02Design ? "Leaf style" : "Leaf style (optional)"} value={form.leafStyle||''}
             onChange={e=>set('leafStyle',e.target.value)} choices={leaves} />
-          <Box>
+          {uc02Design && <hr className="fac-editor-divider fac-editor-divider--preparation" />}
+          <Box className="fac-editor-dosage">
             <Typography sx={{fontSize:16,fontWeight:500,mb:'11px'}}>Dosage unit *</Typography>
             <Box role="group" aria-label="Dosage unit" sx={{display:'flex',height:52,bgcolor:'#F3F2F0',borderRadius:'100px'}}>
-              {['g','tsp','measure','bag'].map(unit=><Button key={unit} type="button" aria-pressed={form.unit===unit} onClick={()=>changeUnit(unit)} sx={{flex:1,minWidth:0,height:52,minHeight:52,borderRadius:'100px',px:0,fontSize:16,fontWeight:700,color:form.unit===unit?'#fff':'#1B272B',bgcolor:form.unit===unit?'#1B272B':'transparent','&:hover':{bgcolor:form.unit===unit?'#1B272B':'transparent'}}}>{DOSE_UNITS[unit]}</Button>)}
+              {(uc02Design ? ['g','tsp','bag'] : ['g','tsp','measure','bag']).map(unit=><Button key={unit} type="button" aria-pressed={form.unit===unit} onClick={()=>changeUnit(unit)} sx={{flex:1,minWidth:0,height:52,minHeight:52,borderRadius:'100px',px:0,fontSize:16,fontWeight:700,color:form.unit===unit?'#fff':'#1B272B',bgcolor:form.unit===unit?'#1B272B':'transparent','&:hover':{bgcolor:form.unit===unit?'#1B272B':'transparent'}}}>{DOSE_UNITS[unit]}</Button>)}
             </Box>
+            {uc02Design && form.unit === 'measure' && <Typography role="note" sx={{fontSize:12,mt:1}}>
+              Existing dosage in measures is preserved. Only select a different unit if you also update the quantity.
+            </Typography>}
           </Box>
-          <Field label="Reference quantity" placeholder="e.g. 1.5" type="number" error={fieldErrors.qty} value={form.qty}
+          <Field label={uc02Design ? "Quantity" : "Reference quantity"} placeholder="e.g. 1.5" type="number" error={fieldErrors.qty} value={form.qty}
             onChange={e=>set('qty',e.target.value)} required />
-          <Field label="Reference water (ml)" placeholder="e.g. 250" type="number" error={fieldErrors.base} value={form.base}
+          <Field label={uc02Design ? "Water (ml)" : "Reference water (ml)"} placeholder="e.g. 250" type="number" error={fieldErrors.base} value={form.base}
             onChange={e=>set('base',e.target.value)} required />
-          <Field label="Brewing time (minutes)" placeholder="e.g. 4" type="number" error={fieldErrors.mins} value={form.mins}
+          {!uc02Design && (
+<Field label="Brewing time (minutes)" placeholder="e.g. 4" type="number" error={fieldErrors.mins} value={form.mins}
             onChange={e=>set('mins',e.target.value)} required />
+          )}
           <Field label="Temperature (°C, optional)" placeholder="e.g. 100" type="number" error={fieldErrors.temperature} value={form.temperature}
             onChange={e=>set('temperature',e.target.value)} />
         </Stack>
+        {uc02Design && <Box className="fac-editor-time" role="group" aria-label="Brewing time">
+          <IconButton type="button" aria-label="Decrease brewing time" disabled={saving || Number(form.mins) <= 1}
+            onClick={() => set('mins', String(Math.max(1, (Number(form.mins) || 1) - 1)))}>
+            <img src={figma + 'tea-v2-minus.svg'} width="66" height="66" alt="" />
+          </IconButton>
+          <Box className="fac-editor-time__value">
+            <input type="number" inputMode="numeric" aria-label="Brewing time in minutes" min="1" max="30" step="1"
+              aria-invalid={Boolean(fieldErrors.mins)} disabled={saving} value={form.mins}
+              onChange={event => set('mins', event.target.value)} />
+            <span>MIN</span>
+          </Box>
+          <IconButton type="button" aria-label="Increase brewing time" disabled={saving || Number(form.mins) >= 30}
+            onClick={() => set('mins', String(Math.min(30, (Number(form.mins) || 1) + 1)))}>
+            <img src={figma + 'tea-v2-plus.svg'} width="66" height="66" alt="" />
+          </IconButton>
+          {fieldErrors.mins && <Typography role="alert" color="error">{fieldErrors.mins}</Typography>}
+        </Box>}
         <Box className="fac-sheet-editor-actions">
           {error && <Typography role="alert" color="error" sx={{fontSize:13}}>{error}</Typography>}
           <Button variant="contained" type="button" onClick={onCancel} disabled={saving}

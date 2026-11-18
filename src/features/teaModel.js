@@ -101,7 +101,7 @@ export function formatDose(quantity,unit) {
   return new Intl.NumberFormat('de-DE',{maximumFractionDigits:decimals}).format(quantity)
     +' '+(DOSE_UNITS[unit]||unit);
 }
-export function initialTeaForm(tea) {
+export function initialTeaForm(tea, { defaultMinutes = '' } = {}) {
   return {
     id:tea?.id||null,
     name:tea?.rawName||'',
@@ -119,7 +119,7 @@ export function initialTeaForm(tea) {
     unit:tea?.unit||'g',
     qty:String(tea?.qty??''),
     base:String(tea?.base??''),
-    mins:String(tea?.brewSeconds?tea.brewSeconds/60:''),
+    mins:String(tea?.brewSeconds?tea.brewSeconds/60:defaultMinutes),
     temperature:tea?.temperature==null?'':String(tea.temperature),
   };
 }
