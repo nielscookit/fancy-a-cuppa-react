@@ -245,8 +245,8 @@
 .fac-editor-time .MuiIconButton-root { width:66px; height:66px; padding:0; flex:0 0 66px; }
 .fac-editor-time__value { display:flex; width:135px; align-items:center; justify-content:center; gap:8px; font-size:34px; }
 .fac-editor-time__value input {
-  width:2ch; min-width:0; border:0; padding:0; font:inherit; color:inherit;
-  text-align:right; appearance:textfield; background:transparent;
+  min-width:0; border:0; padding:0; font:inherit; color:inherit;
+  text-align:center; appearance:textfield; background:transparent;
 }
 .fac-editor-time__value input::-webkit-inner-spin-button,
 .fac-editor-time__value input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }

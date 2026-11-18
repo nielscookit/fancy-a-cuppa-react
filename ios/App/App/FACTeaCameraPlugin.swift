@@ -110,9 +110,14 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private let onClose: (String, [String], String?, String?, String?) -> Void
     private let charcoal = UIColor(red: 27/255, green: 39/255, blue: 43/255, alpha: 1)
     private let lime = UIColor(red: 185/255, green: 252/255, blue: 105/255, alpha: 1)
-    private let finder = CAShapeLayer()
+    private let finder = UIImageView()
     private let close = UIButton(type: .custom)
     private let manual = UIButton(type: .custom)
+    private let manualLabel = UILabel()
+    private let manualArrow = UIImageView()
+    private var manualExpanded = false
+    private var manualOpening = false
+    private var manualNavigationGeneration = 0
     private let shutter = UIButton(type: .custom)
     private let shutterDisc = UIView()
     private let action = UIButton(type: .custom)
@@ -144,9 +149,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private var capture: Task<Void, Never>?
     private var processing: Task<Void, Never>?
     private var photoLookupTimeout: Task<Void, Never>?
+    private var barcodeNavigation: Task<Void, Never>?
+    private var cameraActive = false
     private var closed = false
     private var cameraUnavailable: Bool
-    private enum State { case barcode, unknownBarcode, unreadableBarcode, photo, identifying, unreadablePhoto, matches, noMatch, networkError }
+    private enum State { case barcode, knownBarcode, unknownBarcode, unreadableBarcode, photo, identifying, unreadablePhoto, matches, noMatch, networkError }
     private var state = State.barcode
 
     init(barcodeOnly: Bool, cameraAvailable: Bool,
@@ -185,9 +192,10 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         return UIFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: weight)
     }
     private func roundControl(_ button: UIButton, icon name: String, label: String, selector: Selector) {
-        button.backgroundColor = name == "uc02-close" ? .clear : name == "uc02-delete" ? UIColor(red: 243/255, green: 242/255, blue: 240/255, alpha: 1) : charcoal.withAlphaComponent(0.8)
+        button.backgroundColor = name == "uc02-close" ? .clear : charcoal.withAlphaComponent(0.8)
         button.layer.cornerRadius = 24
-        button.setImage(icon(name), for: .normal)
+        button.setImage(name == "uc02-delete" ? icon(name)?.withRenderingMode(.alwaysTemplate) : icon(name), for: .normal)
+        button.tintColor = .white
         button.accessibilityLabel = label
         button.addTarget(self, action: selector, for: .touchUpInside)
         view.addSubview(button)
@@ -205,13 +213,24 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             scanner.didMove(toParent: self)
             scanner.delegate = self
         }
-        finder.strokeColor = lime.cgColor
-        finder.fillColor = UIColor.clear.cgColor
-        finder.lineWidth = 3
-        finder.lineDashPattern = [8, 6]
-        cameraSurface.layer.addSublayer(finder)
+        finder.image = icon("uc02-scan-corners")?.resizableImage(
+            withCapInsets: UIEdgeInsets(top: 44, left: 40, bottom: 44, right: 40), resizingMode: .stretch)
+        finder.isUserInteractionEnabled = false
+        cameraSurface.addSubview(finder)
         roundControl(close, icon: "uc02-close", label: "Close camera", selector: #selector(closeCamera))
-        roundControl(manual, icon: "uc02-manual", label: "Add tea manually", selector: #selector(addTea))
+        roundControl(manual, icon: "uc02-manual", label: "Add tea manually", selector: #selector(openManualShortcut))
+        manual.setImage(nil, for: .normal)
+        manualLabel.text = "ADD NEW TEA"
+        manualLabel.font = mono(15, weight: .medium)
+        manualLabel.textColor = .white
+        manualLabel.isUserInteractionEnabled = false
+        manualArrow.image = icon("uc02-manual")
+        manualArrow.isUserInteractionEnabled = false
+        manual.addSubview(manualLabel)
+        manual.addSubview(manualArrow)
+        manual.clipsToBounds = true
+        manual.addTarget(self, action: #selector(expandManualShortcut), for: .touchDown)
+        manual.addTarget(self, action: #selector(cancelManualShortcut), for: [.touchCancel, .touchUpOutside])
         roundControl(trash, icon: "uc02-delete", label: "Delete selected photo", selector: #selector(deletePhoto))
         strip.spacing = 8
         thumbnails.addSubview(strip)
@@ -294,11 +313,16 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         let finderTop = controlsTop + 56
         let finderBottom = cameraHeight - (hasPhotos ? (matching ? 86 : 142) : 68)
         let finderRect = CGRect(x: 8, y: finderTop, width: width - 24, height: max(80, finderBottom - finderTop))
-        finder.path = UIBezierPath(roundedRect: finderRect, cornerRadius: 30).cgPath
+        finder.frame = finderRect
         scanner?.regionOfInterest = finderRect
         close.frame = CGRect(x: width - 64, y: controlsTop, width: 48, height: 48)
-        manual.frame = close.frame.offsetBy(dx: -60, dy: 0)
-        trash.frame = manual.frame.offsetBy(dx: -60, dy: 0)
+        let manualWidth: CGFloat = manualExpanded ? 168 : 48
+        manual.frame = CGRect(x: close.frame.minX - 12 - manualWidth, y: controlsTop, width: manualWidth, height: 48)
+        manualArrow.frame = CGRect(x: manualWidth - 36, y: 12, width: 24, height: 24)
+        manualLabel.frame = CGRect(x: 16, y: 0, width: max(0, manualWidth - 64), height: 48)
+        manualLabel.alpha = manualExpanded ? 1 : 0
+        trash.frame = CGRect(x: close.frame.minX - 120, y: controlsTop, width: 48, height: 48)
+        trash.isHidden = photos.isEmpty || manualExpanded
         let thumbsY = cameraHeight - (matching ? 70 : 126)
         thumbnails.frame = CGRect(x: 12, y: thumbsY, width: width - 24, height: 66)
         strip.frame = CGRect(x: 0, y: 0, width: CGFloat(photos.count) * 74 - (hasPhotos ? 8 : 0), height: 66)
@@ -316,12 +340,19 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); startScanner() }
     override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); stopScanner() }
     @objc private func startScanner() {
-        guard !closed, view.window != nil, let scanner, !scanner.isScanning else { return }
+        guard !closed, view.window != nil else { return }
+        cameraActive = true
+        if state == .knownBarcode { render(); scheduleBarcodeNavigation(); return }
+        guard let scanner, !scanner.isScanning else { render(); return }
         do { try scanner.startScanning(); cameraUnavailable = false }
         catch { cameraUnavailable = true }
         render()
     }
     @objc private func stopScanner() {
+        cameraActive = false
+        barcodeNavigation?.cancel()
+        barcodeNavigation = nil
+        cancelManualShortcut()
         scanner?.stopScanning()
         capture?.cancel()
         render()
@@ -333,7 +364,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
     func dataScanner(_ dataScanner: DataScannerViewController,
                      didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
-        guard !closed, state == .barcode || state == .unreadableBarcode,
+        guard !closed, !manualOpening, state == .barcode || state == .unreadableBarcode,
               candidateID == nil, capture == nil, processing == nil else { return }
         for item in addedItems {
             guard case .barcode(let barcode) = item else { continue }
@@ -365,17 +396,30 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         }
     }
     func showBarcodeResult(id: String?, result value: String?, name: String?, brand: String?) {
-        guard !closed, let id, id == candidateID, processing == nil else { return }
+        guard !closed, !manualOpening, let id, id == candidateID, processing == nil else { return }
         // Retain the ID during an offline failure so its one online retry can be accepted.
         if value != "lookup_error" { candidateID = nil }
         acceptedBarcodeID = value == "known" || value == "unknown" ? id : nil
         switch value {
-        case "known": finish("use")
+        case "known": state = .knownBarcode
         case "unknown": state = .unknownBarcode
         case "lookup_error": state = .networkError
         default: state = .unreadableBarcode
         }
         render()
+        if state == .knownBarcode { scheduleBarcodeNavigation() }
+    }
+    private func scheduleBarcodeNavigation() {
+        guard !closed, cameraActive, state == .knownBarcode, barcodeNavigation == nil,
+              let id = acceptedBarcodeID else { return }
+        // Brief readable Figma feedback; still one accepted scan and no extra tap.
+        barcodeNavigation = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled, let self, !self.closed, self.cameraActive,
+                  self.state == .knownBarcode, self.acceptedBarcodeID == id else { return }
+            self.barcodeNavigation = nil
+            self.finish("use")
+        }
     }
     private func invalidatePhotoLookup() {
         photoRevision += 1
@@ -390,7 +434,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         onState("photos_changed")
     }
     @objc private func primaryAction() {
-        guard !closed, capture == nil, processing == nil, photoLookupID == nil else { return }
+        guard !closed, !manualOpening, state != .knownBarcode,
+              capture == nil, processing == nil, photoLookupID == nil else { return }
         switch state {
         case .barcode, .unreadableBarcode:
             candidateID = nil
@@ -414,7 +459,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         render()
     }
     @objc private func takePhoto() {
-        guard !closed, let scanner, scanner.isScanning, capture == nil,
+        guard !closed, !manualOpening, state != .knownBarcode, let scanner, scanner.isScanning, capture == nil,
               processing == nil, photoLookupID == nil, photos.count < 3, state != .matches, candidateID == nil || state == .networkError else { return }
         capture = Task { @MainActor in
             defer { capture = nil; render() }
@@ -469,7 +514,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         rebuildThumbnails()
     }
     @objc private func deletePhoto() {
-        guard !closed, capture == nil, photos.indices.contains(selectedPhoto) else { return }
+        guard !closed, !manualOpening, capture == nil, photos.indices.contains(selectedPhoto) else { return }
         invalidatePhotoLookup()
         photos.remove(at: selectedPhoto)
         selectedPhoto = max(0, min(selectedPhoto, photos.count - 1))
@@ -576,7 +621,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         }
     }
     @objc private func selectCandidate(_ sender: UIButton) {
-        guard state == .matches, candidates.indices.contains(sender.tag), acceptedPhotoID != nil else { return }
+        guard !manualOpening, state == .matches, candidates.indices.contains(sender.tag), acceptedPhotoID != nil else { return }
         selectedTeaID = candidates[sender.tag]["id"]
         finish("use_photo")
     }
@@ -588,6 +633,53 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         toast.isHidden = false
         view.setNeedsLayout()
     }
+    private func updateSearchAnimation(_ searching: Bool) {
+        let key = "uc02-search-rotation"
+        guard searching, cameraActive, !cameraUnavailable, !closed else {
+            toastIcon.layer.removeAnimation(forKey: key)
+            return
+        }
+        if toastIcon.layer.animation(forKey: key) == nil {
+            let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+            rotation.fromValue = 0
+            rotation.toValue = Double.pi * 2
+            rotation.duration = 1
+            rotation.repeatCount = .infinity
+            toastIcon.layer.add(rotation, forKey: key)
+        }
+    }
+    @objc private func expandManualShortcut() {
+        guard manual.isEnabled, !closed, !manualOpening else { return }
+        view.layoutIfNeeded()
+        manualExpanded = true
+        view.setNeedsLayout()
+        UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    @objc private func cancelManualShortcut() {
+        manualNavigationGeneration += 1
+        manualExpanded = false
+        manualOpening = false
+        view.setNeedsLayout()
+    }
+    @objc private func openManualShortcut() {
+        guard manual.isEnabled, cameraActive, !closed, !manualOpening else { return }
+        expandManualShortcut() // VoiceOver activation need not emit touchDown.
+        manualOpening = true
+        manualNavigationGeneration += 1
+        let generation = manualNavigationGeneration
+        candidateID = nil
+        onState("mode_changed")
+        render()
+        UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState]) {
+            self.view.layoutIfNeeded()
+        } completion: { [weak self] _ in
+            guard let self, !self.closed, self.cameraActive, self.manualOpening,
+                  self.manualNavigationGeneration == generation else { return }
+            self.addTea()
+        }
+    }
     private func render() {
         guard isViewLoaded else { return }
         var title = "Looking for a barcode…"
@@ -596,6 +688,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         var buttonTitle = "No barcode · Continue"
         switch state {
         case .barcode: if candidateID != nil { title = "Checking the catalogue…" }
+        case .knownBarcode:
+            title = "Found your tea!"; instruction = ""
         case .unknownBarcode:
             title = "Barcode captured"; detail = "No tea linked yet"
             instruction = "Take a photo of the front"; buttonTitle = "SCAN BARCODE AGAIN"
@@ -612,7 +706,9 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             title = "We found possible matches"; instruction = ""
             buttonTitle = candidates.count == 1 ? "NOT MY TEA" : "NONE OF THESE"
         case .noMatch:
-            title = "No match found"; instruction = "Scan brewing details"; buttonTitle = "ADD NEW TEA"
+            title = "No match found"
+            instruction = photos.count >= 2 ? "Let's add your tea" : "Scan brewing details"
+            buttonTitle = "ADD NEW TEA"
         case .networkError:
             title = "Can’t check the catalogue"; instruction = "Check your connection"; buttonTitle = "SCAN BARCODE AGAIN"
         }
@@ -623,26 +719,31 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         toast.isHidden = title.isEmpty
         toastIcon.image = icon(state == .networkError ? "uc02-offline" : state == .unknownBarcode || state == .matches ? "uc02-check" : "uc02-info")
         if state == .identifying || state == .barcode {
-            toastIcon.image = icon("uc02-progress")
+            toastIcon.image = icon(cameraUnavailable ? "uc02-progress" : "uc02-progress-white")
         } else if state == .unreadableBarcode || state == .unreadablePhoto {
             toastIcon.image = icon("uc02-error")
+        } else if state == .knownBarcode {
+            toastIcon.image = icon("uc02-success")
+        } else if state == .noMatch {
+            toastIcon.image = icon("uc02-info-white")
         }
-        hintIcon.image = icon(cameraUnavailable || state == .networkError ? "uc02-cancel" : "uc02-info")
+        updateSearchAnimation(state == .barcode || state == .identifying)
+        hintIcon.image = icon(cameraUnavailable || state == .networkError ? "uc02-cancel" : "uc02-info-green")
         hintLabel.text = instruction
         hint.isHidden = instruction.isEmpty || barcodeOnly
         action.setTitle(buttonTitle, for: .normal)
-        let busy = capture != nil || processing != nil || photoLookupID != nil
+        let busy = capture != nil || processing != nil || photoLookupID != nil || manualOpening || state == .knownBarcode
         action.isEnabled = !closed && !busy && state != .networkError && !cameraUnavailable
             && !(hasCapturedPhoto && (state == .photo || state == .unreadablePhoto))
         action.alpha = action.isEnabled ? 1 : 0.3
-        action.isHidden = barcodeOnly || cameraUnavailable
+        action.isHidden = barcodeOnly || cameraUnavailable || state == .knownBarcode
         shutter.isHidden = barcodeOnly || state == .matches || cameraUnavailable
         shutter.isEnabled = !closed && !busy && photos.count < 3 && scanner?.isScanning == true
             && (candidateID == nil || state == .networkError)
         shutter.alpha = shutter.isEnabled ? 1 : 0.3
         manual.isHidden = barcodeOnly || cameraUnavailable
         manual.isEnabled = !closed && !busy
-        trash.isHidden = photos.isEmpty
+        trash.isHidden = photos.isEmpty || manualExpanded
         trash.isEnabled = capture == nil && !closed
         candidateScroll.isHidden = state != .matches
         thumbnails.isHidden = photos.isEmpty

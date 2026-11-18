@@ -64,3 +64,16 @@ test('Web/PWA retains its existing field order, measure choice and empty brewing
   assert.match(html, />measures<|>measures<\/button>/);
   assert.match(html, /aria-label="Brewing time \(minutes\)"[^>]*value=""/);
 });
+
+test('UI-08 complete time label centers single and double digit values between unchanged 66px buttons',()=>{
+  for(const minutes of [1,9,10,30]) {
+    const html=render({prefill:{brewSeconds:minutes*60}});
+    const width=String(minutes).length;
+    assert.match(html,new RegExp('aria-label="Brewing time in minutes"[^>]*style="width:'+width+'ch"[^>]*value="'+minutes+'"'));
+    assert.match(html,/<span>MIN<\/span>/);
+  }
+  const css=readFileSync('src/components/tea-sheet.css','utf8');
+  assert.match(css,/\.fac-editor-time__value \{[^}]*width:135px;[^}]*justify-content:center/);
+  assert.match(css,/\.fac-editor-time__value input \{[^}]*text-align:center/);
+  assert.match(css,/\.fac-editor-time \.MuiIconButton-root \{ width:66px; height:66px/);
+});

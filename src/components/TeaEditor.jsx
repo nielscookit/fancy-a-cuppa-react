@@ -362,6 +362,7 @@ export default function TeaEditor({ tea, nativeIOS = false, barcode, photos = []
           </IconButton>
           <Box className="fac-editor-time__value">
             <input type="number" inputMode="numeric" aria-label="Brewing time in minutes" min="1" max="30" step="1"
+              style={{width: `${Math.max(1, Math.min(2, String(form.mins).length))}ch`}}
               aria-invalid={Boolean(fieldErrors.mins)} disabled={saving} value={form.mins}
               onChange={event => set('mins', event.target.value)} />
             <span>MIN</span>

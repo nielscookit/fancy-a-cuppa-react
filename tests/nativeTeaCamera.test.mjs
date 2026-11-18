@@ -99,8 +99,8 @@ test('verified barcode navigates on native acceptance without waiting for a tap'
   assert.equal(response.tea, tea);
 });
 
-test('native camera completes a known lookup directly after accepting its ID', () => {
-  assert.match(cameraSwift, /guard !closed, let id, id == candidateID[\s\S]*?acceptedBarcodeID = value[\s\S]*?case "known":[\s\S]*?finish\("use"\)/);
+test('native camera automatically opens its accepted known lookup after readable feedback', () => {
+  assert.match(cameraSwift, /guard !closed, !manualOpening, let id, id == candidateID[\s\S]*?acceptedBarcodeID = value[\s\S]*?case "known": state = .knownBarcode[\s\S]*?scheduleBarcodeNavigation[\s\S]*?self.acceptedBarcodeID == id[\s\S]*?finish\("use"\)/);
   assert.doesNotMatch(cameraSwift, /useKnownTea/);
 });
 
