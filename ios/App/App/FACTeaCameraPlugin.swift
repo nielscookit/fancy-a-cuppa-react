@@ -229,7 +229,6 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         manual.addSubview(manualLabel)
         manual.addSubview(manualArrow)
         manual.clipsToBounds = true
-        manual.addTarget(self, action: #selector(expandManualShortcut), for: .touchDown)
         manual.addTarget(self, action: #selector(cancelManualShortcut), for: [.touchCancel, .touchUpOutside])
         roundControl(trash, icon: "uc02-delete", label: "Delete selected photo", selector: #selector(deletePhoto))
         strip.spacing = 8
@@ -665,7 +664,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
     @objc private func openManualShortcut() {
         guard manual.isEnabled, cameraActive, !closed, !manualOpening else { return }
-        expandManualShortcut() // VoiceOver activation need not emit touchDown.
+        // Each completed tap performs exactly one action, including VoiceOver.
+        if !manualExpanded {
+            expandManualShortcut()
+            return
+        }
         manualOpening = true
         manualNavigationGeneration += 1
         let generation = manualNavigationGeneration

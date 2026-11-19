@@ -62,10 +62,12 @@ test('UI-02 searching asset is white and rotation is removed on status/lifecycle
   assert.match(swift,/stopScanner\(\) \{\s*cameraActive = false/);
 });
 
-test('UI-03 shortcut expands 48 to 168pt with one accepted tap, cancellation cannot navigate',()=>{
+test('UI-09 shortcut expands on the first completed tap and navigates only on the second',()=>{
   assert.match(swift,/manualWidth: CGFloat = manualExpanded \? 168 : 48/);
   assert.match(swift,/manualLabel\.text = "ADD NEW TEA"/);
-  assert.match(swift,/#selector\(expandManualShortcut\), for: \.touchDown/);
+  assert.doesNotMatch(swift,/#selector\(expandManualShortcut\), for: \.touchDown/);
+  assert.match(swift,/roundControl\(manual,[^\n]*#selector\(openManualShortcut\)/);
+  assert.match(swift,/openManualShortcut\(\) \{[\s\S]*?if !manualExpanded \{\s*expandManualShortcut\(\)\s*return\s*\}\s*manualOpening = true/);
   assert.match(swift,/#selector\(cancelManualShortcut\), for: \[\.touchCancel, \.touchUpOutside\]/);
   assert.match(swift,/openManualShortcut\(\)[\s\S]*?manualNavigationGeneration == generation[\s\S]*?self\.addTea\(\)/);
   assert.match(swift,/cancelManualShortcut\(\) \{\s*manualNavigationGeneration \+= 1/);
