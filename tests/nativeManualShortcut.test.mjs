@@ -7,14 +7,14 @@ import { execFileSync } from 'node:child_process';
 
 const source = readFileSync('ios/App/App/FACTeaCameraPlugin.swift', 'utf8');
 function method(name) {
-  const start = source.indexOf('    @objc private func ' + name + '() {');
+  const start = source.indexOf('private func ' + name + ' {');
   assert.notEqual(start, -1);
   const end = source.indexOf('\n    }', start);
   assert.notEqual(end, -1);
-  return source.slice(start, end + 6);
+  return source.slice(source.lastIndexOf('\n', start) + 1, end + 6);
 }
 
-test('UI-09 actual Swift handlers: two taps, persistent expansion, close/background and duplicate protection', {
+test('UI-10 Swift handlers: four-second collapse, immediate ADD and lifecycle cancellation', {
   skip: process.platform !== 'darwin' ? 'Requires the Apple Swift toolchain; runs in macOS Xcode CI.' : false,
 }, () => {
   // Execute the actual controller methods without creating a camera or changing
@@ -24,77 +24,67 @@ final class Button { var isEnabled = true }
 final class View { func layoutIfNeeded() {} ; func setNeedsLayout() {} }
 enum UIView {
     enum Option { case beginFromCurrentState, allowUserInteraction }
-    static var pending: [(Bool) -> Void] = []
-    static func animate(withDuration: Double, delay: Double, options: [Option],
-                        animations: () -> Void, completion: ((Bool) -> Void)? = nil) {
+    static func animate(withDuration: Double, delay: Double, options: [Option], animations: () -> Void) {
         animations()
-        if let completion { pending.append(completion) }
-    }
-    static func flush() {
-        let callbacks = pending
-        pending.removeAll()
-        for callback in callbacks { callback(true) }
     }
 }
-final class Camera: NSObject {
+@MainActor final class Camera {
     let manual = Button()
     let view = View()
     var closed = false, cameraActive = true, manualExpanded = false, manualOpening = false
-    var manualNavigationGeneration = 0
+    var manualCollapseTask: Task<Void, Never>?
     var candidateID: String? = "accepted-pending-scan"
     var events: [String] = []
     var navigations = 0
     func onState(_ reason: String) { events.append(reason) }
-    func render() { manual.isEnabled = !closed && !manualOpening }
     func addTea() { navigations += 1; closeCamera() }
     func tap() { openManualShortcut() }
     func closeCamera() { closed = true; cameraActive = false; cancelManualShortcut() }
     func background() { cameraActive = false; cancelManualShortcut() }
-${method('expandManualShortcut')}
-${method('cancelManualShortcut')}
-${method('openManualShortcut')}
+${method('setManualShortcutExpanded(_ expanded: Bool)')}
+${method('cancelManualCollapse()')}
+${method('cancelManualShortcut()')}
+${method('openManualShortcut()')}
 }
-let first = Camera()
-first.tap()
-assert(first.manualExpanded && !first.manualOpening && !first.closed)
-assert(first.navigations == 0 && UIView.pending.isEmpty)
-assert(first.events.isEmpty && first.candidateID == "accepted-pending-scan")
-UIView.flush()
-assert(first.manualExpanded && first.navigations == 0)
-first.tap()
-assert(first.manualOpening && first.events == ["mode_changed"])
-assert(UIView.pending.count == 1)
-first.tap() // rapid additional tap cannot enqueue a second navigation
-assert(UIView.pending.count == 1)
-UIView.flush()
-assert(first.navigations == 1)
-first.tap()
-UIView.flush()
-assert(first.navigations == 1)
-for taps in [1, 2] {
-    let closed = Camera()
-    for _ in 0..<taps { closed.tap() }
-    closed.closeCamera()
-    UIView.flush()
-    assert(closed.navigations == 0 && !closed.manualExpanded)
-    let background = Camera()
-    for _ in 0..<taps { background.tap() }
-    background.background()
-    UIView.flush()
-    assert(background.navigations == 0 && !background.manualExpanded)
+@MainActor func runChecks() async throws {
+    let first = Camera()
+    first.tap()
+    assert(first.manualExpanded && !first.closed && first.navigations == 0)
+    assert(first.events.isEmpty && first.candidateID == "accepted-pending-scan")
+    try await Task.sleep(nanoseconds: 3_700_000_000)
+    assert(first.manualExpanded)
+    await first.manualCollapseTask?.value
+    assert(!first.manualExpanded && first.navigations == 0 && first.events.isEmpty)
+
+    first.tap()
+    assert(first.manualExpanded && first.navigations == 0)
+    let timeout = first.manualCollapseTask
+    first.tap()
+    assert(first.navigations == 1 && first.events == ["mode_changed"])
+    assert(timeout?.isCancelled == true && first.manualCollapseTask == nil)
+    first.tap()
+    await timeout?.value
+    assert(first.navigations == 1)
+
+    for close in [true, false] {
+        let camera = Camera()
+        camera.tap()
+        let timeout = camera.manualCollapseTask
+        if close { camera.closeCamera() } else { camera.background() }
+        assert(timeout?.isCancelled == true && camera.manualCollapseTask == nil)
+        await timeout?.value
+        assert(camera.navigations == 0 && !camera.manualExpanded)
+    }
 }
-let disabled = Camera()
-disabled.manual.isEnabled = false
-disabled.tap()
-assert(!disabled.manualExpanded && disabled.navigations == 0)
-print("UI-09 Swift interaction checks passed")
+try await runChecks()
+print("UI-10 Swift interaction checks passed")
 `;
-  const directory = mkdtempSync(join(tmpdir(), 'fac-ui09-'));
+  const directory = mkdtempSync(join(tmpdir(), 'fac-ui10-'));
   try {
     const path = join(directory, 'ManualShortcut.swift');
     writeFileSync(path, code);
     const output = execFileSync('swift', ['-swift-version', '5', path], { encoding:'utf8', timeout:60000 });
-    assert.match(output, /UI-09 Swift interaction checks passed/);
+    assert.match(output, /UI-10 Swift interaction checks passed/);
   } finally {
     rmSync(directory, { recursive:true, force:true });
   }

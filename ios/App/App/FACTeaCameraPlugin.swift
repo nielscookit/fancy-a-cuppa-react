@@ -117,7 +117,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private let manualArrow = UIImageView()
     private var manualExpanded = false
     private var manualOpening = false
-    private var manualNavigationGeneration = 0
+    private var manualCollapseTask: Task<Void, Never>?
     private let shutter = UIButton(type: .custom)
     private let shutterDisc = UIView()
     private let action = UIButton(type: .custom)
@@ -647,41 +647,44 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             toastIcon.layer.add(rotation, forKey: key)
         }
     }
-    @objc private func expandManualShortcut() {
-        guard manual.isEnabled, !closed, !manualOpening else { return }
+    deinit {
+        manualCollapseTask?.cancel()
+    }
+    private func setManualShortcutExpanded(_ expanded: Bool) {
         view.layoutIfNeeded()
-        manualExpanded = true
+        manualExpanded = expanded
         view.setNeedsLayout()
         UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
             self.view.layoutIfNeeded()
         }
     }
+    private func cancelManualCollapse() {
+        manualCollapseTask?.cancel()
+        manualCollapseTask = nil
+    }
     @objc private func cancelManualShortcut() {
-        manualNavigationGeneration += 1
+        cancelManualCollapse()
         manualExpanded = false
         manualOpening = false
         view.setNeedsLayout()
     }
     @objc private func openManualShortcut() {
         guard manual.isEnabled, cameraActive, !closed, !manualOpening else { return }
-        // Each completed tap performs exactly one action, including VoiceOver.
+        cancelManualCollapse()
         if !manualExpanded {
-            expandManualShortcut()
+            setManualShortcutExpanded(true)
+            manualCollapseTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.manualCollapseTask = nil
+                self.setManualShortcutExpanded(false)
+            }
             return
         }
         manualOpening = true
-        manualNavigationGeneration += 1
-        let generation = manualNavigationGeneration
         candidateID = nil
         onState("mode_changed")
-        render()
-        UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState]) {
-            self.view.layoutIfNeeded()
-        } completion: { [weak self] _ in
-            guard let self, !self.closed, self.cameraActive, self.manualOpening,
-                  self.manualNavigationGeneration == generation else { return }
-            self.addTea()
-        }
+        addTea()
     }
     private func render() {
         guard isViewLoaded else { return }
