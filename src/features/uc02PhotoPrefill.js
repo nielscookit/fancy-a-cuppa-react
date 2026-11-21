@@ -108,11 +108,14 @@ function followsKnownTitle(first, second) {
   return gap >= 0 && gap <= 2 * Math.max(a.height, b.height) && centerOffset <= 0.10;
 }
 
+const breakfastVariant = /\b(?:decaf(?:feinated)?|entkoffeiniert\w*|extra strong|organic|bio|iced|kalter aufguss)\b/iu;
+const isTwinings = row => normalizeQuery(stripMark(row.text)) === 'twinings';
+
 function twiningsBreakfast(rows) {
   const candidates = [];
-  for (const brand of rows.filter(row => normalizeQuery(stripMark(row.text)) === 'twinings')) {
+  for (const brand of rows.filter(isTwinings)) {
     const onPack = rows.filter(row => row.photoIndex === brand.photoIndex && !inIngredients(row, rows));
-    if (!onPack.includes(brand)) continue;
+    if (!onPack.includes(brand) || onPack.some(row => breakfastVariant.test(row.text))) continue;
     const matches = text => onPack.filter(row => normalizeQuery(stripMark(row.text)) === text);
     const full = matches('english breakfast');
     const english = matches('english');
@@ -331,6 +334,10 @@ export function extractPhotoPrefill(observations) {
     const headings = titleRows.filter(next => followsAboveLine(row, next)
       && next.boundingBox.height >= row.boundingBox.height * 0.65);
     const block = headings.length === 1 ? titleBlock(headings[0], titleRows) : null;
+    // An abbreviated visible title must not discard an OCR variant label.
+    const truncatedVariant = isTwinings(row) && normalizeQuery(block?.value) === 'english breakfast'
+      && acceptedRows.some(part => part.photoIndex === row.photoIndex && breakfastVariant.test(part.text));
+    if (truncatedVariant) continue;
     if (known || block?.value) visualBrands.push({ value: stripMark(row.text), source: row });
     if (block?.value || (block && !exactBlocks.some(([brand]) => brand === row))) visualNames.push(block);
     else if (known && headings.length > 1) visualNames.push({ value: null, source: headings });

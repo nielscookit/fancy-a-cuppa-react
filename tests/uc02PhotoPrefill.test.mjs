@@ -188,6 +188,10 @@ test('P3.2 recognises complete Twinings title evidence outside the old logo rect
   assert.equal(extractPhotoPrefill([lowerLogo, first, { ...title, photoIndex: 2 }]).prefill, null);
   assert.equal(extractPhotoPrefill([lowerLogo, first, { ...title, confidence: 0.3 }]).prefill, null);
   assert.equal(extractPhotoPrefill([{ ...lowerLogo, text: 'TWINlNGS®' }, first, title]).prefill, null);
+  const variant = observation('DECAFFEINATED', 0.22, 0.28, 0.56, 4);
+  for (const logo of [brand, lowerLogo]) {
+    assert.equal(extractPhotoPrefill([logo, first, second, variant]).prefill, null);
+  }
   const conflict = extractPhotoPrefill([lowerLogo, first, title, ...rows('Hersteller: Other Brand')]);
   assert.equal(conflict.prefill, null);
 });
