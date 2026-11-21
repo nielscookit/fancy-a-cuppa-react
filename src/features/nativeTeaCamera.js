@@ -3,6 +3,7 @@ import { normalizeQuery } from './teaModel.js';
 import { getTeaCategoryIcon } from './teaCategoryIcons.js';
 import { matchNameOnlyCandidates } from './uc02NameOnlyMatch.js';
 import { diagnosePrefill } from './uc02OcrDiagnostics.js';
+import { extractPhotoPrefill } from './uc02PhotoPrefill.js';
 
 // Retained as a test fixture; there is no production barcode hardcoded as a match.
 export const DEMO_TEA_BARCODE = '850045678906';
@@ -79,7 +80,7 @@ export async function captureNativeTeaBarcode(camera) {
 }
 
 export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, shouldOpen,
-  network = globalThis.window } = {}) {
+  structuredPrefill = false, network = globalThis.window } = {}) {
   let active = true;
   let lookup;
   let failedLookup;
@@ -158,6 +159,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
       const matchingStartedAt = diagnostic ? performance.now() : 0;
       let prefillMs = null;
       let extracted = null;
+      let extraction;
       try {
         const found = await matchPhoto?.(candidate.lines, {
           signal: controller.signal,
@@ -174,8 +176,13 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
           result = 'possible';
         } else {
           const started = diagnostic ? performance.now() : 0;
-          extracted = photoPrefillFromText(candidate.lines);
-          if (diagnostic) prefillMs = Number((performance.now() - started).toFixed(1));
+          if (structuredPrefill) {
+            extraction = extractPhotoPrefill(candidate.observations);
+            extracted = extraction.prefill;
+          } else {
+            extracted = photoPrefillFromText(candidate.lines);
+          }
+          if (diagnostic) prefillMs = Number((performance.now() - started).toFixed(3));
           if (extracted) photoPrefills.set(candidate.id, extracted);
         }
       } catch {
@@ -200,6 +207,9 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
             version: 1, id: candidate.id, stage: 'match_complete', result,
             catalog: catalogDiagnostic?.() ?? null,
             prefill: result === 'no_match' ? diagnosePrefill(candidate.lines, extracted) : null,
+            ...(extraction && { structuredPrefill: {
+              acceptedFields: Object.keys(extracted ?? {}), rejected: extraction.rejected,
+            } }),
             timings: { processingMs, prefillMs },
           };
           await camera.reportOCRDiagnostic({ id: candidate.id, report });
@@ -216,7 +226,8 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
     }));
     network?.addEventListener('online', online);
     if (shouldOpen && !shouldOpen()) return { action: 'close' };
-    const { barcodeID, photoID, teaID, ...response } = await camera.open();
+    const cameraResult = structuredPrefill ? await camera.open({ structuredOCR: true }) : await camera.open();
+    const { barcodeID, photoID, teaID, ...response } = cameraResult;
     const match = barcodes.get(barcodeID);
     const photoMatch = photoMatches.get(photoID);
     const matches = photoMatch?.matches ?? [];
@@ -225,11 +236,13 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
       ? (photoID === latestPhotoID && typeof teaID === 'string' && teaID
           ? matches.find(tea => String(tea.id) === teaID) : null)
       : (teaID ? matches.find(tea => tea.id === teaID) : matches.length === 1 ? matches[0] : null);
+    const photoPrefill = response.action === 'add' && (!structuredPrefill || photoID === latestPhotoID)
+      ? photoPrefills.get(photoID) : undefined;
     return {
       ...response,
       tea: response.action === 'use' ? match?.tea ?? null : null,
       barcode: response.action === 'add' && match && !match.tea ? match.code : null,
-      ...(response.action === 'add' && photoPrefills.has(photoID) && { photoPrefill: photoPrefills.get(photoID) }),
+      ...(photoPrefill && { photoPrefill }),
       photoTea: response.action === 'use_photo' ? selected ?? null : null,
     };
   } finally {

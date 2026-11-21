@@ -478,3 +478,81 @@ test('P2a name-only navigation needs an explicit candidate ID and the current ph
     assert.equal((await result).photoTea?.id ?? null, expected);
   }
 });
+
+function structuredPhoto(id) {
+  return {
+    id, lines: ['Manufacturer: Flat input'],
+    observations: [{ photoIndex: 1, order: 0, confidence: 0.9, text: 'Manufacturer: Structured input' }],
+  };
+}
+
+test('P3 requires the isolated configuration and returns only native-accepted no-match fields', async () => {
+  for (const structuredPrefill of [false, true]) {
+    const h = cameraHarness();
+    const open = h.camera.open;
+    h.camera.open = options => {
+      assert.deepEqual(options, structuredPrefill ? { structuredOCR: true } : undefined);
+      return open();
+    };
+    const flow = openNativeTeaCamera(h.camera, {
+      structuredPrefill, matchPhoto: lines => { assert.deepEqual(lines, ['Manufacturer: Flat input']); return []; },
+      lookupBarcode: async () => null,
+    });
+    await h.ready;
+    await h.listeners.barcode({ id: 'unknown', text: '96385074', format: 'EAN8' });
+    await h.listeners.photoText(structuredPhoto('current'));
+    assert.equal(h.results.at(-1).result, 'no_match');
+    h.listeners.cameraState({ reason: 'closed' }); // Native dismissal precedes the ADD result.
+    h.finish({ action: 'add', photoID: 'current', barcodeID: 'unknown', photos: ['preview'] });
+    const response = await flow;
+    assert.deepEqual(response.photoPrefill, { brand: structuredPrefill ? 'Structured input' : 'Flat input' });
+    assert.deepEqual(response.barcode, { value: '96385074', type: 'ean_8' });
+    assert.deepEqual(response.photos, ['preview']);
+  }
+});
+
+test('P3 discards rejected, failed, timed-out, deleted and superseded results', async () => {
+  for (const scenario of ['candidate', 'error', 'nativeTimeout', 'deletion', 'newer', 'close', 'noMetadata']) {
+    const h = cameraHarness();
+    const flow = openNativeTeaCamera(h.camera, {
+      structuredPrefill: true,
+      matchPhoto: () => {
+        if (scenario === 'candidate') return { stage: 'name_only', candidates: [{ id: 'wrong' }] };
+        if (scenario === 'error') throw new Error('offline');
+        return [];
+      },
+    });
+    await h.ready;
+    const photo = structuredPhoto('previous');
+    if (scenario === 'noMetadata') delete photo.observations;
+    await h.listeners.photoText(photo);
+    assert.equal(h.results.at(-1).result, scenario === 'candidate' ? 'possible' : scenario === 'error' ? 'lookup_error' : 'no_match');
+    if (scenario === 'deletion' || scenario === 'candidate') h.listeners.cameraState({ reason: 'photos_changed' });
+    if (scenario === 'newer') await h.listeners.photoText(structuredPhoto('newer'));
+    h.finish({ action: scenario === 'close' ? 'close' : 'add',
+      photoID: scenario === 'nativeTimeout' ? undefined : 'previous' });
+    assert.equal((await flow).photoPrefill, undefined, scenario);
+  }
+});
+
+test('P3 drops pending lookups if a photo is deleted before the result arrives', async () => {
+  let finishLookup;
+  const h = cameraHarness();
+  const flow = openNativeTeaCamera(h.camera, { structuredPrefill: true,
+    matchPhoto: () => new Promise(resolve => { finishLookup = resolve; }),
+  });
+  await h.ready;
+  const pending = h.listeners.photoText(structuredPhoto('removed'));
+  h.listeners.cameraState({ reason: 'photos_changed' });
+  finishLookup([]);
+  await pending;
+  assert.deepEqual(h.results, []);
+  h.finish({ action: 'add', photoID: 'removed' });
+  assert.equal((await flow).photoPrefill, undefined);
+});
+
+test('native structured OCR requires a Fancy Test bundle and rejects late no-match results after timeout', () => {
+  assert.match(cameraSwift, /let structuredOCR = !barcodeOnly && call\.getBool\("structuredOCR"\) == true\s+&& Bundle\.main\.bundleIdentifier == "com\.fancyacuppa\.test"/);
+  assert.match(cameraSwift, /if structuredOCR \{ event\["observations"\] = observations \}/);
+  assert.match(cameraSwift, /let photoID = structuredOCR && state == \.networkError \? nil : acceptedPhotoID/);
+});

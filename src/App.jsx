@@ -184,6 +184,7 @@ export default function App() {
         getNativeTeaCamera(), {
           shouldOpen: () => generation === cameraResultGeneration.current,
           lookupBarcode: lookupTeaByCode,
+          structuredPrefill: nativeIOS && communityTeaV4,
           matchPhoto: async (lines, { signal, onCatalogDiagnostic }) => {
             const started = onCatalogDiagnostic ? performance.now() : 0;
             let available = catalog.status === 'loading'
