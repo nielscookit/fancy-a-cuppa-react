@@ -6,7 +6,7 @@ import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
-import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoCandidates } from './features/nativeTeaCamera.js';
+import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoCandidates, matchFancyTestPhoto } from './features/nativeTeaCamera.js';
 import { diagnoseCatalogMatch } from './features/uc02OcrDiagnostics.js';
 import { observeNativeQuickAccess, routeNativeQuickAccess, waitForCameraCatalog } from './features/nativeQuickAccess.js';
 import TeaEditor from './components/TeaEditor.jsx';
@@ -199,16 +199,27 @@ export default function App() {
             }
             const catalogWaitMs = onCatalogDiagnostic ? performance.now() - started : 0;
             const matchStarted = onCatalogDiagnostic ? performance.now() : 0;
-            const matches = matchPhotoCandidates(lines, available);
+            const full = matchPhotoCandidates(lines, available);
+            const matchingMs = onCatalogDiagnostic ? performance.now() - matchStarted : 0;
+            const fallbackStarted = onCatalogDiagnostic ? performance.now() : 0;
+            let nameOnly = null;
+            const match = matchFancyTestPhoto(lines, available, {
+              full,
+              nameOnlyEnabled: nativeIOS && communityTeaV4,
+              report: onCatalogDiagnostic ? value => { nameOnly = value; } : undefined,
+            });
             if (onCatalogDiagnostic) {
-              const matchingMs = performance.now() - matchStarted;
+              const fallbackMs = match.stage === 'name_only' ? performance.now() - fallbackStarted : 0;
               onCatalogDiagnostic(() => ({
                 ...diagnoseCatalogMatch(lines, available),
+                stage: match.stage,
                 catalogWaitMs: Number(catalogWaitMs.toFixed(1)),
-                matchingMs: Number(matchingMs.toFixed(1)),
+                matchingMs: Number(matchingMs.toFixed(3)),
+                nameOnlyMs: Number(fallbackMs.toFixed(3)),
+                nameOnly,
               }));
             }
-            return matches;
+            return match;
           },
         },
       );

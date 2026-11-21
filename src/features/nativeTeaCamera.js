@@ -1,6 +1,7 @@
 import { normalizeBarcode } from './scanBarcode.js';
 import { normalizeQuery } from './teaModel.js';
 import { getTeaCategoryIcon } from './teaCategoryIcons.js';
+import { matchNameOnlyCandidates } from './uc02NameOnlyMatch.js';
 import { diagnosePrefill } from './uc02OcrDiagnostics.js';
 
 // Retained as a test fixture; there is no production barcode hardcoded as a match.
@@ -31,6 +32,12 @@ export function matchPhotoCandidates(lines, teas) {
       && text.includes(' ' + brand + ' ')
       && text.includes(' ' + name + ' ');
   });
+}
+
+export function matchFancyTestPhoto(lines, teas, { nameOnlyEnabled = false, full = matchPhotoCandidates(lines, teas), report } = {}) {
+  if (full.length || !nameOnlyEnabled) return { stage: full.length ? 'full' : 'none', candidates: full };
+  const candidates = matchNameOnlyCandidates(lines, teas, report);
+  return { stage: 'name_only', candidates };
 }
 
 export function matchPhotoText(lines, teas) {
@@ -81,6 +88,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
   let recoveredDuringLookup = false;
   const barcodes = new Map();
   const photoMatches = new Map();
+  let latestPhotoID;
   const photoPrefills = new Map();
   const listeners = [];
   const cancelLookups = () => {
@@ -138,6 +146,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
     listeners.push(await camera.addListener('photoText', async candidate => {
       if (!active) return;
       const revision = ++photoRevision;
+      latestPhotoID = candidate.id;
       photoLookup?.abort();
       const controller = new AbortController();
       photoLookup = controller;
@@ -156,10 +165,12 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
         });
         if (!active || revision !== photoRevision) return;
         if (controller.signal.aborted) throw new Error('Catalogue lookup timed out');
-        matches = Array.isArray(found) ? found : found ? [found] : [];
+        const requiresSelection = found?.stage === 'name_only';
+        const candidates = found?.candidates ?? found;
+        matches = Array.isArray(candidates) ? candidates : candidates ? [candidates] : [];
         matches = matches.filter((tea, index) => tea?.id && matches.findIndex(item => item?.id === tea.id) === index);
         if (matches.length) {
-          photoMatches.set(candidate.id, matches);
+          photoMatches.set(candidate.id, { matches, requiresSelection });
           result = 'possible';
         } else {
           const started = diagnostic ? performance.now() : 0;
@@ -197,6 +208,7 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
     }));
     listeners.push(await camera.addListener('cameraState', event => {
       cancelLookups();
+      if (event?.reason === 'mode_changed' || event?.reason === 'photos_changed') latestPhotoID = undefined;
       if (event?.reason === 'photos_changed') {
         photoMatches.clear();
         photoPrefills.clear();
@@ -206,10 +218,13 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
     if (shouldOpen && !shouldOpen()) return { action: 'close' };
     const { barcodeID, photoID, teaID, ...response } = await camera.open();
     const match = barcodes.get(barcodeID);
-    const matches = photoMatches.get(photoID) || [];
-    // A candidate is transferable only after its row was selected natively.
-    const selected = teaID ? matches.find(tea => tea.id === teaID)
-      : matches.length === 1 ? matches[0] : null;
+    const photoMatch = photoMatches.get(photoID);
+    const matches = photoMatch?.matches ?? [];
+    // The native plugin sends a teaID only after a candidate row was tapped.
+    const selected = photoMatch?.requiresSelection
+      ? (photoID === latestPhotoID && typeof teaID === 'string' && teaID
+          ? matches.find(tea => String(tea.id) === teaID) : null)
+      : (teaID ? matches.find(tea => tea.id === teaID) : matches.length === 1 ? matches[0] : null);
     return {
       ...response,
       tea: response.action === 'use' ? match?.tea ?? null : null,

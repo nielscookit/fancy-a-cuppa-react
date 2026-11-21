@@ -456,3 +456,25 @@ test('P1 delivers the native result before a failing diagnostic and drops invali
     assert.equal((await flow).photoTea?.id, invalidated ? undefined : 'tea');
   }
 });
+
+test('P2a name-only navigation needs an explicit candidate ID and the current photo ID', async () => {
+  for (const [action, photoID, teaID, newerPhoto, expected] of [
+    ['use_photo','current',undefined,false,null],
+    ['use_photo','current','wrong',false,null],
+    ['use_photo','other','42',false,null],
+    ['use_photo','current','42',true,null],
+    ['use_photo','current','42',false,42],
+    ['add','current','42',false,null],
+  ]) {
+    const h = cameraHarness();
+    const result = openNativeTeaCamera(h.camera, {
+      matchPhoto: () => ({ stage:'name_only', candidates:[{id:42,rawName:'Früchte-Mischung'}] }),
+    });
+    await h.ready;
+    await h.listeners.photoText({ id:'current',lines:['Früchte-Mischung'] });
+    assert.equal(h.results[0].candidates[0].id, '42');
+    if (newerPhoto) await h.listeners.photoText({ id:'newer',lines:['Früchte-Mischung'] });
+    h.finish({ action,photoID,teaID });
+    assert.equal((await result).photoTea?.id ?? null, expected);
+  }
+});
