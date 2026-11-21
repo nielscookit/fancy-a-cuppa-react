@@ -1,6 +1,7 @@
 import { normalizeBarcode } from './scanBarcode.js';
 import { normalizeQuery } from './teaModel.js';
 import { getTeaCategoryIcon } from './teaCategoryIcons.js';
+import { diagnosePrefill } from './uc02OcrDiagnostics.js';
 
 // Retained as a test fixture; there is no production barcode hardcoded as a match.
 export const DEMO_TEA_BARCODE = '850045678906';
@@ -143,8 +144,16 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
       const timeout = setTimeout(() => controller.abort(), 7000);
       let matches = [];
       let result = 'no_match';
+      const diagnostic = candidate.ocrDiagnostic?.version === 1 ? candidate.ocrDiagnostic : null;
+      let catalogDiagnostic = null;
+      let prefillDiagnostic = null;
+      const matchingStartedAt = diagnostic ? performance.now() : 0;
+      let prefillElapsedMs = 0;
       try {
-        const found = await matchPhoto?.(candidate.lines, { signal: controller.signal });
+        const found = await matchPhoto?.(candidate.lines, {
+          signal: controller.signal,
+          ...(diagnostic && { onCatalogDiagnostic: value => { catalogDiagnostic = value; } }),
+        });
         if (!active || revision !== photoRevision) return;
         if (controller.signal.aborted) throw new Error('Catalogue lookup timed out');
         matches = Array.isArray(found) ? found : found ? [found] : [];
@@ -156,6 +165,12 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
           const prefill = photoPrefillFromText(candidate.lines);
           if (prefill) photoPrefills.set(candidate.id, prefill);
         }
+        if (diagnostic) {
+          const started = performance.now();
+          const testPrefill = photoPrefillFromText(candidate.lines);
+          prefillDiagnostic = diagnosePrefill(candidate.lines, testPrefill);
+          prefillElapsedMs = performance.now() - started;
+        }
       } catch {
         // A failed catalogue request is not evidence that no matching tea exists.
         result = 'lookup_error';
@@ -163,10 +178,24 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
         clearTimeout(timeout);
       }
       if (!active || revision !== photoRevision) return;
+      const report = diagnostic ? {
+        ...diagnostic,
+        stage: 'match_complete',
+        result,
+        ocrTextUsed: candidate.lines,
+        catalog: catalogDiagnostic,
+        prefill: prefillDiagnostic,
+        timings: {
+          catalogAndMatchingMs: Number((performance.now() - matchingStartedAt - prefillElapsedMs).toFixed(1)),
+          prefillMs: Number(prefillElapsedMs.toFixed(1)),
+          totalSinceCaptureMs: Math.max(0, Date.now() - Number(diagnostic.captureStartedAtMs || Date.now())),
+        },
+      } : null;
       await camera.showPhotoResult({
         id: candidate.id, result,
         candidates: matches.map(tea => ({ id: String(tea.id), name: tea.rawName || '', brand: tea.brand || '',
           symbol: getTeaCategoryIcon(tea.category) })),
+        ...(report && { diagnostic: report }),
       }).catch(() => {});
     }));
     listeners.push(await camera.addListener('cameraState', event => {

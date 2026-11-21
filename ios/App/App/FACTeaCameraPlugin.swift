@@ -49,8 +49,10 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 } else {
                     self?.notifyListeners("barcode", data: ["id": id, "text": text, "format": format])
                 }
-            } onPhotoText: { [weak self] id, lines in
-                self?.notifyListeners("photoText", data: ["id": id, "lines": lines])
+            } onPhotoText: { [weak self] id, lines, diagnostic in
+                var event: [String: Any] = ["id": id, "lines": lines]
+                if let diagnostic { event["ocrDiagnostic"] = diagnostic }
+                self?.notifyListeners("photoText", data: event)
             } onState: { [weak self] reason in
                 self?.notifyListeners("cameraState", data: ["reason": reason])
             } onClose: { result, photos, barcodeID, photoID, teaID in
@@ -91,7 +93,8 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
                 controller.showPhotoResult(id: call.getString("id"),
                                            result: call.getString("result"),
-                                           candidates: (call.getArray("candidates") as? [[String: String]]) ?? [])
+                                           candidates: (call.getArray("candidates") as? [[String: String]]) ?? [],
+                                           diagnostic: call.getObject("diagnostic"))
             }
             call.resolve()
         }
@@ -105,7 +108,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private let scanner: DataScannerViewController?
     private let barcodeOnly: Bool
     private let onBarcode: (String, String, String) -> Void
-    private let onPhotoText: (String, [String]) -> Void
+    private let onPhotoText: (String, [String], [String: Any]?) -> Void
     private let onState: (String) -> Void
     private let onClose: (String, [String], String?, String?, String?) -> Void
     private let charcoal = UIColor(red: 27/255, green: 39/255, blue: 43/255, alpha: 1)
@@ -137,6 +140,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private var photos: [(image: UIImage, preview: String)] = []
     private var selectedPhoto = 0
     private var hasCapturedPhoto = false
+    private var lastPhotoCaptureDurationMs: Double = 0
+    private var lastCaptureStartedAtMs: Double = 0
     private var photoRevision = 0
     private var photoLookupID: String?
     private var acceptedPhotoID: String?
@@ -158,7 +163,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
 
     init(barcodeOnly: Bool, cameraAvailable: Bool,
          onBarcode: @escaping (String, String, String) -> Void,
-         onPhotoText: @escaping (String, [String]) -> Void, onState: @escaping (String) -> Void,
+         onPhotoText: @escaping (String, [String], [String: Any]?) -> Void, onState: @escaping (String) -> Void,
          onClose: @escaping (String, [String], String?, String?, String?) -> Void) {
         self.barcodeOnly = barcodeOnly
         self.onBarcode = onBarcode
@@ -462,6 +467,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
               processing == nil, photoLookupID == nil, photos.count < 3, state != .matches, candidateID == nil || state == .networkError else { return }
         capture = Task { @MainActor in
             defer { capture = nil; render() }
+            let captureStartedAtMs = Date().timeIntervalSince1970 * 1000
             do {
                 let photo = try await scanner.capturePhoto()
                 guard !Task.isCancelled, !closed else { return }
@@ -478,6 +484,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 }
                 candidateID = nil
                 hasCapturedPhoto = true // Intentionally never cleared by deleting a photo.
+                lastCaptureStartedAtMs = captureStartedAtMs
+                lastPhotoCaptureDurationMs = Date().timeIntervalSince1970 * 1000 - captureStartedAtMs
                 photos.append((preview, "data:image/jpeg;base64," + data.base64EncodedString()))
                 selectedPhoto = photos.count - 1
                 rebuildThumbnails()
@@ -521,24 +529,71 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         if photos.isEmpty { state = .photo; render() }
         else { identifyPhotos() }
     }
+    // P1 instrumentation is compiled only for DEBUG Fancy Test, never iOS Release.
+    private static var ocrDiagnosticsEnabled: Bool {
+        #if DEBUG
+        return Bundle.main.bundleIdentifier == "com.fancyacuppa.test"
+        #else
+        return false
+        #endif
+    }
+    private static func emitOCRDiagnostic(_ payload: [String: Any]) {
+        guard ocrDiagnosticsEnabled, JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let line = String(data: data, encoding: .utf8) else { return }
+        NSLog("[FAC-OCR-P1] %@", line)
+    }
     // Apple Vision stays on-device. Work off an immutable snapshot and reject
     // results for deleted photos, old snapshots or a dismissed camera.
-    private static func recognizeText(in images: [UIImage]) -> [[String]] {
-        return images.map { image in
+    private static func recognizeText(in images: [UIImage]) -> (lines: [[String]], reports: [[String: Any]], durationMs: Double) {
+        let start = CFAbsoluteTimeGetCurrent()
+        let diagnostic = ocrDiagnosticsEnabled
+        var output: [[String]] = []
+        var photoReports: [[String: Any]] = []
+        for (index, image) in images.enumerated() {
+            let photoStart = CFAbsoluteTimeGetCurrent()
             var lines: [String] = []
-            guard let cgImage = image.cgImage else { return [] }
-            let request = VNRecognizeTextRequest()
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            do {
-                try VNImageRequestHandler(cgImage: cgImage).perform([request])
-                for observation in request.results ?? [] {
-                    guard let candidate = observation.topCandidates(1).first, candidate.confidence >= 0.35 else { continue }
-                    lines.append(candidate.string)
+            var observations: [[String: Any]] = []
+            var recognitionError: String?
+            if let cgImage = image.cgImage {
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.usesLanguageCorrection = true
+                do {
+                    try VNImageRequestHandler(cgImage: cgImage).perform([request])
+                    for observation in request.results ?? [] {
+                        guard let candidate = observation.topCandidates(1).first else { continue }
+                        let accepted = candidate.confidence >= 0.35
+                        if accepted { lines.append(candidate.string) }
+                        if diagnostic {
+                            observations.append([
+                                "text": candidate.string,
+                                "confidence": Double(candidate.confidence),
+                                "accepted": accepted,
+                                "reason": accepted ? "accepted" : "below_0.35_confidence"
+                            ])
+                        }
+                    }
+                } catch {
+                    recognitionError = String(describing: error)
                 }
-            } catch { return [] }
-            return lines
+            } else {
+                recognitionError = "no_cgimage"
+            }
+            output.append(lines)
+            if diagnostic {
+                var report: [String: Any] = [
+                    "photoIndex": index + 1,
+                    "acceptedLines": lines,
+                    "observations": observations,
+                    "acceptedCount": lines.count,
+                    "ocrDurationMs": (CFAbsoluteTimeGetCurrent() - photoStart) * 1000
+                ]
+                if let recognitionError { report["error"] = recognitionError }
+                photoReports.append(report)
+            }
         }
+        return (output, photoReports, (CFAbsoluteTimeGetCurrent() - start) * 1000)
     }
     private func identifyPhotos() {
         invalidatePhotoLookup()
@@ -554,13 +609,29 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             }
             guard !Task.isCancelled, !closed, revision == photoRevision else { return }
             processing = nil
-            if recognized.last?.isEmpty != false {
+            let id = UUID().uuidString
+            let diagnostic: [String: Any]? = Self.ocrDiagnosticsEnabled ? [
+                "version": 1,
+                "id": id,
+                "revision": revision,
+                "photoCount": images.count,
+                "photos": recognized.reports,
+                "ocrDurationMs": recognized.durationMs,
+                "captureDurationMs": lastPhotoCaptureDurationMs,
+                "captureStartedAtMs": lastCaptureStartedAtMs,
+                "ocrGate": recognized.lines.last?.isEmpty != false ? "latest_photo_unreadable" : "passed"
+            ] : nil
+            if recognized.lines.last?.isEmpty != false {
+                if var diagnostic {
+                    diagnostic["stage"] = "ocr_only"
+                    diagnostic["catalog"] = "not_checked"
+                    Self.emitOCRDiagnostic(diagnostic)
+                }
                 state = .unreadablePhoto
             } else {
-                let lines = recognized.flatMap { $0 }
-                let id = UUID().uuidString
+                let lines = recognized.lines.flatMap { $0 }
                 photoLookupID = id
-                onPhotoText(id, lines)
+                onPhotoText(id, lines, diagnostic)
                 photoLookupTimeout = Task { @MainActor [weak self] in
                     try? await Task.sleep(nanoseconds: 8_000_000_000)
                     guard !Task.isCancelled else { return }
@@ -571,8 +642,10 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         }
         render()
     }
-    func showPhotoResult(id: String?, result value: String?, candidates values: [[String: String]]) {
+    func showPhotoResult(id: String?, result value: String?, candidates values: [[String: String]],
+                         diagnostic: [String: Any]? = nil) {
         guard !closed, let id, id == photoLookupID else { return }
+        if let diagnostic, Self.ocrDiagnosticsEnabled { Self.emitOCRDiagnostic(diagnostic) }
         photoLookupID = nil
         photoLookupTimeout?.cancel()
         photoLookupTimeout = nil

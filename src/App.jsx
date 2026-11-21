@@ -7,6 +7,7 @@ import {
 } from './features/teaModel.js';
 import { scanBarcodePhoto } from './features/scanBarcode.js';
 import { openNativeTeaCamera, captureNativeTeaBarcode, matchPhotoCandidates } from './features/nativeTeaCamera.js';
+import { diagnoseCatalogMatch } from './features/uc02OcrDiagnostics.js';
 import { observeNativeQuickAccess, routeNativeQuickAccess, waitForCameraCatalog } from './features/nativeQuickAccess.js';
 import TeaEditor from './components/TeaEditor.jsx';
 import TeaDetail from './components/TeaDetail.jsx';
@@ -183,8 +184,9 @@ export default function App() {
         getNativeTeaCamera(), {
           shouldOpen: () => generation === cameraResultGeneration.current,
           lookupBarcode: lookupTeaByCode,
-          matchPhoto: async (lines, { signal }) => {
-            let available = catalog.status === 'loading'
+          matchPhoto: async (lines, { signal, onCatalogDiagnostic }) => {
+             const started = onCatalogDiagnostic ? performance.now() : 0;
+             let available = catalog.status === 'loading'
               ? await waitForCameraCatalog(catalogRequest.current ?? Promise.resolve(teas))
               : teas;
             if (cameraCatalogFailed.current) {
@@ -195,8 +197,20 @@ export default function App() {
               setCatalog(previous => ({ status:'ready', error:'',
                 teas: available.concat(previous.teas.filter(item => !available.some(tea => tea.id === item.id))) }));
             }
-            return matchPhotoCandidates(lines, available);
-          },
+            const catalogWaitMs = onCatalogDiagnostic ? performance.now() - started : 0;
+             const matchStarted = onCatalogDiagnostic ? performance.now() : 0;
+             const matches = matchPhotoCandidates(lines, available);
+             if (onCatalogDiagnostic) {
+               try {
+                 onCatalogDiagnostic({
+                   ...diagnoseCatalogMatch(lines, available),
+                   catalogWaitMs: Number(catalogWaitMs.toFixed(1)),
+                   matchingMs: Number((performance.now() - matchStarted).toFixed(1)),
+                 });
+               } catch { /* Debug-only diagnostics must never affect matching. */ }
+             }
+             return matches;
+           },
         },
       );
       if (generation !== cameraResultGeneration.current) return;
