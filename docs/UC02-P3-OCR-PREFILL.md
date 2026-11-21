@@ -44,3 +44,21 @@ verbleiben im Arbeitsspeicher. Der bestehende SAVE-Pfad bekommt nur Formularwert
    Ablehnungsgründe. Parserzeit und Zeit bis zur sichtbaren Ansicht getrennt
    dokumentieren. Mit 07 Feldentscheidungen und Messwerte teilen. Der vorhandene
    P1-Konsolenauszug enthält Klartext aus der Verpackung.
+
+## P3.1 · OCR-Regressionen von der Geräteabnahme
+
+Die Fixtures verwenden die gemeldeten OCR-Textausschnitte. Positionen,
+Konfidenzen und die genaue Trennung der Fragmente sind für reproduzierbare
+Tests nachgebildet. Der Rohdump des iPhones lag bei der Implementierung nicht vor.
+
+| Verpackung | In den Fixtures übernommen | In den Fixtures leer |
+| --- | --- | --- |
+| Twinings English Breakfast | TWININGS, ENGLISH BREAKFAST und 100 °C bei zusammenhängendem Zubereitungsblock | Ziehzeit aus `-4 min`, Dosis und Wassermenge ohne belegtes Paar |
+| dm Bio Schwangerschaftstee | SCHWANGERSCHAFTSTEE und 5 Minuten aus dem vollständig lesbaren Bereich 5–6 Minuten | Hersteller bei `amBio` und Beuteldosierung bei 200 ml |
+
+Beim erneuten iPhone-Test dieselben Seiten fotografieren. Werte im Formular
+erst nach `No match found` vergleichen, die vorhandenen Defaults von
+übernommenen OCR-Feldern anhand von `structuredPrefill.acceptedFields`
+unterscheiden und `ocrDurationMs` sowie `timings.prefillMs` dokumentieren.
+Die Temperatur bleibt offen, wenn die echten OCR-Boxen keinen gemeinsamen
+Zubereitungsblock bestätigen.

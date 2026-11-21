@@ -22,6 +22,8 @@ on:
       - tests/nativeTeaCamera.test.mjs
       - tests/nativeTeaEditorRendering.test.mjs
       - src/features/nativeTeaCamera.js
+      - src/features/uc02PhotoPrefill.js
+      - tests/uc02PhotoPrefill.test.mjs
       - src/features/nativeQuickAccess.js
       - src/features/teaModel.js
       - src/components/TeaEditor.jsx
