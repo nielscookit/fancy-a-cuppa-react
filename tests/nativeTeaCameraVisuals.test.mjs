@@ -96,6 +96,6 @@ test('UI-06 no-match status and action hint use separate white and lime Figma as
 test('UI-07 remaining photo count selects 03D/03E after deletion while the three-photo limit remains',()=>{
   assert.match(swift,/instruction = photos\.count >= 2 \? "Let's add your tea" : "Scan brewing details"/);
   assert.match(swift,/case \.noMatch:[\s\S]*?buttonTitle = "ADD NEW TEA"/);
-  assert.match(swift,/photos\.remove\(at: selectedPhoto\)[\s\S]*?else \{ identifyPhotos\(\) \}/);
+  assert.match(swift,/photos\.remove\(at: selectedPhoto\)[\s\S]*?else \{ identifyPhotos\(trigger: "photo_deleted"\) \}/);
   assert.match(swift,/photos\.count < 3/);
 });

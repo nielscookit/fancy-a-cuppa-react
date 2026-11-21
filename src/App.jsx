@@ -185,8 +185,8 @@ export default function App() {
           shouldOpen: () => generation === cameraResultGeneration.current,
           lookupBarcode: lookupTeaByCode,
           matchPhoto: async (lines, { signal, onCatalogDiagnostic }) => {
-             const started = onCatalogDiagnostic ? performance.now() : 0;
-             let available = catalog.status === 'loading'
+            const started = onCatalogDiagnostic ? performance.now() : 0;
+            let available = catalog.status === 'loading'
               ? await waitForCameraCatalog(catalogRequest.current ?? Promise.resolve(teas))
               : teas;
             if (cameraCatalogFailed.current) {
@@ -198,20 +198,18 @@ export default function App() {
                 teas: available.concat(previous.teas.filter(item => !available.some(tea => tea.id === item.id))) }));
             }
             const catalogWaitMs = onCatalogDiagnostic ? performance.now() - started : 0;
-             const matchStarted = onCatalogDiagnostic ? performance.now() : 0;
-             const matches = matchPhotoCandidates(lines, available);
-             const actualMatchingMs = onCatalogDiagnostic ? performance.now() - matchStarted : 0;
-             if (onCatalogDiagnostic) {
-               try {
-                 onCatalogDiagnostic({
-                   ...diagnoseCatalogMatch(lines, available),
-                   catalogWaitMs: Number(catalogWaitMs.toFixed(1)),
-                   matchingMs: Number(actualMatchingMs.toFixed(1)),
-                 });
-               } catch { /* Debug-only diagnostics must never affect matching. */ }
-             }
-             return matches;
-           },
+            const matchStarted = onCatalogDiagnostic ? performance.now() : 0;
+            const matches = matchPhotoCandidates(lines, available);
+            if (onCatalogDiagnostic) {
+              const matchingMs = performance.now() - matchStarted;
+              onCatalogDiagnostic(() => ({
+                ...diagnoseCatalogMatch(lines, available),
+                catalogWaitMs: Number(catalogWaitMs.toFixed(1)),
+                matchingMs: Number(matchingMs.toFixed(1)),
+              }));
+            }
+            return matches;
+          },
         },
       );
       if (generation !== cameraResultGeneration.current) return;

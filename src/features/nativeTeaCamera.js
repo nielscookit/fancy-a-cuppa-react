@@ -146,9 +146,9 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
       let result = 'no_match';
       const diagnostic = candidate.ocrDiagnostic?.version === 1 ? candidate.ocrDiagnostic : null;
       let catalogDiagnostic = null;
-      let prefillDiagnostic = null;
       const matchingStartedAt = diagnostic ? performance.now() : 0;
-      let prefillElapsedMs = 0;
+      let prefillMs = null;
+      let extracted = null;
       try {
         const found = await matchPhoto?.(candidate.lines, {
           signal: controller.signal,
@@ -162,20 +162,10 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
           photoMatches.set(candidate.id, matches);
           result = 'possible';
         } else {
-          const prefill = photoPrefillFromText(candidate.lines);
-          if (prefill) photoPrefills.set(candidate.id, prefill);
-        }
-        if (diagnostic) {
-          const started = performance.now();
-          try {
-            const testPrefill = photoPrefillFromText(candidate.lines);
-            prefillDiagnostic = diagnosePrefill(candidate.lines, testPrefill);
-          } catch {
-            // Diagnostics must never turn a valid product match into a lookup error.
-            prefillDiagnostic = { error: 'diagnostic_parser_failed' };
-          } finally {
-            prefillElapsedMs = performance.now() - started;
-          }
+          const started = diagnostic ? performance.now() : 0;
+          extracted = photoPrefillFromText(candidate.lines);
+          if (diagnostic) prefillMs = Number((performance.now() - started).toFixed(1));
+          if (extracted) photoPrefills.set(candidate.id, extracted);
         }
       } catch {
         // A failed catalogue request is not evidence that no matching tea exists.
@@ -184,25 +174,26 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
         clearTimeout(timeout);
       }
       if (!active || revision !== photoRevision) return;
-      const report = diagnostic ? {
-        ...diagnostic,
-        stage: 'match_complete',
-        result,
-        ocrTextUsed: candidate.lines,
-        catalog: catalogDiagnostic,
-        prefill: prefillDiagnostic,
-        timings: {
-          catalogAndMatchingMs: Number((performance.now() - matchingStartedAt - prefillElapsedMs).toFixed(1)),
-          prefillMs: Number(prefillElapsedMs.toFixed(1)),
-          totalSinceCaptureMs: Math.max(0, Date.now() - Number(diagnostic.captureStartedAtMs || Date.now())),
-        },
-      } : null;
+      const processingMs = diagnostic ? Number((performance.now() - matchingStartedAt).toFixed(1)) : 0;
       await camera.showPhotoResult({
         id: candidate.id, result,
         candidates: matches.map(tea => ({ id: String(tea.id), name: tea.rawName || '', brand: tea.brand || '',
           symbol: getTeaCategoryIcon(tea.category) })),
-        ...(report && { diagnostic: report }),
       }).catch(() => {});
+      if (!diagnostic) return;
+      // Yield after delivering the result. A diagnostic failure cannot suppress it.
+      setTimeout(async () => {
+        if (!active || revision !== photoRevision) return;
+        try {
+          const report = {
+            version: 1, id: candidate.id, stage: 'match_complete', result,
+            catalog: catalogDiagnostic?.() ?? null,
+            prefill: result === 'no_match' ? diagnosePrefill(candidate.lines, extracted) : null,
+            timings: { processingMs, prefillMs },
+          };
+          await camera.reportOCRDiagnostic({ id: candidate.id, report });
+        } catch { /* Diagnostics are optional. */ }
+      }, 0);
     }));
     listeners.push(await camera.addListener('cameraState', event => {
       cancelLookups();

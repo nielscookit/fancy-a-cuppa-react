@@ -13,7 +13,8 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "closeForQuickAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showBarcodeResult", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "showPhotoResult", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "showPhotoResult", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reportOCRDiagnostic", returnType: CAPPluginReturnPromise)
     ]
     private weak var camera: UIViewController?
     private var opening = false
@@ -93,12 +94,20 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
                 controller.showPhotoResult(id: call.getString("id"),
                                            result: call.getString("result"),
-                                           candidates: (call.getArray("candidates") as? [[String: String]]) ?? [],
-                                           diagnostic: call.getObject("diagnostic"))
+                                           candidates: (call.getArray("candidates") as? [[String: String]]) ?? [])
             }
             call.resolve()
         }
     }
+    @objc func reportOCRDiagnostic(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            if #available(iOS 16.0, *), let controller = camera as? FACTeaCameraViewController {
+                controller.reportOCRDiagnostic(id: call.getString("id"), payload: call.getObject("report"))
+            }
+            call.resolve()
+        }
+    }
+
 }
 
 // The native session owns accepted lookup IDs. React may return late results,
@@ -140,8 +149,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     private var photos: [(image: UIImage, preview: String)] = []
     private var selectedPhoto = 0
     private var hasCapturedPhoto = false
-    private var lastPhotoCaptureDurationMs: Double = 0
-    private var lastCaptureStartedAtMs: Double = 0
+    private var diagnosticPhotoID: String?
+    private var diagnosticEpoch = 0
     private var photoRevision = 0
     private var photoLookupID: String?
     private var acceptedPhotoID: String?
@@ -354,6 +363,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
     @objc private func stopScanner() {
         cameraActive = false
+        diagnosticPhotoID = nil
+        diagnosticEpoch += 1
         barcodeNavigation?.cancel()
         barcodeNavigation = nil
         cancelManualShortcut()
@@ -427,6 +438,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
     }
     private func invalidatePhotoLookup() {
         photoRevision += 1
+        diagnosticPhotoID = nil
         processing?.cancel()
         processing = nil
         photoLookupTimeout?.cancel()
@@ -467,7 +479,7 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
               processing == nil, photoLookupID == nil, photos.count < 3, state != .matches, candidateID == nil || state == .networkError else { return }
         capture = Task { @MainActor in
             defer { capture = nil; render() }
-            let captureStartedAtMs = Date().timeIntervalSince1970 * 1000
+            let captureStartedAt = Self.ocrDiagnosticsEnabled ? ProcessInfo.processInfo.systemUptime : nil
             do {
                 let photo = try await scanner.capturePhoto()
                 guard !Task.isCancelled, !closed else { return }
@@ -484,12 +496,11 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                 }
                 candidateID = nil
                 hasCapturedPhoto = true // Intentionally never cleared by deleting a photo.
-                lastCaptureStartedAtMs = captureStartedAtMs
-                lastPhotoCaptureDurationMs = Date().timeIntervalSince1970 * 1000 - captureStartedAtMs
                 photos.append((preview, "data:image/jpeg;base64," + data.base64EncodedString()))
                 selectedPhoto = photos.count - 1
                 rebuildThumbnails()
-                identifyPhotos()
+                identifyPhotos(captureStartedAt: captureStartedAt,
+                               captureDurationMs: captureStartedAt.map { (ProcessInfo.processInfo.systemUptime - $0) * 1000 })
             } catch {
                 guard !Task.isCancelled, !closed else { return }
                 showHint("Photo unavailable", "Try another photo")
@@ -527,31 +538,43 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         selectedPhoto = max(0, min(selectedPhoto, photos.count - 1))
         rebuildThumbnails()
         if photos.isEmpty { state = .photo; render() }
-        else { identifyPhotos() }
+        else { identifyPhotos(trigger: "photo_deleted") }
     }
-    // P1 instrumentation is compiled only for DEBUG Fancy Test, never iOS Release.
+    // Raw OCR is opt-in for a live Xcode run of the Debug test bundle.
     private static var ocrDiagnosticsEnabled: Bool {
         #if DEBUG
         return Bundle.main.bundleIdentifier == "com.fancyacuppa.test"
+            && ProcessInfo.processInfo.environment["FAC_OCR_P1_CONSOLE"] == "1"
         #else
         return false
         #endif
     }
     private static func emitOCRDiagnostic(_ payload: [String: Any]) {
-        guard ocrDiagnosticsEnabled, JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let line = String(data: data, encoding: .utf8) else { return }
-        NSLog("[FAC-OCR-P1] %@", line)
+        #if DEBUG
+        guard ocrDiagnosticsEnabled else { return }
+        DispatchQueue.global(qos: .utility).async {
+            guard JSONSerialization.isValidJSONObject(payload),
+                  let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+                  let line = String(data: data, encoding: .utf8) else { return }
+            print("[FAC-OCR-P1] " + line)
+        }
+        #endif
+    }
+    func reportOCRDiagnostic(id: String?, payload: [String: Any]?) {
+        guard Self.ocrDiagnosticsEnabled, cameraActive, !closed, let id,
+              id == diagnosticPhotoID, id == acceptedPhotoID, let payload else { return }
+        diagnosticPhotoID = nil
+        Self.emitOCRDiagnostic(payload)
     }
     // Apple Vision stays on-device. Work off an immutable snapshot and reject
     // results for deleted photos, old snapshots or a dismissed camera.
     private static func recognizeText(in images: [UIImage]) -> (lines: [[String]], reports: [[String: Any]], durationMs: Double) {
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = ProcessInfo.processInfo.systemUptime
         let diagnostic = ocrDiagnosticsEnabled
         var output: [[String]] = []
         var photoReports: [[String: Any]] = []
         for (index, image) in images.enumerated() {
-            let photoStart = CFAbsoluteTimeGetCurrent()
+            let photoStart = ProcessInfo.processInfo.systemUptime
             var lines: [String] = []
             var observations: [[String: Any]] = []
             var recognitionError: String?
@@ -587,18 +610,20 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
                     "acceptedLines": lines,
                     "observations": observations,
                     "acceptedCount": lines.count,
-                    "ocrDurationMs": (CFAbsoluteTimeGetCurrent() - photoStart) * 1000
+                    "ocrDurationMs": (ProcessInfo.processInfo.systemUptime - photoStart) * 1000
                 ]
                 if let recognitionError { report["error"] = recognitionError }
                 photoReports.append(report)
             }
         }
-        return (output, photoReports, (CFAbsoluteTimeGetCurrent() - start) * 1000)
+        return (output, photoReports, (ProcessInfo.processInfo.systemUptime - start) * 1000)
     }
-    private func identifyPhotos() {
+    private func identifyPhotos(trigger: String = "capture", captureStartedAt: Double? = nil,
+                                captureDurationMs: Double? = nil) {
         invalidatePhotoLookup()
         guard !photos.isEmpty else { state = .photo; render(); return }
         let revision = photoRevision
+        let epoch = diagnosticEpoch
         let images = photos.map { $0.image }
         state = .identifying
         processing = Task { @MainActor in
@@ -610,31 +635,38 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
             guard !Task.isCancelled, !closed, revision == photoRevision else { return }
             processing = nil
             let id = UUID().uuidString
-            let diagnostic: [String: Any]? = Self.ocrDiagnosticsEnabled ? [
-                "version": 1,
-                "id": id,
-                "revision": revision,
-                "photoCount": images.count,
-                "photos": recognized.reports,
-                "ocrDurationMs": recognized.durationMs,
-                "captureDurationMs": lastPhotoCaptureDurationMs,
-                "captureStartedAtMs": lastCaptureStartedAtMs,
-                "ocrGate": recognized.lines.last?.isEmpty != false ? "latest_photo_unreadable" : "passed"
-            ] : nil
-            if recognized.lines.last?.isEmpty != false {
-                if var diagnostic {
-                    diagnostic["stage"] = "ocr_only"
-                    diagnostic["catalog"] = "not_checked"
-                    Self.emitOCRDiagnostic(diagnostic)
-                }
+            let unreadable = recognized.lines.last?.isEmpty != false
+            let reportEnabled = Self.ocrDiagnosticsEnabled && cameraActive && epoch == diagnosticEpoch
+            if reportEnabled {
+                let report: [String: Any] = [
+                    "version": 1,
+                    "id": id,
+                    "revision": revision,
+                    "trigger": trigger,
+                    "photoCount": images.count,
+                    "photos": recognized.reports,
+                    "ocrDurationMs": recognized.durationMs,
+                    "captureDurationMs": captureDurationMs.map { $0 as Any } ?? NSNull(),
+                    "captureToOCRMs": captureStartedAt.map { ((ProcessInfo.processInfo.systemUptime - $0) * 1000) as Any } ?? NSNull(),
+                    "ocrGate": unreadable ? "latest_photo_unreadable" : "passed",
+                    "stage": unreadable ? "ocr_only" : "ocr_complete"
+                ]
+                Self.emitOCRDiagnostic(report)
+            }
+            if unreadable {
                 state = .unreadablePhoto
             } else {
                 let lines = recognized.lines.flatMap { $0 }
                 photoLookupID = id
-                onPhotoText(id, lines, diagnostic)
+                diagnosticPhotoID = reportEnabled ? id : nil
+                onPhotoText(id, lines, reportEnabled ? ["version": 1] : nil)
                 photoLookupTimeout = Task { @MainActor [weak self] in
                     try? await Task.sleep(nanoseconds: 8_000_000_000)
                     guard !Task.isCancelled else { return }
+                    if let self, self.diagnosticPhotoID == id {
+                        self.diagnosticPhotoID = nil
+                        Self.emitOCRDiagnostic(["stage": "match_timeout", "id": id, "revision": revision])
+                    }
                     self?.showPhotoResult(id: id, result: "lookup_error", candidates: [])
                 }
             }
@@ -642,10 +674,8 @@ private final class FACTeaCameraViewController: UIViewController, DataScannerVie
         }
         render()
     }
-    func showPhotoResult(id: String?, result value: String?, candidates values: [[String: String]],
-                         diagnostic: [String: Any]? = nil) {
+    func showPhotoResult(id: String?, result value: String?, candidates values: [[String: String]]) {
         guard !closed, let id, id == photoLookupID else { return }
-        if let diagnostic, Self.ocrDiagnosticsEnabled { Self.emitOCRDiagnostic(diagnostic) }
         photoLookupID = nil
         photoLookupTimeout?.cancel()
         photoLookupTimeout = nil

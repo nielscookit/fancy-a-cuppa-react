@@ -388,7 +388,7 @@ test('catalogue failure in photo lookup is not reported as a negative match', as
 });
 
 test('native photos identify automatically, retain unreadable captures and invalidate deleted snapshots', () => {
-  assert.match(cameraSwift, /photos\.append[\s\S]*?rebuildThumbnails\(\)[\s\S]*?identifyPhotos\(\)/);
+  assert.match(cameraSwift, /photos\.append[\s\S]*?rebuildThumbnails\(\)[\s\S]*?identifyPhotos\(captureStartedAt:/);
   assert.match(cameraSwift, /photos\.remove\(at: selectedPhoto\)/);
   assert.match(cameraSwift, /revision == photoRevision/);
   assert.match(cameraSwift, /case \.unreadablePhoto:[\s\S]*?Couldn't read the details[\s\S]*?Try another photo/);
@@ -429,4 +429,30 @@ test('connection restored while the failed request is settling still triggers on
   assert.equal(h.results.at(-1).result, 'unknown');
   h.finish({action:'add',barcodeID:'recover'});
   assert.deepEqual((await result).barcode, {type:'ean_8',value:'96385074'});
+});
+
+test('P1 delivers the native result before a failing diagnostic and drops invalidated reports', async () => {
+  for (const invalidated of [false, true]) {
+    const h = cameraHarness();
+    let analysisRuns = 0;
+    let reports = 0;
+    h.camera.reportOCRDiagnostic = async () => { reports++; };
+    const flow = openNativeTeaCamera(h.camera, {
+      matchPhoto: (_, { onCatalogDiagnostic }) => {
+        onCatalogDiagnostic(() => { analysisRuns++; throw new Error('diagnostic only'); });
+        return [{ id: 'tea', rawName: 'Assam' }];
+      },
+    });
+    await h.ready;
+    await h.listeners.photoText({ id: 'photo', lines: ['Assam'], ocrDiagnostic: { version: 1 } });
+    assert.equal(h.results[0].result, 'possible');
+    assert.equal(h.results[0].diagnostic, undefined);
+    assert.equal(analysisRuns, 0);
+    if (invalidated) h.listeners.cameraState({ reason: 'photos_changed' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(analysisRuns, invalidated ? 0 : 1);
+    assert.equal(reports, 0);
+    h.finish({ action: invalidated ? 'close' : 'use_photo', photoID: 'photo', teaID: 'tea' });
+    assert.equal((await flow).photoTea?.id, invalidated ? undefined : 'tea');
+  }
 });

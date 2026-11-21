@@ -8,7 +8,8 @@ export function diagnoseCatalogMatch(lines, teas) {
   const recognized = normalizeQuery(lines.filter(line => typeof line === 'string').join(' '));
   const padded = ' ' + recognized + ' ';
   const found = new Set(words(recognized));
-  const reasons = { matched: 0, invalid_catalog_fields: 0, missing_brand: 0, missing_name: 0, missing_both: 0 };
+  const reasons = { matched: 0, invalid_catalog_fields: 0, missing_brand: 0, missing_name: 0, missing_both: 0, duplicate_id: 0 };
+  const seen = new Set();
   const accepted = [];
   const rejected = [];
   for (const tea of teas) {
@@ -18,11 +19,13 @@ export function diagnoseCatalogMatch(lines, teas) {
     const brandExact = hasPhrase(padded, brand);
     const nameExact = hasPhrase(padded, name);
     let reason;
-    if (!valid) reason = 'invalid_catalog_fields';
+    if (tea.id && seen.has(tea.id)) reason = 'duplicate_id';
+    else if (!valid) reason = 'invalid_catalog_fields';
     else if (brandExact && nameExact) reason = 'matched';
     else if (!brandExact && !nameExact) reason = 'missing_both';
     else if (!brandExact) reason = 'missing_brand';
     else reason = 'missing_name';
+    if (tea.id) seen.add(tea.id);
     reasons[reason] += 1;
     const entry = { id: String(tea.id ?? ''), brand: tea.brand ?? '', name: tea.rawName ?? '',
       brandExact, nameExact, reason };

@@ -43,9 +43,21 @@ test('P1 prefill only observes existing parser output', () => {
 test('P1 native instrumentation is gated, unpersisted and invisible', () => {
   const source = readFileSync(new URL('../ios/App/App/FACTeaCameraPlugin.swift', import.meta.url), 'utf8');
   assert.match(source, /#if DEBUG\s*return Bundle\.main\.bundleIdentifier == "com\.fancyacuppa\.test"/);
-  assert.match(source, /NSLog\("\[FAC-OCR-P1\] %@", line\)/);
-  assert.match(source, /if let diagnostic, Self\.ocrDiagnosticsEnabled \{ Self\.emitOCRDiagnostic\(diagnostic\) \}/);
+  assert.match(source, /environment\["FAC_OCR_P1_CONSOLE"\] == "1"/);
+  assert.doesNotMatch(source, /NSLog\("\[FAC-OCR-P1\]/);
+  assert.match(source, /print\("\[FAC-OCR-P1\] " \+ line\)/);
+  assert.match(source, /id == diagnosticPhotoID, id == acceptedPhotoID/);
+  assert.match(source, /epoch == diagnosticEpoch/);
   assert.match(source, /recognized\.lines\.last\?\.isEmpty != false/);
   assert.match(source, /candidate\.confidence >= 0\.35/);
   assert.doesNotMatch(source, /diagnosticOverlay|debugButton|diagnosticSheet/);
+});
+
+test('P1 catalog diagnostics report duplicate IDs according to the real matcher', () => {
+  const lines = ['Lebensbaum Assam Breakfast'];
+  const duplicates = [{ ...teas[0], rawName: 'Something else' }, ...teas];
+  const report = diagnoseCatalogMatch(lines, duplicates);
+  assert.deepEqual(report.accepted, []);
+  assert.deepEqual(matchPhotoCandidates(lines, duplicates), []);
+  assert.equal(report.rejectionCounts.duplicate_id, 1);
 });
