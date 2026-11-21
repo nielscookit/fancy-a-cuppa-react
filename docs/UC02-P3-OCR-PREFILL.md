@@ -85,3 +85,35 @@ und den Produktnamen English Breakfast prüfen. Die Temperatur nur
 erwarten, wenn der Zubereitungsblock im Testlauf eindeutig erkannt wird.
 In den Xcode-Protokollen unter structuredPrefill.acceptedFields verifizieren,
 ob die Ziehzeit aus OCR stammt. Einen realen Katalogtreffer gegenprüfen.
+
+## P3.3 · Bestätigte Textfragmente und Wassermenge
+
+Die Regressionstests verwenden die gemeldeten OCR-Fragmente beider
+Aufnahmen. Die Positionen der OCR-Boxen wurden nachgebildet. Die exakten
+Gerätekoordinaten sind offen.
+
+- `EBio`, `SCHWANGER-` und `SCHAFTSTEE` auf der Vorderseite sowie
+  `mindestens 5 Minuten ziehen` auf der Rückseite ergeben
+  Schwangerschaftstee und 5 MIN. Der Hersteller bleibt ohne eindeutiges
+  Markenfragment offen.
+- `TWININGS®`, `ENGLISH`, `BREAKFAST` und `Rich & Balanced` ergeben
+  Twinings und English Breakfast. Der Werbezusatz bleibt außerhalb des
+  Produktnamens. Ein zusammenhängender Block aus `100°C`, `250 ml` und
+  `3-4 min` erlaubt 100 °C, 250 ml Wasser und 3 MIN. Daraus ergibt sich
+  keine Teedosierung.
+
+P3.2 verlangte beim Schwangerschaftstee eine hoch positionierte,
+eng gesetzte Überschrift. Für die exakten dmBio- und Twinings-Fragmente
+lässt P3.3 zusätzliche Abstände und unterschiedliche Zeilenhöhen zu,
+wenn sie im selben Bild weiterhin als Titelblock plausibel sind. Ein
+eindeutig gelesener registrierter Twinings-Aufdruck kann unabhängig vom
+Produktnamen übernommen werden. Als einzelner Wert wird Wasser nur aus
+einem vollständigen Zubereitungsblock übernommen. Unverbundene oder
+widersprüchliche Mengen bleiben offen.
+
+Beim iPhone-Test in Fancy Test beide Packungen erneut vorne und hinten
+fotografieren. In ADD NEW TEA nach „No match found“ die genannten Werte
+prüfen. In den Xcode-Protokollen zeigt `structuredPrefill.acceptedFields`
+die übernommenen Felder, darunter `base` für die Wassermenge.
+`structuredPrefill.rejected` zeigt die Gründe für offene Felder. Den
+bekannten Katalogtreffer und seinen Abbruchpfad gegenprüfen.

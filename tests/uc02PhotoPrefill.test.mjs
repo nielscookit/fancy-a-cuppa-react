@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { extractPhotoPrefill } from '../src/features/uc02PhotoPrefill.js';
+import { matchPhotoCandidates } from '../src/features/nativeTeaCamera.js';
 import { initialTeaForm, validateTeaForm } from '../src/features/teaModel.js';
 
 const rows = (...texts) => texts.map((text, order) => ({ photoIndex: 1, order, text, confidence: 0.96 }));
@@ -124,14 +125,15 @@ test('dm excerpts recover the split name and complete range without guessing amB
 
 test('unlisted marked brands need a contiguous, non-generic title outside ingredients and company copy', () => {
   const [brand, first, second] = twinings;
-  assert.equal(extractPhotoPrefill([{ ...brand, text: 'Harbour™' }, first, second]).prefill.brand, 'Harbour');
+  const harbour = { ...brand, text: 'Harbour™' };
+  assert.equal(extractPhotoPrefill([harbour, first, second]).prefill.brand, 'Harbour');
   for (const observations of [
     [{ ...brand, text: 'Importer Ltd®' }, first, second],
-    [brand, { ...first, text: 'PREMIUM' }, { ...second, text: 'QUALITY TEA' }],
-    [brand, { ...first, text: 'ENGLISH' }, { ...second, text: 'BLACK PEPPER' }],
-    [brand, first, { ...second, photoIndex: 2 }],
-    [brand, first, { ...second, boundingBox: { ...second.boundingBox, x: 0.70, width: 0.26 } }],
-    [brand, { ...first, text: 'Ingredients' }, { ...second, text: 'ENGLISH BREAKFAST' }],
+    [harbour, { ...first, text: 'PREMIUM' }, { ...second, text: 'QUALITY TEA' }],
+    [harbour, { ...first, text: 'ENGLISH' }, { ...second, text: 'BLACK PEPPER' }],
+    [harbour, first, { ...second, photoIndex: 2 }],
+    [harbour, first, { ...second, boundingBox: { ...second.boundingBox, x: 0.70, width: 0.26 } }],
+    [harbour, { ...first, text: 'Ingredients' }, { ...second, text: 'ENGLISH BREAKFAST' }],
     [{ ...brand, text: 'enjoy our tea' }, first, second],
   ]) assert.equal(extractPhotoPrefill(observations).prefill, null);
 });
@@ -190,7 +192,8 @@ test('P3.2 recognises complete Twinings title evidence outside the old logo rect
   assert.equal(extractPhotoPrefill([{ ...lowerLogo, text: 'TWINlNGS®' }, first, title]).prefill, null);
   const variant = observation('DECAFFEINATED', 0.22, 0.28, 0.56, 4);
   for (const logo of [brand, lowerLogo]) {
-    assert.equal(extractPhotoPrefill([logo, first, second, variant]).prefill, null);
+    assert.deepEqual(extractPhotoPrefill([logo, first, second, variant]).prefill,
+      logo === brand ? { brand: 'Twinings' } : null);
   }
   const conflict = extractPhotoPrefill([lowerLogo, first, title, ...rows('Hersteller: Other Brand')]);
   assert.equal(conflict.prefill, null);
@@ -215,4 +218,75 @@ test('P3.2 reads dm preparation times with an explicit label or instruction and 
     rows('– 4 Minuten ziehen lassen'),
     rows('Steep mountain freshness in 4 minutes'),
   ]) assert.equal(extractPhotoPrefill(observations).prefill, null);
+});
+
+// Actual reported strings, with bounding boxes reconstructed for regression tests.
+const dmDevice = [
+  { ...dm[0], text: 'EBio' },
+  observation('SCHWANGER-', 0.16, 0.56, 0.65, 1, 1, 0.048),
+  observation('SCHAFTSTEE', 0.21, 0.40, 0.63, 2, 1, 0.065),
+  observation('mindestens 5 Minuten ziehen', 0.18, 0.60, 0.71, 0, 2),
+];
+const twiningsDevice = [
+  observation('TWININGS®', 0.30, 0.85, 0.40, 0),
+  observation('ENGLISH', 0.33, 0.69, 0.38, 1),
+  observation('BREAKFAST', 0.34, 0.49, 0.53, 2, 1, 0.075),
+  observation('Rich & Balanced', 0.27, 0.37, 0.58, 3),
+  ...twinings.slice(3, 5),
+  { ...twinings[5], text: '3-4 min' },
+];
+
+test('P3.3 dmBio regression recovers the separated title and keeps only the observed minimum time', () => {
+  const result = extractPhotoPrefill(dmDevice);
+  assert.deepEqual(result.prefill, { rawName: 'Schwangerschaftstee', brewSeconds: 300 });
+  assert.equal(result.rejected.brand, 'no_evidence');
+  assert.deepEqual(result.evidence.rawName[0].source.map(row => row.text), ['SCHWANGER-', 'SCHAFTSTEE']);
+});
+
+test('P3.3 Twinings regression separates the tagline and preserves a preparation volume without dosage', () => {
+  const result = extractPhotoPrefill(twiningsDevice);
+  assert.deepEqual(result.prefill, { brand: 'Twinings', rawName: 'English Breakfast',
+    brewSeconds: 180, temperature: 100, base: 250 });
+  assert.equal(result.rejected.dose, 'no_evidence');
+  assert.equal(initialTeaForm(result.prefill).base, '250');
+  assert.equal(initialTeaForm(result.prefill).qty, '');
+});
+
+test('P3.3 keeps exact title fragments within the same label and omits uncertain variants', () => {
+  const [logo, english, breakfast, tagline] = twiningsDevice;
+  for (const front of [
+    [logo, english, { ...breakfast, photoIndex: 2 }],
+    [logo, english, { ...breakfast, boundingBox: { x: 0.07, y: 0.49, width: 0.12, height: 0.075 } }],
+    [logo, english, breakfast, observation('DECAFFEINATED', 0.29, 0.37, 0.48, 3)],
+    [logo, english, breakfast, { ...tagline, text: 'Ingredients', boundingBox: { ...tagline.boundingBox, y: 0.59 } }],
+    [{ ...logo, text: 'TWINlNGS®' }, english, breakfast, tagline],
+  ]) assert.equal(extractPhotoPrefill(front).prefill?.rawName, undefined);
+  assert.equal(extractPhotoPrefill([{ ...logo, text: 'TWINlNGS®' }, english, breakfast]).prefill?.brand, undefined);
+  assert.equal(extractPhotoPrefill([dmDevice[0], dmDevice[1], { ...dmDevice[2], photoIndex: 2 }]).prefill, null);
+  assert.equal(extractPhotoPrefill([...dmDevice.slice(0, 3), observation('Stilltee', 0.2, 0.32, 0.50, 3)]).prefill, null);
+});
+
+test('P3.3 uses standalone water only in a complete and unambiguous preparation strip', () => {
+  const [temp, volume, time] = twiningsDevice.slice(4);
+  for (const [observations, reason] of [
+    [[volume], 'unlinked_preparation_volume'],
+    [[temp, volume, { ...time, text: '-4 min' }], 'unlinked_preparation_volume'],
+    [[temp, volume, { ...time, photoIndex: 1 }], 'unlinked_preparation_volume'],
+    [[temp, volume, time, { ...volume, text: '500 ml' }], 'conflicting_observations'],
+    [[temp, volume, time, { ...volume, text: '250–500 ml' }], 'unsupported_or_incomplete'],
+  ]) {
+    const result = extractPhotoPrefill(observations);
+    assert.equal(result.prefill?.base, undefined);
+    assert.equal(result.rejected.base, reason);
+  }
+});
+
+test('P3.3 prefill cannot manufacture exact-name catalogue evidence from reconstructed titles', () => {
+  const catalogue = [
+    { id: 'other', brand: 'Twinings', rawName: 'Irish Breakfast' },
+    { id: 'variant', brand: 'Twinings', rawName: 'English Breakfast Decaffeinated' },
+    { id: 'invalid-maker', brand: 'dmBio', rawName: 'Schwangerschaftstee' },
+  ];
+  assert.deepEqual(matchPhotoCandidates(twiningsDevice.map(row => row.text), catalogue), []);
+  assert.deepEqual(matchPhotoCandidates(dmDevice.map(row => row.text), catalogue), []);
 });
