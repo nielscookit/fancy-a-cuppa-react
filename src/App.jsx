@@ -200,12 +200,13 @@ export default function App() {
             const catalogWaitMs = onCatalogDiagnostic ? performance.now() - started : 0;
              const matchStarted = onCatalogDiagnostic ? performance.now() : 0;
              const matches = matchPhotoCandidates(lines, available);
+             const actualMatchingMs = onCatalogDiagnostic ? performance.now() - matchStarted : 0;
              if (onCatalogDiagnostic) {
                try {
                  onCatalogDiagnostic({
                    ...diagnoseCatalogMatch(lines, available),
                    catalogWaitMs: Number(catalogWaitMs.toFixed(1)),
-                   matchingMs: Number((performance.now() - matchStarted).toFixed(1)),
+                   matchingMs: Number(actualMatchingMs.toFixed(1)),
                  });
                } catch { /* Debug-only diagnostics must never affect matching. */ }
              }

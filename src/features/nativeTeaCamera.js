@@ -167,9 +167,15 @@ export async function openNativeTeaCamera(camera, { lookupBarcode, matchPhoto, s
         }
         if (diagnostic) {
           const started = performance.now();
-          const testPrefill = photoPrefillFromText(candidate.lines);
-          prefillDiagnostic = diagnosePrefill(candidate.lines, testPrefill);
-          prefillElapsedMs = performance.now() - started;
+          try {
+            const testPrefill = photoPrefillFromText(candidate.lines);
+            prefillDiagnostic = diagnosePrefill(candidate.lines, testPrefill);
+          } catch {
+            // Diagnostics must never turn a valid product match into a lookup error.
+            prefillDiagnostic = { error: 'diagnostic_parser_failed' };
+          } finally {
+            prefillElapsedMs = performance.now() - started;
+          }
         }
       } catch {
         // A failed catalogue request is not evidence that no matching tea exists.
