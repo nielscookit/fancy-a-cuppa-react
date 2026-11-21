@@ -7,13 +7,13 @@ const rows = (...texts) => texts.map((text, order) => ({ photoIndex: 1, order, t
 const title = (text, y, order, photoIndex = 1) => ({ text, order, photoIndex, confidence: 0.94,
   boundingBox: { x: 0.15, y, width: 0.5, height: 0.08 } });
 
-test('unlabelled manufacturer and product heading retain their OCR spelling', () => {
+test('unlabelled manufacturer and product heading use readable display spelling', () => {
   const result = extractPhotoPrefill([
     title('dmBio', 0.81, 1), title('Schwangerschaftstee', 0.70, 0), ...rows('Kräutertee', '20 Beutel'),
   ]);
   assert.deepEqual(result.prefill, { brand: 'dmBio', rawName: 'Schwangerschaftstee', category: 'herbal' });
   assert.deepEqual(extractPhotoPrefill(rows('dm Bio Schwangerschaftstee')).prefill,
-    { brand: 'dm Bio', rawName: 'Schwangerschaftstee' });
+    { brand: 'dmBio', rawName: 'Schwangerschaftstee' });
 });
 
 test('an aligned two-line heading is read in geometric order, never across photos', () => {
@@ -21,9 +21,9 @@ test('an aligned two-line heading is read in geometric order, never across photo
   const first = title('Früchte-', 0.72, 3);
   const second = title('Mischung', 0.62, 1);
   assert.deepEqual(extractPhotoPrefill([second, logo, first]).prefill, {
-    brand: 'TEEKANNE', rawName: 'Früchte-Mischung',
+    brand: 'Teekanne', rawName: 'Früchte-Mischung',
   });
-  assert.deepEqual(extractPhotoPrefill([logo, first, { ...second, photoIndex: 2 }]).prefill, { brand: 'TEEKANNE' });
+  assert.deepEqual(extractPhotoPrefill([logo, first, { ...second, photoIndex: 2 }]).prefill, { brand: 'Teekanne' });
 });
 
 test('category and subtype require explicit, unambiguous evidence', () => {
@@ -111,14 +111,14 @@ const dm = [
 
 test('Twinings excerpts yield brand, two-line product and contextual temperature without time or dose', () => {
   const result = extractPhotoPrefill(twinings);
-  assert.deepEqual(result.prefill, { brand: 'TWININGS', rawName: 'ENGLISH BREAKFAST', temperature: 100 });
+  assert.deepEqual(result.prefill, { brand: 'Twinings', rawName: 'English Breakfast', temperature: 100 });
   assert.equal(result.rejected.brewSeconds, 'unsupported_or_incomplete');
   assert.equal(result.rejected.dose, 'no_evidence');
 });
 
 test('dm excerpts recover the split name and complete range without guessing amBio or adopting 200 ml', () => {
   const result = extractPhotoPrefill(dm);
-  assert.deepEqual(result.prefill, { rawName: 'SCHWANGERSCHAFTSTEE', brewSeconds: 300 });
+  assert.deepEqual(result.prefill, { rawName: 'Schwangerschaftstee', brewSeconds: 300 });
   assert.deepEqual(result.evidence.brewSeconds[0].value, { min: 5, max: 6 });
 });
 
@@ -167,5 +167,48 @@ test('split dosage still requires a documented pairing and the supported bag rec
     [heading, { ...portion, text: '1 tea bag' }, reference],
     [heading, portion, { ...reference, photoIndex: 2 }],
     [portion, reference],
+  ]) assert.equal(extractPhotoPrefill(observations).prefill, null);
+});
+
+test('P3.2 preserves OCR evidence and tidies only the fields transferred to ADD', () => {
+  const observations = rows('Hersteller: DM BIO™', 'Produktname: FRÜCHTE-MISCHUNG® MIT ÄPFELN');
+  const original = structuredClone(observations);
+  const result = extractPhotoPrefill(observations);
+  assert.deepEqual(result.prefill, { brand: 'dmBio', rawName: 'Früchte-Mischung mit Äpfeln' });
+  assert.deepEqual(observations, original);
+  assert.equal(result.evidence.rawName[0].source.text, original[1].text);
+});
+
+test('P3.2 recognises complete Twinings title evidence outside the old logo rectangle', () => {
+  const [brand, first, second] = twinings;
+  const lowerLogo = { ...brand, boundingBox: { ...brand.boundingBox, x: 0.05, y: 0.49 }, confidence: 0.49 };
+  const title = { ...second, boundingBox: { ...second.boundingBox, y: 0.60, height: 0.035 } };
+  assert.deepEqual(extractPhotoPrefill([title, first, lowerLogo]).prefill,
+    { brand: 'Twinings', rawName: 'English Breakfast' });
+  assert.equal(extractPhotoPrefill([lowerLogo, first, { ...title, photoIndex: 2 }]).prefill, null);
+  assert.equal(extractPhotoPrefill([lowerLogo, first, { ...title, confidence: 0.3 }]).prefill, null);
+  assert.equal(extractPhotoPrefill([{ ...lowerLogo, text: 'TWINlNGS®' }, first, title]).prefill, null);
+  const conflict = extractPhotoPrefill([lowerLogo, first, title, ...rows('Hersteller: Other Brand')]);
+  assert.equal(conflict.prefill, null);
+});
+
+test('P3.2 reads dm preparation times with an explicit label or instruction and uses the lower bound', () => {
+  const heading = observation('Ziehzeit', 0.20, 0.53, 0.55, 0, 2);
+  const duration = observation('5–6 Minuten', 0.24, 0.37, 0.39, 1, 2);
+  assert.deepEqual(extractPhotoPrefill([...dm.slice(0, 3), heading, duration]).prefill,
+    { rawName: 'Schwangerschaftstee', brewSeconds: 300 });
+  assert.deepEqual(extractPhotoPrefill([heading, { ...duration, text: '4 Minuten' }]).prefill, { brewSeconds: 240 });
+  assert.deepEqual(extractPhotoPrefill(rows('5–6 Minuten ziehen.')).prefill, { brewSeconds: 300 });
+  assert.deepEqual(extractPhotoPrefill(rows('Zubereitung: 3–5 Minuten.')).prefill, { brewSeconds: 180 });
+  for (const observations of [
+    [duration],
+    [heading, { ...duration, photoIndex: 1 }],
+    [heading, { ...duration, text: '–6 Minuten' }],
+    [heading, duration, observation('Zutaten', 0.22, 0.45, 0.41, 2, 2)],
+    rows('Zutaten: Kräuter 5–6 Minuten ziehen lassen'),
+    rows('5–6 Minuten Genuss'),
+    rows('250 ml in 4 Minuten'),
+    rows('– 4 Minuten ziehen lassen'),
+    rows('Steep mountain freshness in 4 minutes'),
   ]) assert.equal(extractPhotoPrefill(observations).prefill, null);
 });

@@ -62,3 +62,26 @@ erst nach `No match found` vergleichen, die vorhandenen Defaults von
 unterscheiden und `ocrDurationMs` sowie `timings.prefillMs` dokumentieren.
 Die Temperatur bleibt offen, wenn die echten OCR-Boxen keinen gemeinsamen
 Zubereitungsblock bestätigen.
+
+## P3.2 · Lesbare Namen und beschriftete Ziehzeit
+
+Nur die Formularwerte werden formatiert. Der OCR-Text für die Diagnose
+bleibt erhalten. Bei Twinings genügt der belegte Markenname zusammen mit dem
+vollständigen Titel im selben Foto. Sind ENGLISH und BREAKFAST getrennt
+erkannt, müssen sie weiterhin räumlich zusammenpassen. Die Marke kann
+außerhalb des bisherigen Logobereichs stehen. Unvollständige oder
+widersprüchliche Identitäten bleiben von diesem Pfad ausgeschlossen.
+
+Eine explizite Ziehzeit kann als Textzeile, Anweisung oder separater
+Wert unter der passenden Beschriftung erkannt werden. Bei vollständig
+lesbaren Bereichen übernimmt das Formular die Untergrenze. Ein
+abgeschnittener Wert wie -4 min bleibt offen. Die übrigen Feldregeln gelten
+weiterhin.
+
+Beim Gerätetest Vorder- und Rückseite beider Packungen erneut aufnehmen.
+Nach „No match found“ im ADD-Formular für dmBio
+Schwangerschaftstee und 5 MIN prüfen. Für Twinings den Hersteller Twinings
+und den Produktnamen English Breakfast prüfen. Die Temperatur nur
+erwarten, wenn der Zubereitungsblock im Testlauf eindeutig erkannt wird.
+In den Xcode-Protokollen unter structuredPrefill.acceptedFields verifizieren,
+ob die Ziehzeit aus OCR stammt. Einen realen Katalogtreffer gegenprüfen.

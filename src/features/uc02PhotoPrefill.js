@@ -4,8 +4,26 @@ const productCue = /(?:tee|mischung|blend)\b|\b(?:tea|infusion|english breakfast
 const trademark = /^(\p{L}[\p{L}'’ -]{2,39}?)\s*[®™]$/u;
 const ingredientHeading = /^(?:zutaten|ingredients|ingredients list)\b/i;
 const nonProductCopy = /\b(?:bio|organic|premium|natürlich|genuss|qualität|quality|delicious|finest|tradition|traditional|original|aus kontrolliertem anbau|zutaten|ingredients|family owned|since|seit|company|limited|ltd|gmbh|visit|website|100%|the best)\b/iu;
-const stripMark = text => text.replace(/\s*[®™]$/u, '').trim();
-const inlineLogo = /^(dm\s*bio|teekanne|lebensbaum|sonnentor|alnatura|yogi tea)\s+(.+)$/iu;
+const stripMark = text => text.replace(/\s*[®™]+$/u, '').trim();
+const brandedDisplay = new Map([['dmbio', 'dmBio'], ['twinings', 'Twinings']]);
+
+function displayIdentity(value, isBrand = false) {
+  const text = value.replace(/\s*[®™]/gu, '').replace(/\s+/gu, ' ').trim();
+  if (isBrand) {
+    const brand = brandedDisplay.get(normalizeQuery(text).replace(/ /g, ''));
+    if (brand) return brand;
+  }
+  if (text === text.toLocaleLowerCase('de') || text === text.toLocaleUpperCase('de')) {
+    return text.toLocaleLowerCase('de').replace(/(^|[\s‐-])(\p{L})(\p{L}*)/gu, (_, separator, initial, rest) => {
+      const word = initial + rest;
+      return separator === ' ' && /^(?:and|of|the|mit|und|von|für)$/u.test(word)
+        ? separator + word : separator + initial.toLocaleUpperCase('de') + rest;
+    });
+  }
+  return text;
+}
+
+const inlineLogo = /^(dm\s*bio|teekanne|lebensbaum|sonnentor|alnatura|yogi tea|twinings)\s+(.+)$/iu;
 const logoText = new Set(['dm bio', 'dmbio', 'teekanne', 'lebensbaum', 'sonnentor', 'alnatura', 'yogi tea']);
 const categories = new Map(Object.entries(CATEGORY_LABELS).map(([key, label]) => [normalizeQuery(label), key]));
 for (const [key, text] of Object.entries({
@@ -44,8 +62,9 @@ function followsAboveLine(above, below) {
 }
 
 function heading(row) {
-  return !!row && /^[\p{L}][\p{L} &’'‐-]{2,79}$/u.test(row.text)
-    && !categories.has(normalizeQuery(row.text)) && !nonProductCopy.test(row.text);
+  const text = row && stripMark(row.text);
+  return !!text && /^[\p{L}][\p{L} &’'‐-]{2,79}$/u.test(text)
+    && !categories.has(normalizeQuery(text)) && !nonProductCopy.test(text);
 }
 
 function titleBelow(above, below) {
@@ -65,16 +84,45 @@ function titleBlock(first, rows) {
   if (following.length === 0) return productCue.test(first.text) ? { value: first.text, source: [first] } : null;
   if (following.length !== 1) return { value: null, source: [first, ...following] };
   const [second] = following;
-  const split = /[-‐]$/u.test(first.text);
+  const firstText = stripMark(first.text);
+  const secondText = stripMark(second.text);
+  const split = /[-‐]$/u.test(firstText);
   // A trailing hyphen can split a German derivational suffix, while a
   // hyphen between independently readable words stays (Früchte-Mischung).
-  const dividedWord = split && /^(?:schafts|tungs|heits|keits|ungs)\p{L}*tee$/iu.test(second.text);
-  const joined = dividedWord ? first.text.slice(0, -1) + second.text
-    : first.text + (split ? '' : ' ') + second.text;
+  const dividedWord = split && /^(?:schafts|tungs|heits|keits|ungs)\p{L}*tee$/iu.test(secondText);
+  const joined = dividedWord ? firstText.slice(0, -1) + secondText
+    : firstText + (split ? '' : ' ') + secondText;
   if (!productCue.test(first.text) && !categories.has(normalizeQuery(joined)) && productCue.test(joined)) {
     return { value: joined, source: [first, second] };
   }
   return productCue.test(first.text) || productCue.test(second.text) ? { value: null, source: [first, second] } : null;
+}
+
+function followsKnownTitle(first, second) {
+  if (titleBelow(first, second) || readBefore(first, second)) return true;
+  const a = first.boundingBox;
+  const b = second.boundingBox;
+  if (!validBox(a) || !validBox(b)) return false;
+  const gap = a.y - b.y - b.height;
+  const centerOffset = Math.abs(a.x + a.width / 2 - b.x - b.width / 2);
+  return gap >= 0 && gap <= 2 * Math.max(a.height, b.height) && centerOffset <= 0.10;
+}
+
+function twiningsBreakfast(rows) {
+  const candidates = [];
+  for (const brand of rows.filter(row => normalizeQuery(stripMark(row.text)) === 'twinings')) {
+    const onPack = rows.filter(row => row.photoIndex === brand.photoIndex && !inIngredients(row, rows));
+    if (!onPack.includes(brand)) continue;
+    const matches = text => onPack.filter(row => normalizeQuery(stripMark(row.text)) === text);
+    const full = matches('english breakfast');
+    const english = matches('english');
+    const breakfast = matches('breakfast');
+    if (full.length === 1) candidates.push([brand, full[0]]);
+    if (english.length === 1 && breakfast.length === 1 && followsKnownTitle(english[0], breakfast[0])) {
+      candidates.push([brand, english[0], breakfast[0]]);
+    }
+  }
+  return candidates;
 }
 
 function labelValues(rows, pattern, labels) {
@@ -86,19 +134,20 @@ function labelValues(rows, pattern, labels) {
 }
 
 function brewingTime(text) {
-  const label = /^(?:ziehzeit|brewing time)\b/i.test(text);
-  const instruction = /\b(?:ziehen lassen|steep|infuse)\b/i.test(text);
+  const label = /^(?:ziehzeit|brewing time|steeping time|zubereitung:|brewing instructions:)/i.test(text);
+  const instruction = /\b(?:ziehen(?: lassen)?|steep|infuse)\b/i.test(text);
   if (!label && !instruction) return undefined;
   const duration = '(\\d{1,2})(?:\\s*[-–—]\\s*(\\d{1,2}))?\\s*(?:min(?:uten|utes?)?\\.?)(?![\\p{L}\\d])';
   const pattern = label
-    ? new RegExp('^(?:ziehzeit|brewing time)\\s*:?\\s*' + duration + '$', 'iu')
-    : new RegExp('(?:^|\\s)(?:(?:steep|infuse)(?: for)?\\s+)?' + duration
-      + '(?:\\s+ziehen lassen)?[.!]?$', 'iu');
+    ? new RegExp('^(?:(?:ziehzeit|brewing time|steeping time)\\b\\s*:?|zubereitung:|brewing instructions:)\\s*' + duration + '[.!]?$', 'iu')
+    : new RegExp('(?:^|\\s)(?:(?:steep|infuse)(?: for)?\\s+' + duration + '|'
+      + duration + '\\s+ziehen(?: lassen)?)[.!]?$', 'iu');
   const match = text.match(pattern);
-  if (!match || (!label && /\d\s*(?:[-–—]|bis|to|oder|or)\s*$/i.test(text.slice(0, match.index)))) return null;
+  if (!match || (!label && /(?:[-–—]|\b(?:bis|to|oder|or))\s*$/i.test(text.slice(0, match.index)))) return null;
   if (!label && [...text.matchAll(/\d\s*min(?:uten|utes?)?\b/gi)].length !== 1) return null;
-  const min = Number(match[1]);
-  const max = Number(match[2] ?? match[1]);
+  const lower = match[1] ?? match[3];
+  const min = Number(lower);
+  const max = Number(match[2] ?? match[4] ?? lower);
   return min >= 1 && max >= min && max <= 30 ? { min, max } : null;
 }
 
@@ -123,6 +172,7 @@ const rangePrefix = /^(?:\d{1,2}|\d{1,2}\s*[-–—](?:\s*\d{1,2})?)$/u;
 const rangeFragment = /^(?:[-–—]|(?:[-–—]\s*)?\d{1,2}(?:\s*min(?:uten|utes?)?\.?)?|min(?:uten|utes?)?\.?)$/iu;
 const rangeWithUnit = /^\d{1,2}\s*[-–—]\s*\d{1,2}\s*min(?:uten|utes?)?\.?$/iu;
 const temperatureOnly = /^\d{2,3}\s*°\s*C$/iu;
+const timeHeading = /^(?:ziehzeit|brewing time|steeping time|zubereitung|preparation|brewing instructions)\s*:?$/iu;
 const unrelatedContext = /\b(?:lager(?:n|ung|hinweis)?|storage|store|serving temperature|serviertemperatur|abkühlen|cool down|zutaten|ingredients)\b/iu;
 
 function nearby(a, b) {
@@ -133,6 +183,20 @@ function nearby(a, b) {
   const overlap = Math.min(first.y + first.height, second.y + second.height) - Math.max(first.y, second.y);
   const gap = Math.max(first.x, second.x) - Math.min(first.x + first.width, second.x + second.width);
   return overlap >= Math.min(first.height, second.height) * 0.6 && gap >= -0.005 && gap <= 0.13;
+}
+
+function labelledTimeContext(heading, time, rows) {
+  if (!timeHeading.test(heading.text) || heading.photoIndex !== time.photoIndex) return false;
+  if (nearby(heading, time)) return true;
+  const a = heading.boundingBox;
+  const b = time.boundingBox;
+  if (!validBox(a) || !validBox(b)) return false;
+  const height = Math.max(a.height, b.height);
+  const gap = a.y - b.y - b.height;
+  const aligned = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) >= Math.min(a.width, b.width) / 2;
+  return aligned && gap > height && gap <= height * 3
+    && !rows.some(row => unrelatedContext.test(row.text) && row.photoIndex === time.photoIndex
+      && validBox(row.boundingBox) && row.boundingBox.y > b.y && row.boundingBox.y < a.y);
 }
 
 function readBefore(a, b) {
@@ -182,7 +246,8 @@ function readPreparation(rows) {
   const justified = row => !unrelated(row) && (independentContext.includes(row)
     || independentContext.some(other => nearby(other, row)) || strips.some(strip => strip.includes(row)));
   const brewTimeContext = row => justified(row)
-    || (!unrelated(row) && bagInstructions.some(bag => nearby(bag, row)));
+    || (!unrelated(row) && (bagInstructions.some(bag => nearby(bag, row))
+      || rows.some(heading => labelledTimeContext(heading, row, rows))));
 
   for (const row of rows) {
     if (doseOnly.test(row.text)) {
@@ -214,7 +279,7 @@ function readPreparation(rows) {
           && !/\d\s*[-–—]\s*\d+\s*°/u.test(text) ? value : null, source: row });
       }
     }
-    if (reconstructed.has(row)) continue;
+    if (reconstructed.has(row) || timeHeading.test(text) || unrelatedContext.test(text) || packaging.test(text)) continue;
     const time = minutes.test(text) && brewTimeContext(row) ? brewingTime('Ziehzeit: ' + text) : brewingTime(text);
     if (time !== undefined) times.push({ value: time, source: row });
   }
@@ -223,11 +288,12 @@ function readPreparation(rows) {
 
 /** Data and decisions are ephemeral. Only prefill belongs in the form. */
 export function extractPhotoPrefill(observations) {
-  const rows = (Array.isArray(observations) ? observations : []).filter(row =>
+  const acceptedRows = (Array.isArray(observations) ? observations : []).filter(row =>
     Number.isInteger(row?.photoIndex) && row.photoIndex > 0 && Number.isInteger(row.order) && row.order >= 0
-    && row.confidence >= 0.6 && row.confidence <= 1 && typeof row.text === 'string')
+    && row.confidence >= 0.35 && row.confidence <= 1 && typeof row.text === 'string')
     .map(row => ({ ...row, text: row.text.trim() })).filter(row => row.text)
     .sort((a, b) => a.photoIndex - b.photoIndex || a.order - b.order);
+  const rows = acceptedRows.filter(row => row.confidence >= 0.6);
   const prefill = {};
   const evidence = {};
   const rejected = {};
@@ -252,8 +318,9 @@ export function extractPhotoPrefill(observations) {
     return match && productCue.test(match[2]) && heading({ text: match[2] }) && !inIngredients(row, rows)
       ? [{ brand: match[1], name: match[2], source: row }] : [];
   });
-  const visualNames = [];
-  const visualBrands = [];
+  const exactBlocks = twiningsBreakfast(acceptedRows);
+  const visualNames = exactBlocks.map(source => ({ value: 'English Breakfast', source }));
+  const visualBrands = exactBlocks.map(source => ({ value: source[0].text, source }));
   for (const row of rows) {
     const known = logos.includes(row);
     const mark = row.text.match(trademark);
@@ -265,7 +332,7 @@ export function extractPhotoPrefill(observations) {
       && next.boundingBox.height >= row.boundingBox.height * 0.65);
     const block = headings.length === 1 ? titleBlock(headings[0], titleRows) : null;
     if (known || block?.value) visualBrands.push({ value: stripMark(row.text), source: row });
-    if (block) visualNames.push(block);
+    if (block?.value || (block && !exactBlocks.some(([brand]) => brand === row))) visualNames.push(block);
     else if (known && headings.length > 1) visualNames.push({ value: null, source: headings });
   }
   // A distinct, hyphenated tea name can stand on its own near the top of the
@@ -281,14 +348,14 @@ export function extractPhotoPrefill(observations) {
     ...brands.map(({ value, source }) => ({ value: value && stripMark(value), source })),
     ...visualBrands, ...quotedTitles.map(({ brand: value, source }) => ({ value, source })),
   ], value => normalizeQuery(value).replace(/ /g, ''));
-  if (brand) prefill.brand = brand;
+  if (brand) prefill.brand = displayIdentity(brand, true);
   const names = [
     ...labelValues(rows, identityLabel, ['teename', 'tea name', 'produktname', 'product name']),
     ...visualNames, ...quotedTitles.map(({ name: value, source }) => ({ value, source })),
   ];
   if (!brand && (brands.length || visualBrands.length)) names.push({ value: null, source: [...brands, ...visualBrands] });
   const name = assign('rawName', names, normalizeQuery);
-  if (name) prefill.rawName = name;
+  if (name) prefill.rawName = displayIdentity(name);
 
   const categoryLabels = labelValues(rows, otherLabel, ['kategorie', 'category']);
   const category = assign('category', [
