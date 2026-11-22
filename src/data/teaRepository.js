@@ -1,8 +1,11 @@
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { supabaseConfig, uc02IosEnabled } from './supabaseConfig.js';
 
 // Framework-independent V3 adapter, behavior based on app-v2/cloud.js.
 // For later migration: changing backend settings does not require React changes.
 const endpoint = supabaseConfig.url;
+const pilot = supabaseConfig.communityFunction === '/functions/v1/community-tea-v4';
+const pilotWriter = registerPlugin('FACIosPilot');
 const communityEndpoint = endpoint + (supabaseConfig.communityFunction ?? '/functions/v1/community-tea');
 // Keep builds compatible with the existing endpoint until the coordinated cutover.
 export const communityTeaV4 = uc02IosEnabled;
@@ -208,6 +211,12 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
       payload.previous_code_value = previousCode?.value ?? null;
     }
     if (data.photos !== undefined) payload.photos = data.photos;
+  }
+  if (pilot) {
+    if (Capacitor.getPlatform() !== 'ios') throw new Error('Pilot writes require the native iOS app.');
+    signal?.throwIfAborted();
+    const { status, body } = await pilotWriter.saveTea({ payload: JSON.stringify(payload) });
+    return readJson(new Response(body, { status }), 'Cloud saving failed');
   }
   const response = await fetchImpl(communityEndpoint, {
     method: 'POST',

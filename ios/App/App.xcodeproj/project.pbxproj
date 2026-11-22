@@ -12,6 +12,7 @@
 		FACCA1000000000000000004 /* RobotoMono-Medium.ttf in App Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000002; };
 		FACCA1000000000000000001 /* FACTeaCameraPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACCA1000000000000000002; };
 		FACCE3000000000000000001 /* FACVoiceTeaPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACCE3000000000000000002; };
+		FACCE5000000000000000001 /* FACIosPilotPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACCE5000000000000000002; };
 		FACCA1000000000000000003 /* RobotoMono-Regular.ttf in App Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000001; };
         FACA2B000000000000000003 /* OFL.txt in Activity Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000003 /* OFL.txt */; };
         FACA2B000000000000000002 /* RobotoMono-Medium.ttf in Activity Resources */ = {isa = PBXBuildFile; fileRef = FACA2A000000000000000002 /* RobotoMono-Medium.ttf */; };
@@ -50,6 +51,7 @@
         FAC010000000000000000001 /* uc01-timer.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "QuickAccess/uc01-timer.png"; sourceTree = "<group>"; };
 		FACCA1000000000000000002 /* FACTeaCameraPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACTeaCameraPlugin.swift; sourceTree = "<group>"; };
 		FACCE3000000000000000002 /* FACVoiceTeaPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACVoiceTeaPlugin.swift; sourceTree = "<group>"; };
+		FACCE5000000000000000002 /* FACIosPilotPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FACIosPilotPlugin.swift; sourceTree = "<group>"; };
         FACA2A000000000000000003 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fonts/OFL.txt"; sourceTree = "<group>"; };
         FACA2A000000000000000002 /* RobotoMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/RobotoMono-Medium.ttf"; sourceTree = "<group>"; };
         FACA2A000000000000000001 /* RobotoMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/RobotoMono-Regular.ttf"; sourceTree = "<group>"; };
@@ -116,6 +118,7 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				FACCA1000000000000000002 /* FACTeaCameraPlugin.swift */,
 				FACCE3000000000000000002 /* FACVoiceTeaPlugin.swift */,
+				FACCE5000000000000000002 /* FACIosPilotPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				FACA1A00000000000000000F /* AppIcon-512@2x.png */,
@@ -250,6 +253,7 @@
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				FACCA1000000000000000001 /* FACTeaCameraPlugin.swift in Sources */,
 				FACCE3000000000000000001 /* FACVoiceTeaPlugin.swift in Sources */,
+				FACCE5000000000000000001 /* FACIosPilotPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

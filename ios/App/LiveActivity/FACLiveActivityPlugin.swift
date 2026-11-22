@@ -14,6 +14,7 @@ final class FACBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(FACTeaCameraPlugin())
         bridge?.registerPluginInstance(FACQuickAccessPlugin())
         bridge?.registerPluginInstance(FACVoiceTeaPlugin())
+        bridge?.registerPluginInstance(FACIosPilotPlugin())
     }
 }
 

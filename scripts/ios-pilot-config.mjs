@@ -27,7 +27,7 @@ export async function verifyIosPilotBackend(fetchImpl = fetch) {
       .then(async response => {
         if (!response.ok) return false;
         const capability = await response.json();
-        return capability?.contract === 'fancy-a-cuppa/uc02-v4' && capability.pilotReady === true;
+        return capability?.contract === 'fancy-a-cuppa/uc02-v4-pilot-auth' && capability.pilotReady === true;
       }),
   ]);
   const [catalog, edge] = results.map(result => result.status === 'fulfilled' && result.value === true);

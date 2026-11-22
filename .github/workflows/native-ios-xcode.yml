@@ -33,6 +33,12 @@ on:
       - src/App.jsx
       - public/figma/uc02-*
       - tests/nativeLiveActivityPrototype.test.mjs
+      - ios/App/App/FACIosPilotPlugin.swift
+      - src/data/teaRepository.js
+      - supabase/functions/community-tea/**
+      - supabase/functions/community-tea-v4/**
+      - supabase/pilot/**
+      - tests/communityTeaCors.test.mjs
       - scripts/build-ios-pilot.mjs
       - scripts/ios-pilot-config.mjs
       - tests/iosPilotConfig.test.mjs
@@ -127,7 +133,7 @@ jobs:
             }
             if (target.pathname === '/rest/v1/teas') return Response.json([{ origin: 'curated', revision: 1 }]);
             if (target.pathname === '/functions/v1/community-tea-v4') {
-              return Response.json({ contract: 'fancy-a-cuppa/uc02-v4', pilotReady: true });
+              return Response.json({ contract: 'fancy-a-cuppa/uc02-v4-pilot-auth', pilotReady: true });
             }
             throw Error('Unexpected iOS Pilot fixture route');
           };

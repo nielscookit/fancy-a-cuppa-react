@@ -1,0 +1,217 @@
+import { parsePhotos, photoBucket, readLimitedText, sanitizePhoto, uuid } from "./photos.ts";
+
+// Browser and packaged iOS origins; never use a wildcard for write requests.
+const allowedOrigins = new Set(["https://nielscookit.github.io", "capacitor://localhost"]);
+const cors = {
+  "Access-Control-Allow-Origin": "https://nielscookit.github.io",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info",
+  "Content-Type": "application/json; charset=utf-8",
+  "Vary": "Origin"
+};
+export function createCommunityTeaHandler({ pilot = false } = {}) {
+  return async (req: Request) => {
+    const origin=req.headers.get("origin");
+    const headers={
+      ...cors,
+      "Access-Control-Allow-Origin": origin && allowedOrigins.has(origin)
+        ? origin : "https://nielscookit.github.io"
+    };
+    const reply=(body:unknown, status=200) =>
+      new Response(JSON.stringify(body),{status,headers});
+    if(req.method==="OPTIONS") {
+      if(origin && !allowedOrigins.has(origin)) return reply({error:"Origin not allowed"},403);
+      return new Response(null,{status:204,headers});
+    }
+    const url=Deno.env.get("SUPABASE_URL");
+    const secret=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const serviceHeaders = { "Content-Type": "application/json", apikey: secret ?? "", Authorization: "Bearer " + (secret ?? "") };
+    const rpc = (name: string, body: unknown) => fetch(url + "/rest/v1/rpc/" + name, {
+      method: "POST", headers: serviceHeaders, body: JSON.stringify(body),
+    });
+    if (pilot && req.method === "GET" && new URL(req.url).searchParams.get("capabilities") === "ios-pilot") {
+      let pilotReady = false;
+      if (url && secret && Deno.env.get("COMMUNITY_TEA_IOS_PILOT_READY") === "true") {
+        try {
+          // An invalid digest never matches a registry row. Verify the
+          // read-only authorization RPC exists before enabling pilot builds.
+          const probe = await rpc("community_tea_pilot_identity", { p_token_hash: "" });
+          pilotReady = probe.ok && await probe.json() === null;
+        } catch { /* The build stays closed if the backend is unreachable. */ }
+      }
+      return new Response(JSON.stringify({ contract: "fancy-a-cuppa/uc02-v4-pilot-auth", pilotReady }), {
+        status: pilotReady ? 200 : 503,
+        headers: { ...headers, "Cache-Control": "no-store" },
+      });
+    }
+    if(req.method!=="POST") return reply({error:"Method not allowed"},405);
+    if(origin && !allowedOrigins.has(origin)) return reply({error:"Origin not allowed"},403);
+    if(!url || !secret) return reply({error:"Backend unavailable"},503);
+    let data:Record<string,unknown>;
+    let raw: string;
+    try {
+      raw = await readLimitedText(req, 4205000);
+      data = JSON.parse(raw);
+      if (!data || Array.isArray(data) || typeof data !== "object") throw Error("format");
+    } catch (error) {
+      if (error instanceof RangeError) return reply({error:"Request too large"},413);
+      return reply({error:"Invalid JSON"},400);
+    }
+    const version4 = data.write_version === 4;
+    if (!version4 && raw.length > 5000) return reply({error:"Request too large"},413);
+    if (data.action === "photos") {
+      if (!version4 || typeof data.id !== "string" || !uuid.test(data.id)) return reply({error:"Invalid tea ID"},400);
+      try {
+        const result = await rpc("community_tea_photo_keys", { p_tea: data.id });
+        if (!result.ok) throw Error("Could not read photo keys");
+        const keys: string[] = await result.json();
+        if (!keys.length) return reply([]);
+        const signatures = await fetch(url + "/storage/v1/object/sign/" + photoBucket, {
+          method: "POST", headers: serviceHeaders, body: JSON.stringify({ paths: keys, expiresIn: 3600 }),
+        });
+        if (!signatures.ok) throw Error("Could not sign photos");
+        const signed = await signatures.json();
+        // The local Edge runtime uses a container URL for internal requests.
+        // Signed links must use the address reachable from the client.
+        const publicUrl = (Deno.env.get("COMMUNITY_TEA_PUBLIC_URL") || url).replace(/\/$/, "");
+        const photos = keys.map(key => {
+          const path = signed.find((item: {path: string}) => item.path === key)?.signedURL;
+          if (typeof path !== "string") throw Error("Missing photo signature");
+          return { key, url: publicUrl + "/storage/v1" + path };
+        });
+        return reply(photos);
+      } catch {
+        return reply({error:"Tea photos are temporarily unavailable."},503);
+      }
+    }
+    if (!version4 && data.action === undefined) data.action = "create";
+    const updateBarcode = version4 && data.action === "update_barcode";
+    const isUpdate = data.action === "update" || updateBarcode;
+    if (data.action !== "create" && !isUpdate) return reply({error:"Invalid action"},400);
+    // These fields are exclusively constructed by the server.
+    delete data.photo_keys;
+    delete data.uploaded_photo_keys;
+    delete data.request_fingerprint;
+    if (version4 && (typeof data.save_id !== "string" || !uuid.test(data.save_id)
+        || (isUpdate && (!Number.isSafeInteger(data.expected_revision)
+          || Number(data.expected_revision) < 1 || typeof data.id !== "string" || !uuid.test(data.id))))) {
+      return reply({error:"Invalid save ID or revision"},400);
+    }
+    let clientHash: string;
+    let tokenHash: string | undefined;
+    if (pilot) {
+      if (!version4 || Deno.env.get("COMMUNITY_TEA_IOS_PILOT_READY") !== "true") {
+        return reply({error:"Pilot writes are unavailable."},503);
+      }
+      const token = req.headers.get("x-fac-pilot-token") || "";
+      if (!/^[a-f0-9]{64}$/.test(token)) return reply({error:"Pilot write authorization required."},403);
+      tokenHash = await digest(token);
+      try {
+        const check = await rpc("community_tea_pilot_identity", { p_token_hash: tokenHash });
+        if (!check.ok) throw Error("Authorization check unavailable");
+        clientHash = await check.json();
+        if (!clientHash || !/^[a-f0-9]{64}$/.test(clientHash)) {
+          return reply({error:"Pilot write authorization required."},403);
+        }
+      } catch {
+        return reply({error:"Pilot authorization is temporarily unavailable."},503);
+      }
+    } else {
+      // Keep the existing installation-independent limits for local and legacy requests.
+      const ip=(req.headers.get("cf-connecting-ip") ||
+                req.headers.get("x-real-ip") ||
+                req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "").trim();
+      if(!ip || ip.length>100) return reply({error:"Client address unavailable"},503);
+      clientHash = await digest(ip+"|"+secret);
+    }
+    const uploaded: string[] = [];
+    async function discardUploads() {
+      if (!uploaded.length) return;
+      await fetch(url + "/storage/v1/object/" + photoBucket, {
+        method: "DELETE", headers: serviceHeaders, body: JSON.stringify({ prefixes: uploaded }),
+      }).catch(() => {});
+    }
+    if (version4) {
+      const hash = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(raw));
+      data.request_fingerprint = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2,"0")).join("");
+      if (data.photos !== undefined) {
+        let photos;
+        try { photos = parsePhotos(data.photos); }
+        catch { return reply({error:"Invalid photos. Use up to three JPEG files, each up to 1 MiB."},400); }
+        const newCount = photos.filter(photo => "bytes" in photo).length;
+        if (newCount) {
+          try {
+            const quota = await rpc("reserve_community_photo_upload", {p_client_hash:clientHash,p_count:newCount});
+            if (!quota.ok) {
+              const failure = await quota.json().catch(() => ({}));
+              return String(failure.message).includes("Daily photo")
+                ? reply({error:"Today's photo upload limit reached."},429)
+                : reply({error:"Photo uploads are temporarily unavailable."},503);
+            }
+          } catch { return reply({error:"Photo uploads are temporarily unavailable."},503); }
+        }
+        const keys = [];
+        for (const photo of photos) {
+          if ("key" in photo) { keys.push(photo.key); continue; }
+          let image;
+          try { image = sanitizePhoto(photo.bytes); }
+          catch {
+            await discardUploads();
+            return reply({error:"Invalid or oversized JPEG photo."},400);
+          }
+          const key = "community/" + crypto.randomUUID() + ".jpg";
+          uploaded.push(key);
+          try {
+            const upload = await fetch(url + "/storage/v1/object/" + photoBucket + "/" + key, {
+              method: "POST", headers: { ...serviceHeaders, "Content-Type":"image/jpeg" }, body: new Uint8Array(image).buffer,
+            });
+            if (!upload.ok) throw Error("Upload failed");
+          } catch {
+            await discardUploads();
+            return reply({error:"Photo upload failed. Your changes were not saved."},503);
+          }
+          keys.push(key);
+        }
+        data.photo_keys = keys;
+        data.uploaded_photo_keys = uploaded;
+      }
+    }
+    delete data.photos;
+    let result: Response;
+    try {
+      const name = updateBarcode ? "update_community_tea_barcode"
+        : isUpdate ? "update_community_tea" : "add_community_tea";
+      result = tokenHash
+        ? await rpc("community_tea_pilot_save", { p_data: data, p_token_hash: tokenHash })
+        : await rpc(name, { p_data: data, p_client_hash: clientHash });
+    } catch {
+      // Storage and Postgres do not share a transaction. A lost response could
+      // follow a committed save. Keep the objects and allow an idempotent retry.
+      return reply({error:"Save could not be confirmed. Try the same save again."},503);
+    }
+    const payload=await result.json().catch(()=>null);
+    if (!payload || result.status >= 500) {
+      return reply({error:"Save could not be confirmed. Try the same save again."},503);
+    }
+    if (payload.replayed || !result.ok) await discardUploads();
+    if(!result.ok){
+      const msg=String(payload.message||"Could not save tea");
+      if (result.status === 403) return reply({error:"Pilot write authorization required."},403);
+      if(msg.includes("Curated tea is read-only")) return reply({error:"This editorial tea is read-only."},403);
+      if(msg.includes("Tea revision conflict") || msg.includes("Tea barcode conflict")) return reply({error:"This tea was updated elsewhere. Reopen it before saving."},409);
+      if(msg.includes("save identity conflict")) return reply({error:"This save ID was already used for different changes."},409);
+      if(msg.includes("Daily submission limit")) return reply({error:"Today's entry limit reached. Try again tomorrow."},429);
+      if(msg.includes("duplicate key")) return reply({error:"Product code already exists."},409);
+      if(msg.startsWith("Invalid")) return reply({error:msg},400);
+      if(msg.includes("not found")) return reply({error:"Tea not found."},404);
+      if(msg.includes("belongs to another")) return reply({error:msg},409);
+      return reply({error:"Tea could not be saved"},500);
+    }
+    return reply(payload,200);
+  };
+}
+
+async function digest(input: string) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2,"0")).join("");
+}

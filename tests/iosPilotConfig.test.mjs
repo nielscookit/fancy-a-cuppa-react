@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { verifyIosPilotBackend } from '../scripts/ios-pilot-config.mjs';
 import { supabaseConfig } from '../src/data/supabaseConfig.js';
 
-const ready = { contract: 'fancy-a-cuppa/uc02-v4', pilotReady: true };
+const ready = { contract: 'fancy-a-cuppa/uc02-v4-pilot-auth', pilotReady: true };
 const catalog = () => Response.json([{ origin: 'curated', revision: 1 }]);
 
 test('iOS Pilot checks the production catalog and explicit V4 readiness with GET only', async () => {

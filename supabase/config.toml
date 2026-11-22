@@ -3,3 +3,8 @@
 [functions.tea-push]
 verify_jwt = false
 entrypoint = "./functions/tea-push/index.js"
+
+# Separate deployment; the handler requires a registered iOS installation for writes.
+[functions.community-tea-v4]
+verify_jwt = false
+entrypoint = "./functions/community-tea-v4/index.ts"

@@ -4,10 +4,10 @@ import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 
-const source = stripTypeScriptTypes(readFileSync('supabase/functions/community-tea/index.ts','utf8')
-  .replace(/^import .*\n/, ''));
+const source = stripTypeScriptTypes(readFileSync('supabase/functions/community-tea/handler.ts','utf8')
+  .replace(/^import .*\n/, '').replace('export function', 'function'));
 let handler;
-runInNewContext(source,{
+runInNewContext(source + '\nDeno.serve(createCommunityTeaHandler());',{
   Deno:{
     serve(callback){handler=callback;},
     env:{get(){return undefined;}},
@@ -55,7 +55,7 @@ test('unapproved POST remains rejected',async()=>{
 
 function mockSave(fetchImpl, overrides = {}) {
   let saveHandler;
-  runInNewContext(source, {
+  runInNewContext(source + '\nDeno.serve(createCommunityTeaHandler());', {
     Deno: { serve(callback) { saveHandler = callback; }, env: { get: () => 'https://backend.test' } },
     Response, TextEncoder, crypto: globalThis.crypto,
     fetch: fetchImpl,
@@ -121,7 +121,7 @@ test('local signed photo links use the configured public URL instead of the runt
     SUPABASE_SERVICE_ROLE_KEY: 'fixture',
     COMMUNITY_TEA_PUBLIC_URL: 'http://127.0.0.1:54321/',
   };
-  runInNewContext(source, {
+  runInNewContext(source + '\nDeno.serve(createCommunityTeaHandler({ pilot: true }));', {
     Deno: { serve(callback) { photoHandler = callback; }, env: { get: key => values[key] } },
     Response, uuid: /^[0-9a-f-]{36}$/, photoBucket: 'community-tea-photos',
     readLimitedText: request => request.text(),
@@ -159,23 +159,100 @@ test('barcode edits use the dedicated version-4 RPC and conflicts return 409', a
 });
 
 test('the iOS Pilot readiness route defaults to closed and never calls the backend', async () => {
-  const response = await handler(new Request(url + '?capabilities=ios-pilot'));
+  const pilotHandler = runInNewContext(source + '\ncreateCommunityTeaHandler({ pilot: true });', {
+    Deno: { env: { get: () => undefined } }, Response, URL,
+  });
+  const response = await pilotHandler(new Request(url + '?capabilities=ios-pilot'));
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(await response.json(), { contract: 'fancy-a-cuppa/uc02-v4', pilotReady: false });
+  assert.deepEqual(await response.json(), { contract: 'fancy-a-cuppa/uc02-v4-pilot-auth', pilotReady: false });
 });
 
 test('the iOS Pilot readiness route reports only the explicitly released contract', async () => {
   let pilotHandler;
-  runInNewContext(source, {
+  runInNewContext(source + '\nDeno.serve(createCommunityTeaHandler({ pilot: true }));', {
     Deno: {
       serve(callback) { pilotHandler = callback; },
-      env: { get(key) { return key === 'COMMUNITY_TEA_IOS_PILOT_READY' ? 'true' : undefined; } },
+      env: { get(key) { return key === 'COMMUNITY_TEA_IOS_PILOT_READY' ? 'true' : 'https://backend.test'; } },
     },
     Response, URL,
-    fetch() { throw new Error('Readiness must not call RPC or Storage'); },
+    fetch(target, options) {
+      assert.match(target, /community_tea_pilot_identity$/);
+      assert.deepEqual(JSON.parse(options.body), { p_token_hash: '' });
+      return Response.json(null);
+    },
   });
   const response = await pilotHandler(new Request(url + '?capabilities=ios-pilot'));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { contract: 'fancy-a-cuppa/uc02-v4', pilotReady: true });
+  assert.deepEqual(await response.json(), { contract: 'fancy-a-cuppa/uc02-v4-pilot-auth', pilotReady: true });
+});
+
+function callPilotWrite(fetchImpl, { action = 'create', token, ready = true, data = {} } = {}) {
+  const pilotHandler = runInNewContext(source + '\ncreateCommunityTeaHandler({ pilot: true });', {
+    Deno: { env: { get: key => key === 'COMMUNITY_TEA_IOS_PILOT_READY' ? String(ready) : 'https://backend.test' } },
+    Response, URL, TextEncoder, crypto: globalThis.crypto, fetch: fetchImpl,
+    uuid: /^[0-9a-f-]{36}$/, photoBucket: 'community-tea-photos',
+    readLimitedText: req => req.text(),
+    parsePhotos: () => { throw new Error('Photos must not be parsed before authorization'); },
+  });
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['x-fac-pilot-token'] = token;
+  return pilotHandler(new Request(url.replace('community-tea', 'community-tea-v4'), {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      action, write_version: 4, expected_revision: 1,
+      id: '00000000-0000-4000-8000-000000000001',
+      save_id: '00000000-0000-4000-8000-000000000002',
+      ...data,
+    }),
+  }));
+}
+
+test('pilot checks installation permission before photos or any mutation', async () => {
+  const denyFetch = () => assert.fail('Missing token must not invoke the backend');
+  for (const action of ['create', 'update', 'update_barcode']) {
+    assert.equal((await callPilotWrite(denyFetch, { action, data: { photos: [{}] } })).status, 403);
+  }
+  assert.equal((await callPilotWrite(denyFetch, { ready: false, token: 'a'.repeat(64) })).status, 503);
+  assert.equal((await callPilotWrite(denyFetch, { token: 'a'.repeat(64), data: { write_version: 3 } })).status, 503);
+
+  let calls = 0;
+  const revoked = await callPilotWrite(async target => {
+    calls++;
+    assert.match(target, /community_tea_pilot_identity$/);
+    return Response.json(null);
+  }, { token: 'a'.repeat(64), data: { photos: [{}] } });
+  assert.equal(revoked.status, 403);
+  assert.equal(calls, 1);
+});
+
+test('pilot uses a hash and rechecks authorization in the save transaction', async () => {
+  const token = 'a'.repeat(64);
+  let attemptedHash;
+  const calls = [];
+  const response = await callPilotWrite(async (target, options) => {
+    assert.ok(!JSON.stringify(options).includes(token));
+    const input = JSON.parse(options.body);
+    calls.push(target.split('/').at(-1));
+    if (!attemptedHash) {
+      attemptedHash = input.p_token_hash;
+      assert.match(attemptedHash, /^[0-9a-f]{64}$/);
+      return Response.json('b'.repeat(64));
+    }
+    assert.equal(input.p_token_hash, attemptedHash);
+    assert.equal(input.p_data.action, 'update_barcode');
+    assert.equal(input.p_data.photo_keys, undefined);
+    return Response.json({ message: 'Pilot write authorization required' }, { status: 403 });
+  }, { token, action: 'update_barcode', data: { photo_keys: ['untrusted'] } });
+  assert.deepEqual(calls, ['community_tea_pilot_identity', 'community_tea_pilot_save']);
+  assert.equal(response.status, 403);
+});
+
+test('pilot published photo read stays accessible without write permission', async () => {
+  const response = await callPilotWrite(async target => {
+    assert.match(target, /community_tea_photo_keys$/);
+    return Response.json([]);
+  }, { ready: false, action: 'photos' });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), []);
 });
