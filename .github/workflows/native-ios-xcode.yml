@@ -28,6 +28,7 @@ on:
       - src/features/voiceTeaIntent.js
       - tests/voiceTea.test.mjs
       - src/features/teaModel.js
+      - src/components/TeaImageGallery.jsx
       - src/components/TeaEditor.jsx
       - src/components/tea-sheet.css
       - src/App.jsx

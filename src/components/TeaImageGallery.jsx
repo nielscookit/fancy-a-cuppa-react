@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import { getTeaProductImage } from '../data/teaProductImages.js';
-import { communityTeaV4, listCommunityTeaPhotos } from '../data/teaRepository.js';
+import { communityTeaV4, pilotCatalogEditing, listCommunityTeaPhotos } from '../data/teaRepository.js';
 import './tea-image-gallery.css';
 
 /** Mounted per tea: category remains visible until the external image has decoded. */
@@ -11,12 +11,18 @@ export default function TeaImageGallery({tea,children}) {
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(false);
   const gesture=useRef(null),suppress=useRef(false);
-  const community = communityTeaV4 && tea.origin === 'community';
+  const community = communityTeaV4 && (tea.origin === 'community' || pilotCatalogEditing);
   useEffect(() => {
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), 8000);
-    const request = community ? listCommunityTeaPhotos(tea.id, { signal: ac.signal })
-      : getTeaProductImage(tea.id, { signal: ac.signal }).then(image => image ? [image] : []);
+    const external = () => getTeaProductImage(tea.id, { signal: ac.signal }).then(image => image ? [image] : []);
+    const request = community
+      ? listCommunityTeaPhotos(tea.id, { signal: ac.signal }).then(async photos => {
+        if (tea.origin === 'community') return photos;
+        // Keep the selected catalog packaging alongside pilot-added photos.
+        return [...await external().catch(() => []), ...photos];
+      })
+      : external();
     request.then(items => {
       if (!ac.signal.aborted) {
         setImages(items);
