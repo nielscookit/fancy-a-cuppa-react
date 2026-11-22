@@ -35,7 +35,7 @@ export function parseRoleSetting(name, source) {
   if (!allowedSettings.has(name)) throw Error('Nicht erlaubte Rolleneinstellung: ' + name);
   const tokens = settingTokens(source);
   if (name === 'search_path') {
-    const paths = tokens.flatMap(token => token === '' ? [] : token.split(',').map(part => part.trim()));
+    const paths = tokens.flatMap(token => token === '' || token === '""' ? [] : token.split(',').map(part => part.trim()));
     const schemas = paths.map(path => {
       if (path === '"$user"') return '$user';
       if (/^"[A-Za-z_][A-Za-z0-9_]*"$/.test(path)) return path.slice(1, -1);
@@ -256,11 +256,19 @@ export async function main() {
     report.steps.push('Cutover atomar erfolgreich; alle Bestandsdaten und Katalog-Leserechte erhalten; direkte Client-RPCs gesperrt');
     stage='Rolleneinstellungen wiederherstellen';
     if (roles.settings.length) {
-      pg('postgres','begin;\n'+roles.settings.map(setting=>
-        'alter role '+q(setting.role)+' set '+setting.name+' to '+literal(setting.value)+';').join('\n')+'\ncommit;');
+      pg('postgres','begin;\n'+roles.settings.map(setting => {
+        const value = setting.name === 'search_path' && setting.value ? setting.value
+          : setting.name === 'session_preload_libraries' && setting.libraries.length
+            ? setting.libraries.map(literal).join(', ') : literal(setting.value);
+        return 'alter role '+q(setting.role)+' set '+setting.name+' to '+value+';';
+      }).join('\n')+'\ncommit;');
       const restoredSettings=rows('postgres', "select coalesce(json_agg(json_build_object('role',r.rolname,'config',s.setconfig)),'[]') from pg_db_role_setting s join pg_roles r on r.oid=s.setrole where s.setdatabase=0;");
       for(const setting of report.roleSettings) {
-        if(!restoredSettings.some(row=>row.role===setting.role && row.config.includes(setting.name+'='+setting.value))) {
+        const stored=restoredSettings.find(row=>row.role===setting.role)?.config
+          .find(value=>value.startsWith(setting.name+'='));
+        // PostgreSQL normalizes quoting and whitespace in list-valued GUCs.
+        // Parse the stored list under the same rules before comparing meaning.
+        if(stored===undefined || parseRoleSetting(setting.name,literal(stored.slice(setting.name.length+1))).value!==setting.value) {
           throw Error('Rolleneinstellung wurde nicht originalgetreu gespeichert: '+setting.role+'.'+setting.name);
         }
         setting.status='restored_and_verified';
