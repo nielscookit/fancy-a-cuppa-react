@@ -23,9 +23,19 @@ export function parseRoles(source) {
       attributes.set(nameOf(m), options);
       continue;
     }
-    m = line.match(new RegExp('^GRANT '+identifier+' TO '+identifier+'( WITH ADMIN OPTION)?(?: GRANTED BY '+identifier+')?;$'));
+    const grantor = line.match(/ GRANTED BY ("?[a-z_][a-z0-9_]*"?);$/)?.[1].replaceAll('"','');
+    const grant = line.replace(/ GRANTED BY ("?[a-z_][a-z0-9_]*"?);$/, ';');
+    m = grant.match(new RegExp('^GRANT '+identifier+' TO '+identifier+'(?: WITH (.+))?;$'));
     if (m) {
-      memberships.push({ role:m[1]||m[2], member:m[3]||m[4], admin:Boolean(m[5]), grantor:m[6]||m[7] });
+      const options=m[5];
+      if (options && options!=='ADMIN OPTION') {
+        const parts=options.split(/,\s*/);
+        if(!parts.every(option=>/^(?:ADMIN|INHERIT|SET) (?:TRUE|FALSE)$/.test(option))
+          || new Set(parts.map(option=>option.split(' ')[0])).size!==parts.length) {
+          throw Error('Nicht unterstützte Mitgliedschaftsoptionen.');
+        }
+      }
+      memberships.push({role:m[1]||m[2],member:m[3]||m[4],options,grantor});
       continue;
     }
     throw Error('Nicht unterstützte Anweisung im Rollenexport. Kein Rollen-SQL ausgeführt.');
@@ -125,7 +135,7 @@ export async function main() {
       if(name!=='postgres' && !existing.includes(name)) pg('postgres','create role '+q(name)+';');
       if(name!=='postgres' && roles.attributes.has(name)) pg('postgres','alter role '+q(name)+' with '+roles.attributes.get(name).join(' ')+';');
     }
-    for(const m of roles.memberships) pg('postgres','grant '+q(m.role)+' to '+q(m.member)+(m.admin?' with admin option':'')+(m.grantor?' granted by '+q(m.grantor):'')+';');
+    for(const m of roles.memberships) pg('postgres','grant '+q(m.role)+' to '+q(m.member)+(m.options?' with '+m.options:'')+(m.grantor?' granted by '+q(m.grantor):'')+';');
     report.limitations.push('Bootstrap-Rolle postgres bleibt lokaler Superuser. Rollenpasswörter, externe Dienste und Betriebssystemkonfiguration sind nicht Bestandteil dieses Nachweises.');
     const suffix=randomBytes(6).toString('hex');
     for(const label of ['baseline','cutover']) {

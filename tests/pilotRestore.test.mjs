@@ -18,7 +18,7 @@ test('restore parses password-free roles and reconstructs only allowed SQL', () 
   const parsed=parseRoles(roleExport);
   assert.equal(parsed.names.length,4);
   assert.ok(parsed.attributes.get('service_role').includes('BYPASSRLS'));
-  assert.deepEqual(parsed.memberships,[{role:'anon',member:'authenticator',admin:false,grantor:'service_role'}]);
+  assert.deepEqual(parsed.memberships,[{role:'anon',member:'authenticator',options:undefined,grantor:'service_role'}]);
 });
 test('restore rejects secrets, injected SQL, role settings and unknown attributes before execution', () => {
   for(const extra of [
@@ -43,4 +43,12 @@ test('restore accepts only the explicitly isolated container', () => {
     {...safe,Mounts:[{Type:'bind',Source:'/Users/stephan'}]},
     {...safe,NetworkSettings:{Networks:{none:{},bridge:{}}}},
   ]) assert.throws(()=>validateContainer(changed));
+});
+
+test('restore validates PostgreSQL 17 membership options and built-in role references', () => {
+  const parsed=parseRoles(roleExport+'GRANT pg_read_all_data TO authenticated WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY service_role;');
+  assert.equal(parsed.memberships[1].options,'ADMIN FALSE, INHERIT TRUE, SET TRUE');
+  for(const options of ['ADMIN TRUE; DROP ROLE anon','INHERIT TRUE, INHERIT FALSE','SET TRUE WITH ADMIN OPTION']) {
+    assert.throws(()=>parseRoles(roleExport+'GRANT anon TO authenticated WITH '+options+';'));
+  }
 });
