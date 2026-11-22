@@ -182,3 +182,18 @@ test('voice search opens the existing search with an empty or explicit query, ne
   assert.equal(routeVoiceTeaIntent(resolveVoiceTeaIntent(['Find tea', 'Scan tea'], catalog), actions), false);
   assert.deepEqual(calls, ['', '', '', '', '', 'Assam Morning Tea', 'Grüntee']);
 });
+
+test('native voice plays the bundled cue before capture and cancels it with the session', async () => {
+  const { readFile, stat } = await import('node:fs/promises');
+  const swift = await readFile('ios/App/App/FACVoiceTeaPlugin.swift', 'utf8');
+  const project = await readFile('ios/App/App.xcodeproj/project.pbxproj', 'utf8');
+  assert.ok((await stat('ios/App/App/FACVoiceStart.mp3')).size > 0);
+  const reference = project.match(/(\w+) \/\* FACVoiceStart\.mp3 in Resources \*\/ = \{isa = PBXBuildFile; fileRef = (\w+)\b/);
+  assert.ok(reference);
+  assert.match(project, new RegExp(reference[2] + ' /\\* FACVoiceStart\\.mp3 \\*/ = \\{isa = PBXFileReference;'));
+  assert.match(project, new RegExp('files = \\(\\s*(?:[^\\n]*\\n)*?\\s*' + reference[1] + ' /\\* FACVoiceStart\\.mp3 in Resources \\*/,'));
+  assert.match(swift, /self\.playStartSound\(call\)/);
+  assert.match(swift, /player\.numberOfLoops = 0[\s\S]*?player\.play\(\)/);
+  assert.match(swift, /func audioPlayerDidFinishPlaying[\s\S]*?guard self\.startSound === player, let call = self\.pending[\s\S]*?guard flag[\s\S]*?"start sound end"\)[\s\S]*?self\.start\(call\)/);
+  assert.match(swift, /private func finish[\s\S]*?startSound = nil[\s\S]*?player\.stop\(\)/);
+});

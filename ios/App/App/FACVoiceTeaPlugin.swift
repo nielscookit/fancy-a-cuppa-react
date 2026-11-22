@@ -4,7 +4,7 @@ import Speech
 import UIKit
 
 @objc(FACVoiceTeaPlugin)
-final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
+final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegate {
     let identifier = "FACVoiceTeaPlugin"
     let jsName = "FACVoiceTea"
     var pluginMethods: [CAPPluginMethod] {
@@ -51,6 +51,7 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
     private var recordings: [Recognition] = []
     private var unresolved: Set<String> = []
     private var transcripts: [String] = []
+    private var startSound: AVAudioPlayer?
     private var engine: AVAudioEngine?
     private var originalAudio: (AVAudioSession.Category, AVAudioSession.Mode, AVAudioSession.CategoryOptions)?
     private var audioActive = false
@@ -90,7 +91,7 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
                         DispatchQueue.main.async {
                             guard let self, self.pending === call else { return }
                             guard microphone else { self.finish("PERMISSION"); return }
-                            self.start(call)
+                            self.playStartSound(call)
                         }
                     }
                 }
@@ -119,17 +120,55 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
             .filter { $0.isAvailable && $0.supportsOnDeviceRecognition }
     }
 
-    private func start(_ call: CAPPluginCall) {
+    private func playStartSound(_ call: CAPPluginCall) {
         guard UIApplication.shared.applicationState != .background else { finish("CANCELLED"); return }
-        let recognizers = recognizers()
-        guard !recognizers.isEmpty else { finish("UNAVAILABLE"); return }
+        guard !recognizers().isEmpty,
+              let url = Bundle.main.url(forResource: "FACVoiceStart", withExtension: "mp3") else {
+            finish("UNAVAILABLE")
+            return
+        }
         let session = AVAudioSession.sharedInstance()
-        let audio = AVAudioEngine()
         originalAudio = (session.category, session.mode, session.categoryOptions)
         do {
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
             try session.setActive(true)
             audioActive = true
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.delegate = self
+            player.numberOfLoops = 0
+            startSound = player
+            guard player.play() else { finish("UNAVAILABLE"); return }
+            log(call, "start sound begin")
+        } catch {
+            let failure = error as NSError
+            log(call, "start sound failed domain=\(failure.domain) code=\(failure.code)")
+            finish("UNAVAILABLE")
+        }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        DispatchQueue.main.async {
+            guard self.startSound === player, let call = self.pending else { return }
+            self.startSound = nil
+            guard flag else { self.finish("UNAVAILABLE"); return }
+            self.log(call, "start sound end")
+            self.start(call)
+        }
+    }
+
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        DispatchQueue.main.async {
+            guard self.startSound === player else { return }
+            self.finish("UNAVAILABLE")
+        }
+    }
+
+    private func start(_ call: CAPPluginCall) {
+        guard UIApplication.shared.applicationState != .background else { finish("CANCELLED"); return }
+        let recognizers = recognizers()
+        guard !recognizers.isEmpty else { finish("UNAVAILABLE"); return }
+        let audio = AVAudioEngine()
+        do {
             let input = audio.inputNode
             let format = input.outputFormat(forBus: 0)
             guard format.sampleRate > 0, format.channelCount > 0 else { finish("UNAVAILABLE"); return }
@@ -215,6 +254,12 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
     private func finish(_ error: String? = nil) {
         guard let call = pending else { return }
         pending = nil
+        if let player = startSound {
+            startSound = nil
+            player.delegate = nil
+            player.stop()
+            log(call, "start sound interrupted")
+        }
         if engine != nil { log(call, "capture end reason=\(error ?? "finalised")") }
         log(call, "session end status=\(error ?? "complete") finalCount=\(transcripts.count) pendingLocales=\(unresolved.sorted().joined(separator: ","))")
         stopInput()
