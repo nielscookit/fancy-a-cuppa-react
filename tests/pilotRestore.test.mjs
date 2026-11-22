@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parseRoles, parseRoleSetting, validateContainer } from '../scripts/verify-pilot-restore.mjs';
+import { parseRoles, parseRoleSetting, readEscapeLiteral, validateContainer } from '../scripts/verify-pilot-restore.mjs';
 
 const roleExport = `-- PostgreSQL database cluster dump
 SET default_transaction_read_only = off;
@@ -93,4 +93,52 @@ test('role defaults reject expressions, injected settings, library paths and uns
   assert.throws(()=>parseRoles(roleExport+"ALTER ROLE missing SET lock_timeout TO '0';"),/Rollenreferenz/);
   assert.throws(()=>parseRoles(roleExport+"ALTER ROLE anon SET lock_timeout TO '0'; ALTER ROLE anon LOGIN;"));
   assert.throws(()=>parseRoles(roleExport+"ALTER ROLE anon SET lock_timeout TO '0';\nALTER ROLE anon SET lock_timeout TO '0';"),/Doppelte/);
+});
+
+test('production E-prefixed search_path syntax preserves schema order and user substitution', () => {
+  const actualSyntax = String.raw`E'\"$user\", public, extensions'`;
+  assert.equal(parseRoleSetting('search_path', actualSyntax).value,'"$user", "public", "extensions"');
+  const parsed=parseRoles(roleExport+"CREATE ROLE postgres;\nALTER ROLE postgres SET search_path TO "+actualSyntax+";");
+  assert.equal(parsed.settings[0].role,'postgres');
+  assert.equal(parsed.settings[0].value,'"$user", "public", "extensions"');
+  assert.equal(parseRoleSetting('search_path', String.raw`e'\u0070ublic', E'extensions'`).value,'"public", "extensions"');
+});
+test('PostgreSQL escape decoding handles quotes, bytes, Unicode and literal backslashes', () => {
+  for(const [source, expected] of [
+    [String.raw`E'it\'s'`, "it's"],
+    [String.raw`E'it''s'`, "it's"],
+    [String.raw`E'a\\b'`, 'a\\b'],
+    [String.raw`E'\b\f\n\r\t'`, '\b\f\n\r\t'],
+    [String.raw`E'\160\x75blic'`, 'public'],
+    [String.raw`E'\xc3\xa4'`, 'ä'],
+    [String.raw`E'\u00e4\U000000df'`, 'äß'],
+    [String.raw`E'\uD83D\uDE00'`, '😀'],
+    [String.raw`E'\U0000D83D\U0000DE00'`, '😀'],
+    [String.raw`E'\public'`, 'public'],
+    [String.raw`E'\xzz'`, 'xzz'],
+  ]) {
+    const result=readEscapeLiteral(source);
+    assert.equal(result.value,expected,source);
+    assert.equal(result.length,source.length);
+  }
+});
+test('escape literals cannot inject SQL, bypass setting validation or carry invalid encoding', () => {
+  for(const source of [
+    String.raw`E'public'; DROP ROLE anon`,
+    String.raw`E'public' || 'extensions'`,
+    String.raw`E'public\x3b DROP ROLE anon'`,
+    String.raw`E'public\047; DROP ROLE anon; --'`,
+    String.raw`E'public' /* comment */`,
+    String.raw`E'public\000'`,
+    String.raw`E'public\x00'`,
+    String.raw`E'public\u0000'`,
+    String.raw`E'public\xff'`,
+    String.raw`E'\uD800'`,
+    String.raw`E'\uDC00'`,
+    String.raw`E'\U00110000'`,
+    String.raw`E'\u12'`,
+    String.raw`E'public\'`,
+  ]) assert.throws(()=>parseRoleSetting('search_path',source),source);
+  assert.throws(()=>parseRoles(roleExport+String.raw`ALTER ROLE anon PASSWORD E'secret';`),/PASSWORD/);
+  assert.throws(()=>parseRoleSetting('unknown_setting',String.raw`E'on'`));
 });

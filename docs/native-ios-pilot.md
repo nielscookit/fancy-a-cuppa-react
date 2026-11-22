@@ -167,3 +167,11 @@ Alle Settings werden nach dem Daten-/Cutover-Vergleich gemeinsam in einer Transa
 PostgreSQL übernimmt Rollen-Defaults bei einer neuen Anmeldung. SET ROLE lädt diese Defaults nicht erneut. Der Nachweis prüft deshalb gespeicherte Rollenwerte und separat die Katalogrechte; er bestätigt keine produktive PostgREST-/Supabase-Session-Konfiguration. Ein echter Mac-Restore ist weiterhin erforderlich. Das ursprüngliche Produktionsrollenfile liegt hier nicht vor; die neue Fixture enthält 15 repräsentative Einstellungen aus den genannten Gruppen. CI testet zusätzlich Read-only und einen eingeschränkten search_path der Bootstrap-Rolle sowie die Wiederholung des gesamten Restores.
 
 Für den lokalen Nachtest bleibt es bei einem Aufruf von `node scripts/verify-pilot-restore.mjs` nach Übernahme des Korrekturcommits. Backupdateien und Xcode-Signing werden nicht verändert.
+
+### PostgreSQL-Escape-Literale
+
+Der Restore-Parser akzeptiert auch E- und e-präfixierte Stringliterale in den erlaubten Rolleneinstellungen. Ein eigener Scanner interpretiert verdoppelte bzw. maskierte Quotes, Backslashes, b/f/n/r/t, Oktal-/Hex-Bytes und Unicode-Escapes einschließlich gültiger Surrogatpaare. Byte-Escapes müssen zusammen gültiges UTF-8 ergeben; NUL und ungültige Unicodewerte führen zum Abbruch. Andere Backslash-Escapes folgen PostgreSQLs Regel, das folgende Zeichen wörtlich zu übernehmen.
+
+Erst nach dem Dekodieren wird der Wert anhand derselben Setting-Allowlist geprüft und als neues SQL rekonstruiert. Die Escape-Schreibweise erteilt keine zusätzlichen Rechte für Settings, Bibliotheken oder Schema-Ausdrücke. Zusätzliche Statements, Konkatenation und Kommentare bleiben verboten. Mehrzeilige SQL-Literalfortsetzungen werden weiterhin nicht unterstützt.
+
+Die Regression verwendet die gemeldete Syntax `ALTER ROLE postgres SET search_path TO E'…';` mit repräsentativen Schemawerten. Der vollständige Produktionsrollenexport wurde nicht bereitgestellt. CI erzeugt den Rollenexport aus echtem PostgreSQL 17.11, überführt den Bootstrap-search_path in ein gleichwertiges E-Literal mit Unicode-Escape und führt damit den vollständigen Restore einschließlich Wiederholung aus.

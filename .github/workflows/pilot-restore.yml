@@ -59,6 +59,17 @@ jobs:
           chmod 700 "$HOME/fac-pilot-backup"
           docker exec fac-pilot-restore pg_dump -U postgres -d backup_fixture -Fc > "$HOME/fac-pilot-backup/database.dump"
           docker exec fac-pilot-restore pg_dumpall -U postgres --roles-only --no-role-passwords > "$HOME/fac-pilot-backup/roles.sql"
+          # Reproduce the production export's E-prefixed bootstrap setting.
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          path=Path(os.environ['HOME'])/'fac-pilot-backup/roles.sql'
+          source,count=re.subn(r"^ALTER ROLE postgres SET search_path TO .+;$",
+              lambda _: r"ALTER ROLE postgres SET search_path TO E'\u0070g_catalog';",
+              path.read_text(), flags=re.M)
+          assert count == 1
+          path.write_text(source)
+          PY
           # Remove this CI-created source container, retain only the host-side synthetic dump.
           docker rm -f fac-pilot-restore
           docker run -d --name fac-pilot-restore --network none -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17.11

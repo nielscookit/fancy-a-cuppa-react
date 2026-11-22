@@ -11,12 +11,83 @@ const allowedSettings = new Set([
 ]);
 const allowedLibraries = new Set(['safeupdate', 'auto_explain', 'pgaudit', 'pg_stat_statements', 'supautils', 'pgsodium']);
 
+export function readEscapeLiteral(source) {
+  if (!/^[eE]'/.test(source)) throw Error('Ungültiges Escape-Literal.');
+  const bytes = [];
+  const append = text => bytes.push(Buffer.from(text, 'utf8'));
+  const simple = { b:'\b', f:'\f', n:'\n', r:'\r', t:'\t' };
+  let index = 2;
+  while (index < source.length) {
+    const character = source[index++];
+    if (character === "'") {
+      if (source[index] === "'") { append("'"); index++; continue; }
+      const value = new TextDecoder('utf-8', { fatal:true }).decode(Buffer.concat(bytes));
+      if (value.includes('\0')) throw Error('NUL ist in PostgreSQL-Strings nicht erlaubt.');
+      return { value, length:index };
+    }
+    if (character !== '\\') {
+      const point = source.codePointAt(index - 1);
+      append(String.fromCodePoint(point));
+      if (point > 0xffff) index++;
+      continue;
+    }
+    if (index >= source.length) throw Error('Unvollständige Escape-Sequenz.');
+    const escape = source[index++];
+    if (Object.hasOwn(simple, escape)) { append(simple[escape]); continue; }
+    if (/[0-7]/.test(escape)) {
+      const digits = (escape + source.slice(index)).match(/^[0-7]{1,3}/)[0];
+      bytes.push(Buffer.from([parseInt(digits, 8) & 255]));
+      index += digits.length - 1;
+      continue;
+    }
+    if (escape === 'x') {
+      const digits = source.slice(index).match(/^[0-9a-fA-F]{1,2}/)?.[0];
+      if (!digits) { append('x'); continue; }
+      bytes.push(Buffer.from([parseInt(digits, 16)]));
+      index += digits.length;
+      continue;
+    }
+    if (escape === 'u' || escape === 'U') {
+      const size = escape === 'u' ? 4 : 8;
+      const digits = source.slice(index, index + size);
+      if (!new RegExp('^[0-9a-fA-F]{'+size+'}$').test(digits)) throw Error('Ungültige Unicode-Escape-Sequenz.');
+      let point = parseInt(digits, 16);
+      index += size;
+      if (point >= 0xd800 && point <= 0xdbff) {
+        const low = source.slice(index).match(/^\\(?:u([dD][c-fC-F][0-9a-fA-F]{2})|U(0000[dD][c-fC-F][0-9a-fA-F]{2}))/);
+        if (!low) throw Error('Unvollständiges Unicode-Surrogatpaar.');
+        point = 0x10000 + ((point - 0xd800) << 10) + parseInt(low[1] || low[2],16) - 0xdc00;
+        index += low[0].length;
+      }
+      if (point > 0x10ffff || point >= 0xdc00 && point <= 0xdfff) throw Error('Ungültiger Unicode-Codepunkt.');
+      append(String.fromCodePoint(point));
+      continue;
+    }
+    // PostgreSQL takes other backslash-escaped characters literally,
+    // including quotes, backslashes and non-special letters.
+    const point = source.codePointAt(index - 1);
+    append(String.fromCodePoint(point));
+    if (point > 0xffff) index++;
+  }
+  throw Error('Nicht abgeschlossenes Escape-Literal.');
+}
+
 function settingTokens(source) {
-  // Only ordinary SQL literals and identifiers. No expressions, escapes,
-  // comments, dollar quoting or additional statements.
+  // Decode literals into values, never replay their SQL spelling.
+  // Expressions, comments, dollar quoting and additional statements stay forbidden.
   const tokens = [];
   let rest = source.trim();
   while (rest) {
+    if (/^[eE]'/.test(rest)) {
+      const decoded = readEscapeLiteral(rest);
+      tokens.push(decoded.value);
+      rest = rest.slice(decoded.length).trim();
+      if (!rest) break;
+      if (!rest.startsWith(',')) throw Error('Zusätzlicher Ausdruck in einer Rolleneinstellung.');
+      rest = rest.slice(1).trim();
+      if (!rest) throw Error('Unvollständige Rolleneinstellung.');
+      continue;
+    }
     const match = rest.match(/^(?:'((?:[^'\\]|'')*)'|"([A-Za-z_$][A-Za-z0-9_$]*)"|([A-Za-z0-9_]+))/);
     if (!match) throw Error('Ungültiger SQL-Wert einer Rolleneinstellung.');
     tokens.push(match[1] !== undefined ? match[1].replaceAll("''", "'")

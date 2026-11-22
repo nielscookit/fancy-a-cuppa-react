@@ -1,7 +1,7 @@
 -- Representative PostgreSQL 17 role settings, not production data.
 ALTER ROLE anon SET statement_timeout TO '3s';
 ALTER ROLE anon SET lock_timeout TO '1s';
-ALTER ROLE anon SET search_path TO '"$user", public, extensions';
+ALTER ROLE anon SET search_path TO E'\"$user\", public, extensions';
 ALTER ROLE anon SET log_statement TO 'none';
 ALTER ROLE anon SET session_preload_libraries TO 'auto_explain';
 ALTER ROLE authenticated SET statement_timeout TO '8s';
