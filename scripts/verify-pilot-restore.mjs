@@ -144,7 +144,10 @@ export async function main() {
     const data=snapshot(baseline);
     if(JSON.stringify(data)!==JSON.stringify(snapshot(target))) throw Error('Die beiden vollständigen Restores weichen voneinander ab.');
     report.counts=Object.fromEntries(tables.map(t=>[t,data[t].length]));
-    if(data.teas.length!==167) throw Error('Abweichender Katalogumfang. Erwartet werden 167 Tees.');
+    const expectedCounts={teas:167,tea_codes:110,tea_preparations:167,tea_product_images:142};
+    for(const [table,count] of Object.entries(expectedCounts)) {
+      if(data[table].length!==count) throw Error('Abweichender Backupumfang bei '+table+': erwartet '+count+', gefunden '+data[table].length+'.');
+    }
     const permissions=database=>pg(database,`select json_agg(row_to_json(p) order by tablename,policyname) from pg_policies p where schemaname='public' and tablename in ('teas','tea_codes','tea_preparations','tea_product_images');`)
       +'\n'+pg(database,`select json_agg(json_build_array(c.relname,pg_get_userbyid(c.relowner),c.relrowsecurity,c.relacl::text) order by c.relname) from pg_class c where c.relnamespace='public'::regnamespace and c.relname in ('teas','tea_codes','tea_preparations','tea_product_images');`);
     const before=permissions(baseline);
