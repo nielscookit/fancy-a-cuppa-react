@@ -127,3 +127,29 @@ Am 22. November 2026 bestanden die realen lokalen Supabase-Prüfungen im GitHub-
 Der aktuelle öffentliche Produktionskatalog wurde zusätzlich lesend als temporärer JSON-Export gesichert und in PGlite wiederhergestellt. 167 Tees, 110 Barcode-Zuordnungen, 167 Zubereitungen und 142 Bildreferenzen wurden nach den drei SQL-Schritten feldweise mit dem Export verglichen. Dieser Export wurde nicht eingecheckt und enthält keine Secrets. Der gleiche Lauf bestand auch die Tests von Widerruf, Rotation, Idempotenz, Audit und Legacy-Sperren.
 
 Der Xcode-Lauf [45066942404](https://github.com/nielscookit/fancy-a-cuppa-react/actions/runs/45066942404) bestand 371/371 Tests und drei Simulator-Builds. Der vollständige Produktionsdump einschließlich Rollen/Grants und dessen Restore sowie eine physische iPhone-Abnahme bleiben vor dem produktiven Cutover offen. Die hier vorliegende Umgebung besitzt keine direkte PostgreSQL-Backup-Verbindung zum Produktionsprojekt. Katalog-JSON und synthetischer DB-Dump decken diesen vollständigen Wiederherstellungsnachweis nicht ab.
+
+## Automatisierte Abnahme des vorhandenen Mac-Backups
+
+`node scripts/verify-pilot-restore.mjs` verwendet ausschließlich `~/fac-pilot-backup/database.dump` und den passwortfreien Rollenexport `roles.sql`. Der Container muss exakt `fac-pilot-restore` heißen, laufen, Docker-Netzwerkmodus `none` verwenden und darf weder Host-Bind-Mounts noch veröffentlichte Ports oder privilegierten Betrieb besitzen. PostgreSQL wird ausschließlich über `docker exec` an Port 55432 oder 5432 angesprochen. Es wird keine Host-/Produktionsverbindung hergestellt.
+
+Das Skript prüft Repository und Branch sowie unveränderte Restore-/SQL-Eingaben. Andere lokale Änderungen wie Signing werden nicht angefasst. Es löscht weder Container noch bestehende Datenbanken. Die vorhandene Datenbank `fac_restore_check` bleibt erhalten. Jeder Durchlauf legt zwei eindeutig benannte Datenbanken `fac_check_baseline_…` und `fac_check_cutover_…` an; Namen und Container-ID stehen im Bericht. Diese Datenbanken bleiben für die Prüfung erhalten.
+
+Ablauf:
+1. Backupdateien hashen, Custom-Archiv und benötigte Erweiterungen prüfen.
+2. Rollenexport strikt parsen. CREATE ROLE, erlaubte Rollenattribute und bekannte Mitgliedschaften werden rekonstruiert. Passwörter, sonstiges SQL, Rollen-Settings und unbekannte Syntax führen zum Abbruch. Bootstrap-postgres bleibt der lokale Superuser; diese Abweichung ist ausdrücklich im Bericht aufgeführt.
+3. Zwei vollständige Restores ohne `--no-owner`, `--no-acl` oder TOC-Filter und mit `--exit-on-error --single-transaction` ausführen.
+4. Katalogdaten und IDs einschließlich Barcodes, Zubereitungen und Bildzuordnungen zwischen den unabhängigen Restores vergleichen. Ownership, ACL und RLS-Policies der vier Katalogtabellen vergleichen.
+5. Beide UC02-Migrationen und Pilot-Guard in einer Transaktion in der zweiten Datenbank anwenden. Alle Bestandswerte erneut vergleichen; ausschließlich die neuen Herkunfts-/Revisionsfelder werden beim Datenvergleich ausgeklammert. Danach für alle 167 Tees `origin=curated`, `revision=1`, öffentliche Lesbarkeit und fehlende direkte Client-Schreib-RPC-Rechte prüfen.
+
+Der Bericht liegt unter `~/fac-pilot-backup/restore-check-<Zeitpunkt>/report.json` mit Dateirecht 0600. Er enthält Prüfschritte, Hashes, Datensatzanzahlen und Einschränkungen. Backupdaten und Rohfehler von pg_restore werden nicht ins Terminal oder nach GitHub geschrieben. Nach einem Abbruch wird kein Teilerfolg als vollständiger Restore gemeldet. Fehlende Plattform-Erweiterungen werden vor der Rollenänderung festgestellt. Wiederholung ist nur für denselben Container und dasselbe Backuppaar erlaubt, sobald Rollen angelegt wurden; ein eigener Marker prüft diese Zuordnung.
+
+Ein Ergebnis `LOGICAL_RESTORE_AND_CUTOVER_PASSED` bestätigt den vollständigen logischen Archiv-Restore und den isolierten Cutover-Test. Es bestätigt keine identische Supabase-Betriebsumgebung, keine Rollenpasswörter, keine Storage-Dateien und keinen iPhone-Test. Es fehlt außerdem ein unabhängiges Manifest vom Zeitpunkt der Sicherung: Der Datenvergleich prüft die konsistente Wiederherstellung desselben Archivs. Physische Storage-Dateien sind nicht Bestandteil des Dumps.
+
+Die CI-Prüfung erzeugt ein synthetisches vollständiges Custom-Archiv mit 167 Tees auf PostgreSQL 17.11, restauriert es mit dem identischen Skript in einem netzwerklosen Container und prüft die Wiederholbarkeit. Produktionsdateien werden dafür nicht hochgeladen. Die echten Mac-Dateien sind hier nicht verfügbar. Ihr Ergebnis steht erst nach dem lokalen Lauf fest.
+
+Einziger lokaler Prüfbefehl nach Übernahme dieses Commits im Branch `feature/native-ios`:
+```bash
+node scripts/verify-pilot-restore.mjs
+```
+
+Fehlen Erweiterungen wie pg_net oder Supabase-spezifische Objekte, bleibt die Abnahme gesperrt. Es ist dann ein kompatibles PostgreSQL-/Supabase-Image im weiter vollständig isolierten Container erforderlich. Das Skript installiert keine Erweiterungen und öffnet kein Netzwerk automatisch. Der Bericht ist die Rückmeldung an 02; eine produktive Migration wird durch diesen Prüflauf nie ausgelöst.

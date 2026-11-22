@@ -1,0 +1,65 @@
+name: Validate isolated restore runner
+on:
+  push:
+    branches: [feature/native-ios]
+    paths:
+      - scripts/verify-pilot-restore.mjs
+      - tests/pilotRestore.test.mjs
+      - .github/workflows/pilot-restore.yml
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/native-ios
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit tests
+        run: node --test tests/pilotRestore.test.mjs
+      - name: Create networkless synthetic backup fixture
+        run: |
+          set -euo pipefail
+          docker run -d --name fac-pilot-restore --network none -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17.11
+          for attempt in $(seq 1 60); do
+            if docker exec fac-pilot-restore pg_isready -U postgres; then break; fi
+            sleep 1
+          done
+          docker exec -i fac-pilot-restore psql -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          create role anon;
+          create role authenticated;
+          create role service_role bypassrls;
+          create database backup_fixture;
+          SQL
+          docker exec -i fac-pilot-restore psql -U postgres -d backup_fixture -v ON_ERROR_STOP=1 < tests/fixtures/community-tea-local-schema.sql
+          docker exec -i fac-pilot-restore psql -U postgres -d backup_fixture -v ON_ERROR_STOP=1 < docs/product-images-schema.sql
+          docker exec -i fac-pilot-restore psql -U postgres -d backup_fixture -v ON_ERROR_STOP=1 <<'SQL'
+          create schema storage;
+          create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+          insert into public.teas(brand,name,status)
+          select 'Synthetic','Fixture '||n,'published' from generate_series(1,166) n;
+          insert into public.tea_preparations(tea_id,brew_seconds,dose_grams)
+          select id,180,2 from public.teas where brand='Synthetic';
+          SQL
+          mkdir -p "$HOME/fac-pilot-backup"
+          chmod 700 "$HOME/fac-pilot-backup"
+          docker exec fac-pilot-restore pg_dump -U postgres -d backup_fixture -Fc > "$HOME/fac-pilot-backup/database.dump"
+          docker exec fac-pilot-restore pg_dumpall -U postgres --roles-only --no-role-passwords > "$HOME/fac-pilot-backup/roles.sql"
+          # Remove this CI-created source container, retain only the host-side synthetic dump.
+          docker rm -f fac-pilot-restore
+          docker run -d --name fac-pilot-restore --network none -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17.11
+          for attempt in $(seq 1 60); do
+            if docker exec fac-pilot-restore pg_isready -U postgres; then break; fi
+            sleep 1
+          done
+      - name: Full synthetic archive restore and cutover
+        run: node scripts/verify-pilot-restore.mjs
+      - name: Verify repeatability
+        run: node scripts/verify-pilot-restore.mjs
+      - name: Stop only this job's container
+        if: always()
+        run: docker rm -f fac-pilot-restore
