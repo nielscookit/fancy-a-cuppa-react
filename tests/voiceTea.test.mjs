@@ -223,3 +223,48 @@ test('German start commands require an exact tea and use the existing brew durat
     assert.notEqual(parseVoiceTeaIntent(utterance, teas).type, 'brew');
   }
 });
+
+test('expanded German and English matrix maps complete phrases to one existing action', () => {
+  const cases = {
+    scan: ['Scanner öffnen', 'Öffne Scanner', 'Öffne den Scanner', 'Mach den Scanner auf',
+      'Scanner starten', 'Tee scannen', 'Barcode scannen', 'Teepackung scannen', 'Open the scanner',
+      'Scan the barcode', 'Kannst du bitte den Scanner öffnen', 'Könntest du bitte den Scanner öffnen'],
+    search: ['Tee suchen', 'Öffne Suche', 'Öffne die Teesuche', 'Open tea search',
+      'Could you please open the tea search?'],
+    add: ['Neuen Tee', 'Einen neuen Tee anlegen', 'Neuen Tee hinzufügen', 'Füge neuen Tee hinzu',
+      'Erstelle einen neuen Tee', 'Tee erfassen', 'Add a new tea', 'Create a new tea',
+      'Bitte, füge einen neuen Tee hinzu!'],
+  };
+  for (const [type, variants] of Object.entries(cases)) {
+    for (const utterance of variants) {
+      assert.deepEqual(parseVoiceTeaIntent(utterance, catalog),
+        type === 'search' ? { type, query: '' } : { type }, utterance);
+    }
+  }
+});
+
+test('expanded search captures the original name after German and English command wrappers', () => {
+  for (const [utterance, query] of [
+    ['Suche Schwarztee', 'Schwarztee'],
+    ['Suche nach Früchte Tee Mischung Teekanne', 'Früchte Tee Mischung Teekanne'],
+    ['Finde Tee von Teekanne', 'Teekanne'],
+    ['Öffne Suche nach Assam', 'Assam'],
+    ['Oeffne die Teesuche nach Assám & Earl Grey', 'Assám & Earl Grey'],
+    ['Search for Assam and Darjeeling', 'Assam and Darjeeling'],
+    ['Find tea by Please & Bitte', 'Please & Bitte'],
+    ['Bitte, suche nach Assam von Tee & Co., bitte!', 'Assam von Tee & Co.'],
+  ]) assert.deepEqual(parseVoiceTeaIntent(utterance, catalog), { type: 'search', query }, utterance);
+  const branded = { id: 12, brand: 'Please & Bitte', rawName: 'Früchte und Kräuter', brewSeconds: 240 };
+  assert.deepEqual(parseVoiceTeaIntent('Früchte und Kräuter Please & Bitte, 500 ml', [branded]),
+    { type: 'detail', tea: branded, water: 500 });
+});
+
+test('unrecognised commands never route mixed or incomplete actions', () => {
+  for (const utterance of ['Scan', 'Neu', 'Start', 'Öffne den', 'Suche nach', 'Finde Tee von',
+    'Öffne die Suche nach', 'Suche nach, bitte', 'Tee scannen oder', 'Tee scannen und Tee erfassen',
+    'Suche Assam und öffne den Scanner', 'Suche Assam, add a new tea', 'Open scanner then find tea']) {
+    assert.equal(parseVoiceTeaIntent(utterance, catalog).type, 'unrecognised', utterance);
+  }
+  assert.equal(resolveVoiceTeaIntent(['Teesuche öffnen', 'Öffne den Scanner'], catalog).type, 'unrecognised');
+  assert.deepEqual(resolveVoiceTeaIntent(['Suche Assám', 'Search for Assam'], catalog), { type: 'search', query: 'Assám' });
+});
