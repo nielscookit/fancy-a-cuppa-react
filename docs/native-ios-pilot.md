@@ -136,7 +136,7 @@ Das Skript prüft Repository und Branch sowie unveränderte Restore-/SQL-Eingabe
 
 Ablauf:
 1. Backupdateien hashen, Custom-Archiv und benötigte Erweiterungen prüfen.
-2. Rollenexport strikt parsen. CREATE ROLE, erlaubte Rollenattribute und bekannte Mitgliedschaften werden rekonstruiert. Passwörter, sonstiges SQL, Rollen-Settings und unbekannte Syntax führen zum Abbruch. Bootstrap-postgres bleibt der lokale Superuser; diese Abweichung ist ausdrücklich im Bericht aufgeführt.
+2. Rollenexport strikt parsen. CREATE ROLE, erlaubte Rollenattribute und bekannte Mitgliedschaften werden rekonstruiert. Passwörter, sonstiges SQL, unbekannte Settings und unbekannte Syntax führen zum Abbruch. Bootstrap-postgres bleibt der lokale Superuser; diese Abweichung ist ausdrücklich im Bericht aufgeführt.
 3. Zwei vollständige Restores ohne `--no-owner`, `--no-acl` oder TOC-Filter und mit `--exit-on-error --single-transaction` ausführen.
 4. Katalogdaten und IDs einschließlich Barcodes, Zubereitungen und Bildzuordnungen zwischen den unabhängigen Restores vergleichen. Ownership, ACL und RLS-Policies der vier Katalogtabellen vergleichen.
 5. Beide UC02-Migrationen und Pilot-Guard in einer Transaktion in der zweiten Datenbank anwenden. Alle Bestandswerte erneut vergleichen; ausschließlich die neuen Herkunfts-/Revisionsfelder werden beim Datenvergleich ausgeklammert. Der bekannte Sicherungsumfang von 167 Tees, 110 Barcodes, 167 Zubereitungen und 142 Bildzuordnungen muss ebenfalls stimmen. Danach für alle 167 Tees `origin=curated`, `revision=1`, öffentliche Lesbarkeit und fehlende direkte Client-Schreib-RPC-Rechte prüfen.
@@ -153,3 +153,17 @@ node scripts/verify-pilot-restore.mjs
 ```
 
 Fehlen Erweiterungen wie pg_net oder Supabase-spezifische Objekte, bleibt die Abnahme gesperrt. Es ist dann ein kompatibles PostgreSQL-/Supabase-Image im weiter vollständig isolierten Container erforderlich. Das Skript installiert keine Erweiterungen und öffnet kein Netzwerk automatisch. Der Bericht ist die Rückmeldung an 02; eine produktive Migration wird durch diesen Prüflauf nie ausgelöst.
+
+## Kontrollierte Rolleneinstellungen im Restore
+
+Der Parser unterstützt ausschließlich `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `session_preload_libraries`, `search_path`, `log_statement` und `default_transaction_read_only`. Er erkennt normale SQL-Stringliterale beziehungsweise sichere Identifikator-/Wertelisten nach `SET ... TO` oder `SET ... =`. Die Werte werden in strukturierte Daten zerlegt und anschließend neu als SQL aufgebaut. Rohzeilen aus dem Export werden weiterhin nie ausgeführt.
+
+Timeouts akzeptieren nichtnegative Zahlen und die PostgreSQL-Einheiten us/ms/s/min/h/d. Boolean-Werte werden auf on/off normalisiert. `log_statement` ist auf none/ddl/mod/all begrenzt. `search_path` enthält ausschließlich eindeutige Schemanamen und den besonderen Eintrag `"$user"`; Reihenfolge und Bedeutung bleiben erhalten, Identifier-Quoting wird normalisiert. Ausdrücke, Kommentare hinter Anweisungen, zusätzliche Statements, Backslash-/Dollar-Strings, unbekannte Settings, Bibliothekspfade und doppelte Settings derselben Rolle werden abgewiesen.
+
+Für `session_preload_libraries` sind safeupdate, auto_explain, pgaudit, pg_stat_statements, supautils und pgsodium ausdrücklich zugelassen. Jede angeforderte Bibliothek muss im vom Container gemeldeten PostgreSQL-Bibliotheksverzeichnis vorhanden sein und in einer isolierten administrativen Testsitzung über LOAD funktionieren. Fehlt eine Bibliothek oder ist sie inkompatibel, bleibt der Lauf vor der Rollenänderung gesperrt. Der Bericht benennt die Bibliothek und die nicht bestätigte Übertragbarkeit; die Einstellung wird nicht stillschweigend entfernt. Eine vorhandene Datei allein genügt nicht als Nachweis ihrer Ladbarkeit.
+
+Alle Settings werden nach dem Daten-/Cutover-Vergleich gemeinsam in einer Transaktion gesetzt und anschließend in `pg_db_role_setting` gegen die normalisierten Sollwerte geprüft. Der Bericht enthält pro Rolle und Setting den Status `restored_and_verified`. Restore-Administrationsverbindungen überschreiben Timeouts, Read-only, search_path und Preload nur für ihre eigene Sitzung über feste PGOPTIONS. Dadurch können insbesondere exportierte Read-only- oder kurze Timeout-Defaults der Bootstrap-Rolle weder Restore noch Wiederholung blockieren. Die gespeicherten Rollenwerte bleiben erhalten. Bereits bestehende Einschränkungen der lokalen Bootstrap-Superuser-Rolle bleiben separat ausgewiesen.
+
+PostgreSQL übernimmt Rollen-Defaults bei einer neuen Anmeldung. SET ROLE lädt diese Defaults nicht erneut. Der Nachweis prüft deshalb gespeicherte Rollenwerte und separat die Katalogrechte; er bestätigt keine produktive PostgREST-/Supabase-Session-Konfiguration. Ein echter Mac-Restore ist weiterhin erforderlich. Das ursprüngliche Produktionsrollenfile liegt hier nicht vor; die neue Fixture enthält 15 repräsentative Einstellungen aus den genannten Gruppen. CI testet zusätzlich Read-only und einen eingeschränkten search_path der Bootstrap-Rolle sowie die Wiederholung des gesamten Restores.
+
+Für den lokalen Nachtest bleibt es bei einem Aufruf von `node scripts/verify-pilot-restore.mjs` nach Übernahme des Korrekturcommits. Backupdateien und Xcode-Signing werden nicht verändert.

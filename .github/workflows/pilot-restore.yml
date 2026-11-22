@@ -5,6 +5,7 @@ on:
     paths:
       - scripts/verify-pilot-restore.mjs
       - tests/pilotRestore.test.mjs
+      - tests/fixtures/pilot-role-settings.sql
       - .github/workflows/pilot-restore.yml
 permissions:
   contents: read
@@ -48,6 +49,11 @@ jobs:
           select id,'ean_13',lpad(row_number() over(order by id)::text,13,'0') from public.teas order by id limit 110;
           insert into public.tea_product_images(tea_id,source_image_url,source_page_url)
           select id,'https://example.invalid/image.jpg','https://example.invalid/product' from public.teas order by id limit 142;
+          SQL
+          docker exec -i fac-pilot-restore psql -U postgres -v ON_ERROR_STOP=1 < tests/fixtures/pilot-role-settings.sql
+          docker exec -i fac-pilot-restore psql -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          alter role postgres set default_transaction_read_only to 'on';
+          alter role postgres set search_path to 'pg_catalog';
           SQL
           mkdir -p "$HOME/fac-pilot-backup"
           chmod 700 "$HOME/fac-pilot-backup"

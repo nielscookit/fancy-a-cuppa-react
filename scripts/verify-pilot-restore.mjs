@@ -5,9 +5,63 @@ import { dirname, join, resolve } from 'node:path';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+const allowedSettings = new Set([
+  'statement_timeout', 'lock_timeout', 'idle_in_transaction_session_timeout',
+  'session_preload_libraries', 'search_path', 'log_statement', 'default_transaction_read_only',
+]);
+const allowedLibraries = new Set(['safeupdate', 'auto_explain', 'pgaudit', 'pg_stat_statements', 'supautils', 'pgsodium']);
+
+function settingTokens(source) {
+  // Only ordinary SQL literals and identifiers. No expressions, escapes,
+  // comments, dollar quoting or additional statements.
+  const tokens = [];
+  let rest = source.trim();
+  while (rest) {
+    const match = rest.match(/^(?:'((?:[^'\\]|'')*)'|"([A-Za-z_$][A-Za-z0-9_$]*)"|([A-Za-z0-9_]+))/);
+    if (!match) throw Error('Ungültiger SQL-Wert einer Rolleneinstellung.');
+    tokens.push(match[1] !== undefined ? match[1].replaceAll("''", "'")
+      : match[2] !== undefined ? '"' + match[2] + '"' : match[3]);
+    rest = rest.slice(match[0].length).trim();
+    if (!rest) break;
+    if (!rest.startsWith(',')) throw Error('Zusätzlicher Ausdruck in einer Rolleneinstellung.');
+    rest = rest.slice(1).trim();
+    if (!rest) throw Error('Unvollständige Rolleneinstellung.');
+  }
+  if (!tokens.length) throw Error('Leere SQL-Werteliste.');
+  return tokens;
+}
+
+export function parseRoleSetting(name, source) {
+  if (!allowedSettings.has(name)) throw Error('Nicht erlaubte Rolleneinstellung: ' + name);
+  const tokens = settingTokens(source);
+  if (name === 'search_path') {
+    const paths = tokens.flatMap(token => token === '' ? [] : token.split(',').map(part => part.trim()));
+    const schemas = paths.map(path => {
+      if (path === '"$user"') return '$user';
+      if (/^"[A-Za-z_][A-Za-z0-9_]*"$/.test(path)) return path.slice(1, -1);
+      if (/^[a-z_][a-z0-9_]*$/.test(path)) return path;
+      throw Error('Ungültiges Schema im search_path.');
+    });
+    return { value: schemas.map(q).join(', '), libraries: [] };
+  }
+  if (name === 'session_preload_libraries') {
+    const libraries = tokens.flatMap(token => token === '' ? [] : token.split(',').map(part => part.trim()));
+    if (libraries.some(library => !allowedLibraries.has(library))) throw Error('Nicht erlaubte Preload-Bibliothek.');
+    return { value: libraries.join(','), libraries };
+  }
+  if (tokens.length !== 1) throw Error('Rolleneinstellung benötigt genau einen Wert.');
+  const value = tokens[0];
+  if (name.endsWith('_timeout') && /^\d+(?:\.\d+)?(?:us|ms|s|min|h|d)?$/.test(value)) return { value, libraries: [] };
+  if (name === 'log_statement' && ['none', 'ddl', 'mod', 'all'].includes(value)) return { value, libraries: [] };
+  if (name === 'default_transaction_read_only' && /^(?:on|off|true|false|0|1)$/i.test(value)) {
+    return { value: /^(?:on|true|1)$/i.test(value) ? 'on' : 'off', libraries: [] };
+  }
+  throw Error('Nicht erlaubter Wert für ' + name);
+}
+
 export function parseRoles(source) {
   if (/\bPASSWORD\b/i.test(source)) throw Error('Rollenexport enthält PASSWORD. Passwortfreien Export verwenden.');
-  const names = new Set(), attributes = new Map(), memberships = [];
+  const names = new Set(), attributes = new Map(), memberships = [], settings = [];
   const identifier = '(?:"([a-z_][a-z0-9_]*)"|([a-z_][a-z0-9_]*))';
   const nameOf = match => match[1] || match[2];
   for (const line of source.split('\n').map(line=>line.trim())) {
@@ -15,6 +69,13 @@ export function parseRoles(source) {
       || /^SET (?:default_transaction_read_only|client_encoding|standard_conforming_strings) = (?:off|'UTF8'|on);$/.test(line)) continue;
     let m = line.match(new RegExp('^CREATE ROLE '+identifier+';$'));
     if (m) { names.add(nameOf(m)); continue; }
+    m = line.match(new RegExp('^ALTER ROLE '+identifier+' SET ([a-z_]+) (?:TO|=) (.+);$'));
+    if (m) {
+      const setting = { role: nameOf(m), name: m[3], ...parseRoleSetting(m[3], m[4]) };
+      if (settings.some(item => item.role === setting.role && item.name === setting.name)) throw Error('Doppelte Rolleneinstellung.');
+      settings.push(setting);
+      continue;
+    }
     m = line.match(new RegExp('^ALTER ROLE '+identifier+' WITH (.+);$'));
     if (m) {
       const options=m[3].split(/\s+/);
@@ -41,11 +102,11 @@ export function parseRoles(source) {
     throw Error('Nicht unterstützte Anweisung im Rollenexport. Kein Rollen-SQL ausgeführt.');
   }
   if (!names.has('anon') || !names.has('authenticated') || !names.has('service_role')) throw Error('Supabase-Basisrollen fehlen.');
-  if ([...attributes.keys()].some(name=>!names.has(name))
+  if ([...attributes.keys(), ...settings.map(item => item.role)].some(name=>!names.has(name))
     || memberships.some(m=>[m.role,m.member,m.grantor].filter(Boolean).some(name=>!names.has(name) && !/^pg_[a-z_]+$/.test(name)))) {
     throw Error('Unbekannte Rollenreferenz.');
   }
-  return { names:[...names], attributes, memberships };
+  return { names:[...names], attributes, memberships, settings };
 }
 
 export function validateContainer(value) {
@@ -63,6 +124,9 @@ export function validateContainer(value) {
 const q = value => '"' + value.replaceAll('"','""') + '"';
 const literal = value => "'" + value.replaceAll("'","''") + "'";
 const tables=['teas','tea_codes','tea_preparations','tea_product_images'];
+// Keep restore administration independent of role login defaults while leaving
+// the exported defaults intact in pg_db_role_setting.
+const adminOptions = 'PGOPTIONS=-c default_transaction_read_only=off -c statement_timeout=0 -c lock_timeout=0 -c idle_in_transaction_session_timeout=0 -c search_path=pg_catalog,public -c session_preload_libraries=';
 
 export async function main() {
   process.umask(0o077);
@@ -77,7 +141,7 @@ export async function main() {
   const docker=args=>execute('docker',args);
   const container='fac-pilot-restore';
   let port;
-  const pg=(database,source)=>execute('docker',['exec','-i',container,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-p',String(port),'-d',database,'-f','-'],source).trim();
+  const pg=(database,source)=>execute('docker',['exec','-i','-e',adminOptions,container,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-p',String(port),'-d',database,'-f','-'],source).trim();
   const rows=(database,source)=>JSON.parse(pg(database,source));
   try {
     const branch=execute('git',['-C',root,'rev-parse','--abbrev-ref','HEAD']).trim();
@@ -94,6 +158,7 @@ export async function main() {
     if(dump.subarray(0,5).toString()!=='PGDMP') throw Error('Kein PostgreSQL-Custom-Dump.');
     const roleText=readFileSync(realpathSync(join(backup,'roles.sql')),'utf8');
     const roles=parseRoles(roleText);
+    report.roleSettings=roles.settings.map(({role,name,value})=>({role,name,value,status:'validated'}));
     report.dumpSha256=createHash('sha256').update(dump).digest('hex');
     report.rolesSha256=createHash('sha256').update(roleText).digest('hex');
     report.roles=roles.names;
@@ -122,6 +187,17 @@ export async function main() {
     const missing=extensions.filter(name=>!available.includes(name));
     report.extensions={ required:extensions, missing };
     if(missing.length) throw Error('Supabase-Erweiterungen im Container fehlen: '+missing.join(', ')+'. Vollständiger Restore blockiert; es werden keine Archivobjekte ausgelassen.');
+    const libraries=[...new Set(roles.settings.flatMap(setting=>setting.libraries))];
+    const libraryDir=libraries.length ? docker(['exec',container,'pg_config','--pkglibdir']).trim() : '';
+    for(const library of libraries) {
+      try {
+        docker(['exec',container,'test','-f',join(libraryDir,library+'.so')]);
+        pg('postgres','load '+literal(library)+';');
+      } catch {
+        report.limitations.push('Preload-Bibliothek '+library+' fehlt oder kann nicht geladen werden; zugehörige Rolleneinstellungen und vollständiger Restore sind nicht bestätigt.');
+        throw Error('Nicht übertragbare Preload-Bibliothek: '+library+'. Abnahme bleibt gesperrt.');
+      }
+    }
     for(const name of tables) {
       if(!new RegExp('TABLE DATA public '+name+'(?:\\s|$)').test(toc)) throw Error('Katalogtabelle fehlt im Archiv: '+name);
     }
@@ -145,7 +221,7 @@ export async function main() {
       report.databases.push(database);
       if(/^\d+; \d+ \d+ SCHEMA - public\s/m.test(toc)) pg(database,'drop schema public;');
       // No --no-owner, no --no-acl and no TOC filtering.
-      docker(['exec',container,'pg_restore','--exit-on-error','--single-transaction','-U','postgres','-p',String(port),'-d',database,copyPath]);
+      docker(['exec','-e',adminOptions,container,'pg_restore','--exit-on-error','--single-transaction','-U','postgres','-p',String(port),'-d',database,copyPath]);
       report.steps.push('Vollständiges Archiv einschließlich Ownership und ACL restauriert: '+label);
     }
     const [baseline,target]=report.databases;
@@ -178,6 +254,20 @@ export async function main() {
     }
     report.steps.push('Katalogdaten, IDs, Barcodes, Zubereitungen und Bildzuordnungen in beiden Restores identisch');
     report.steps.push('Cutover atomar erfolgreich; alle Bestandsdaten und Katalog-Leserechte erhalten; direkte Client-RPCs gesperrt');
+    stage='Rolleneinstellungen wiederherstellen';
+    if (roles.settings.length) {
+      pg('postgres','begin;\n'+roles.settings.map(setting=>
+        'alter role '+q(setting.role)+' set '+setting.name+' to '+literal(setting.value)+';').join('\n')+'\ncommit;');
+      const restoredSettings=rows('postgres', "select coalesce(json_agg(json_build_object('role',r.rolname,'config',s.setconfig)),'[]') from pg_db_role_setting s join pg_roles r on r.oid=s.setrole where s.setdatabase=0;");
+      for(const setting of report.roleSettings) {
+        if(!restoredSettings.some(row=>row.role===setting.role && row.config.includes(setting.name+'='+setting.value))) {
+          throw Error('Rolleneinstellung wurde nicht originalgetreu gespeichert: '+setting.role+'.'+setting.name);
+        }
+        setting.status='restored_and_verified';
+      }
+      report.steps.push('Alle erlaubten Rolleneinstellungen transaktional wiederhergestellt und in pg_db_role_setting verifiziert');
+      report.limitations.push('Rollen-Defaults werden am Ende gesetzt. Restore-Administrationsverbindungen überschreiben Timeouts, search_path, Read-only und Preload transient per PGOPTIONS. SET ROLE testet Rechte, simuliert jedoch keine neue Anmeldung mit Rollen-Defaults.');
+    }
     report.limitations.push('Kein früheres Produktionsmanifest vorhanden: Die beiden unabhängigen Restores werden gegen dasselbe gesicherte Archiv verglichen.');
     report.limitations.push('Storage-Dateien sind nicht im DB-Dump. Edge-Runtime, signierte Downloads, Keychain und iPhone bleiben eigene Prüfungen.');
     report.status='LOGICAL_RESTORE_AND_CUTOVER_PASSED';
