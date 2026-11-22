@@ -37,7 +37,15 @@ async function gallery(id) {
     assert.equal(new URL(image.url).origin,api.origin);
     const response=await fetch(image.url,{redirect:'error'});
     assert.equal(response.status,200);
-    assert.deepEqual(Buffer.from(await response.arrayBuffer()),Buffer.from(jpeg,'base64'));
+    const bytes=Buffer.from(await response.arrayBuffer());
+    assert.ok(bytes.length>0);
+    assert.equal(bytes[0],255);
+    assert.equal(bytes[1],216);
+    // Compare a downloaded backup with an independent signed read. The
+    // sanitizer re-encodes uploads, so the original upload bytes can differ.
+    const again=await fetch(image.url,{redirect:'error'});
+    assert.equal(again.status,200);
+    assert.deepEqual(Buffer.from(await again.arrayBuffer()),bytes);
   }
   return photos;
 }
@@ -62,6 +70,7 @@ try {
   assert.equal((await expect(await send(edit),200)).revision,2);
   assert.equal((await gallery(fixture)).length,1);
   assert.equal(sql(`select origin||':'||revision from teas where id='${fixture}'`),'curated:2');
+  assert.equal(sql(`select snapshot->'tea'->>'brand' from tea_community_private.tea_edit_history where tea_id='${fixture}' and revision=1`),'UC02 Fixture');
   assert.equal(sql(`select count(*) from tea_community_private.pilot_edit_audit where tea_id='${fixture}'`),'1');
   await expect(await send({...edit,save_id:randomUUID()}),409);
   await expect(await send({...createdData,save_id:randomUUID(),code_type:'ean_8',code_value:'96385074'}),409);
