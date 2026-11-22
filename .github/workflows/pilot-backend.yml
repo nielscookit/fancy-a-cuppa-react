@@ -28,6 +28,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fac-pilot-ci"
           cd "$RUNNER_TEMP/fac-pilot-ci"
           supabase init
+          # Keep this dedicated stack away from an existing UC02 stack.
+          sed -i -E 's/5432([0-9])/5832\1/g' supabase/config.toml
           cp -R "$GITHUB_WORKSPACE/supabase/functions" supabase/
           mkdir -p supabase/migrations
           cp "$GITHUB_WORKSPACE/tests/fixtures/community-tea-local-schema.sql" supabase/migrations/20261110000000_local_fixture.sql
@@ -41,10 +43,10 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/fac-pilot-ci"
           echo 'COMMUNITY_TEA_IOS_PILOT_READY=true' > "$RUNNER_TEMP/pilot.env"
-          echo 'COMMUNITY_TEA_PUBLIC_URL=http://127.0.0.1:54321' >> "$RUNNER_TEMP/pilot.env"
+          echo 'COMMUNITY_TEA_PUBLIC_URL=http://127.0.0.1:58321' >> "$RUNNER_TEMP/pilot.env"
           supabase functions serve --env-file "$RUNNER_TEMP/pilot.env" --no-verify-jwt > "$RUNNER_TEMP/pilot-edge.log" 2>&1 &
           for attempt in $(seq 1 60); do
-            if curl -fsS 'http://127.0.0.1:54321/functions/v1/community-tea-v4?capabilities=ios-pilot' >/dev/null; then break; fi
+            if curl -fsS 'http://127.0.0.1:58321/functions/v1/community-tea-v4?capabilities=ios-pilot' >/dev/null; then break; fi
             sleep 2
           done
           node "$GITHUB_WORKSPACE/scripts/verify-ios-pilot-local.mjs"
