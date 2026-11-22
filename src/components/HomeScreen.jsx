@@ -16,7 +16,13 @@ const MEDIA_BASE = import.meta.env.BASE_URL + 'media/';
 const PHASES = ['fill', 'brew', 'steep', 'milk'];
 const FILL_POSTER = MEDIA_BASE + MEDIA_ASSETS.fill.poster;
 
-export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTimerError }) {
+const VOICE_HINTS = {
+  listening: ['Listening…', 'Say your tea or a command.', 'voice-listening.svg'],
+  processing: ['Finding your tea…', 'Your request is being processed.', 'voice-processing.svg'],
+  unrecognised: ["Couldn't understand", 'Please try again.', 'voice-error.svg'],
+};
+
+export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTimerError, voiceTea }) {
   const videoRefs = useRef([]);
   const native = Capacitor.getPlatform() === 'ios';
   const push = usePushNotifications();
@@ -85,10 +91,12 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
     void push.resetAlarm();
   };
   const handlePrimary = () => {
+    voiceTea?.cancel();
     if (preload === 'error') void actions.retryPreload();
     else if (inSession) reset();
     else begin(minutes * 60);
   };
+  const voiceHint = !inSession && VOICE_HINTS[voiceTea?.state];
   const primaryLabel = inSession ? 'Reset'
     : preload === 'error' ? 'Retry videos' : 'Fancy a Cuppa';
 
@@ -104,6 +112,12 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
               poster={phase === 'fill' ? FILL_POSTER : undefined} />
           ))}
         </Box>
+        {voiceHint && (
+          <Box className="fac-home__voice-hint" data-state={voiceTea.state} role="status">
+            <img src={SVG_BASE + voiceHint[2]} width="24" height="24" alt="" />
+            <span><strong>{voiceHint[0]}</strong><br />{voiceHint[1]}</span>
+          </Box>
+        )}
         <Box className="fac-home__time-control" aria-label="Brewing time">
           {inSession ? (
             <Button component={native ? 'div' : 'button'} role={native ? 'presentation' : undefined}
@@ -153,7 +167,7 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
         </Button>
       </Box>
       </Box>
-      <Box className="fac-home__assistant-slot">
+      <Box className="fac-home__assistant-slot" data-voice={Boolean(voiceTea) || undefined}>
         <Button
           variant="contained"
           disableElevation
@@ -164,6 +178,13 @@ export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTim
         >
           How do you take it?
         </Button>
+        {voiceTea && <IconButton
+          className="fac-home__voice-button"
+          aria-label={['listening', 'processing'].includes(voiceTea.state) ? 'Cancel voice input' : 'Start voice input'}
+          onClick={voiceTea.toggle} disabled={inSession} disableRipple
+        >
+          <img src={SVG_BASE + 'voice-button.svg'} width="66" height="66" alt="" />
+        </IconButton>}
       </Box>
     </>
   );

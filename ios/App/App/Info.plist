@@ -83,5 +83,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Use the microphone when you tap it to find or brew tea.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Recognise spoken tea names and commands while voice input is active.</string>
 </dict>
 </plist>

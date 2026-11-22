@@ -1,3 +1,6 @@
+export const TEA_DETAIL_VOLUMES = Object.freeze([250, 500, 1000]);
+export const isValidDetailWater = value => Number.isInteger(value) && value >= 50 && value <= 5000;
+
 /** British-English Tea Detail copy, with comma decimal following Figma. */
 export const CATEGORY_ENGLISH = Object.freeze({
   black:'BLACK TEA',green:'GREEN TEA',white:'WHITE TEA',

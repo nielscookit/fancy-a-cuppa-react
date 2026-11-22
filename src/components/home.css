@@ -189,3 +189,49 @@ body {
 .fac-home[data-native-ios] .fac-home__time-control { bottom:210px; }
 .fac-home[data-native-ios] .fac-home__action--primary.MuiButton-root { bottom:96px; }
 .fac-home[data-native-ios] + .fac-home__assistant-slot { margin:-80px auto 14px; }
+
+.fac-home__assistant-slot[data-voice] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 66px;
+  gap: 8px;
+}
+
+.fac-home__voice-button.MuiIconButton-root {
+  width: 66px;
+  height: 66px;
+  padding: 0;
+}
+
+.fac-home__voice-button.Mui-disabled { opacity: .35; }
+.fac-home__voice-button.Mui-focusVisible {
+  outline: 3px solid #782b40;
+  outline-offset: 2px;
+}
+
+.fac-home__voice-hint {
+  position: absolute;
+  top: min(calc(50% - 137px), calc(100% - 314px));
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(303px, calc(100% - 16px));
+  min-height: 48px;
+  padding: 8px 16px;
+  border-radius: 100px;
+  background: rgb(27 39 43 / 80%);
+  color: #F3F2F0;
+  font: 12px / 16px "Roboto Mono", monospace;
+  pointer-events: none;
+}
+
+.fac-home__voice-hint img { flex: 0 0 24px; }
+.fac-home__voice-hint[data-state="listening"] strong { font-weight: 400; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .fac-home__voice-hint[data-state="processing"] img { animation: fac-voice-turn .85s linear infinite; }
+}
+
+@keyframes fac-voice-turn { to { transform: rotate(360deg); } }

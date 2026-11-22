@@ -1,11 +1,10 @@
 import { Button, TextField, Typography } from '@mui/material';
 import TeaCard from './TeaCard.jsx';
 import { calculateDose } from '../features/teaModel.js';
-import { formatTeaDetailDose } from '../features/teaDetailModel.js';
+import { formatTeaDetailDose, isValidDetailWater, TEA_DETAIL_VOLUMES } from '../features/teaDetailModel.js';
 import './tea-detail.css';
 
 const asset = import.meta.env.BASE_URL + 'figma/';
-const VOLUME_OPTIONS = [250, 500, 1000];
 
 function VolumeOption({ value, current, onChange }) {
   const isSelected = current === value;
@@ -29,7 +28,7 @@ export default function TeaDetail({
 }) {
   if (!tea) return null;
   const water = volume === null ? Number(customMl) : volume;
-  const validWater = Number.isInteger(water) && water >= 50 && water <= 5000;
+  const validWater = isValidDetailWater(water);
   const dose = validWater ? calculateDose(tea, water) : null;
   const brewButton = (
     <Button type="button" variant="contained" fullWidth disableRipple disableElevation
@@ -44,9 +43,9 @@ export default function TeaDetail({
       <TeaCard tea={tea} onEdit={onEdit} onClose={onClose} pinned={pinned} onTogglePin={onTogglePin} />
 
       <div className="fac-tea-volume" role="group" aria-label="Water quantity"
-        style={{'--volume-index':volume === null ? 3 : Math.max(0, VOLUME_OPTIONS.indexOf(volume))}}>
+        style={{'--volume-index':volume === null ? 3 : Math.max(0, TEA_DETAIL_VOLUMES.indexOf(volume))}}>
         <span className="fac-tea-volume__indicator" aria-hidden="true" />
-        {VOLUME_OPTIONS.map(value => (
+        {TEA_DETAIL_VOLUMES.map(value => (
           <VolumeOption key={value} value={value}
             current={volume} onChange={onVolumeChange} />
         ))}

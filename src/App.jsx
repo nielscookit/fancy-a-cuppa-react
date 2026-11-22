@@ -15,7 +15,9 @@ import TeaCategoryIcon from './components/TeaCategoryIcon.jsx';
 import TeaSearchBar from './components/TeaSearchBar.jsx';
 import TeaSheetHandle from './components/TeaSheetHandle.jsx';
 import { manufacturerOptions, filterTeaGroups } from './features/teaSearchModel.js';
-import { initialDetailMinutes } from './features/teaDetailModel.js';
+import { resolveVoiceTeaIntent, routeVoiceTeaIntent } from './features/voiceTeaIntent.js';
+import { useNativeVoiceTea } from './features/useNativeVoiceTea.js';
+import { initialDetailMinutes, TEA_DETAIL_VOLUMES } from './features/teaDetailModel.js';
 import './components/tea-detail.css';
 import HomeScreen from './components/HomeScreen.jsx';
 import { readQuickMinutes, saveQuickMinutes, stepQuickMinutes } from './features/quickTimer.js';
@@ -83,6 +85,7 @@ export default function App() {
     return next;
   });
   const showTeaAssistant = () => {
+    voiceTea.cancel();
     setMode('search');
     setQuery('');
     setManufacturer('');
@@ -131,9 +134,11 @@ export default function App() {
     () => filterTeaGroups(teas, { query, manufacturer, pinnedIds, recentIds }),
     [teas, query, manufacturer, pinnedIds, recentIds],
   );
-  function chooseTea(tea) {
+  function chooseTea(tea, water = 250) {
     setSelectedId(tea.id);
-    setVolume(250);
+    const preset = TEA_DETAIL_VOLUMES.includes(water);
+    setVolume(preset ? water : null);
+    if (!preset) setCustomMl(String(water));
     setDetailMinutes(initialDetailMinutes(tea));
     setScanError('');
     setMessage('');
@@ -148,6 +153,7 @@ export default function App() {
     setMessage('');
   }
   function showQuickAccessHome() {
+    voiceTea.cancel();
     cameraResultGeneration.current++;
     setMode('closed');
     setSelectedId(null);
@@ -330,6 +336,25 @@ export default function App() {
     setMessage('');
     setMode(mode === 'edit' && selected ? 'prep' : 'search');
   };
+  const voiceTea = useNativeVoiceTea(nativeIOS && mode === 'closed' && !scannerBusy,
+    async (transcripts, current) => {
+      let intent = resolveVoiceTeaIntent(transcripts, catalog.status === 'ready' ? teas : null);
+      if (intent.type === 'catalog-unavailable' && catalog.status === 'loading') {
+        const available = await waitForCameraCatalog(catalogRequest.current ?? Promise.resolve([])).catch(() => []);
+        intent = resolveVoiceTeaIntent(transcripts, available);
+      }
+      if (!current() || nativeCameraBusy.current) return true;
+      return routeVoiceTeaIntent(intent, {
+        scan: () => { void openCamera({ fromQuickAccess: true }); },
+        add: openAdd,
+        detail: chooseTea,
+        search: query => { showTeaAssistant(); setQuery(query); },
+        brew: seconds => quickTimerRef.current?.begin(seconds),
+        notice: setQuickNotice,
+      });
+    }, code => setQuickNotice(code === 'PERMISSION'
+      ? 'Allow Microphone and Speech Recognition in Settings to use voice input.'
+      : 'Speech recognition is currently unavailable.'));
   const sheetOpen = mode !== 'closed' && !closing;
   const isSearch = mode === 'search';
   const nativeEditor = nativeIOS && (mode === 'add' || mode === 'edit');
@@ -411,6 +436,7 @@ export default function App() {
           onStep={delta => setQuickMinutes(previous => stepQuickMinutes(previous,delta))}
           onTimerError={setQuickNotice}
           onTeaAssistant={showTeaAssistant}
+          voiceTea={nativeIOS ? voiceTea : undefined}
         />
       </Box>
       <Drawer anchor="bottom" open={sheetOpen} onClose={closeSheet}
