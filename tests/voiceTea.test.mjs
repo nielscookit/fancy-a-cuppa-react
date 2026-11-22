@@ -26,7 +26,7 @@ test('voice keeps the detail default and reads preset and custom water quantitie
 });
 
 test('voice only brews an exact product with explicit command and valid water', () => {
-  for (const text of ['Brew Assam Morning Tea, 500 ml', 'Assam Morning Tea mit 500 ml aufbrühen']) {
+  for (const text of ['Brew Assam Morning Tea, 500 ml', 'Starte Assam Morning Tea mit 500 ml']) {
     assert.deepEqual(parseVoiceTeaIntent(text, catalog), { type: 'brew', tea, water: 500 });
   }
   assert.equal(parseVoiceTeaIntent('Brew Assam Morning Tea', catalog).type, 'unrecognised');
@@ -196,4 +196,30 @@ test('native voice plays the bundled cue before capture and cancels it with the 
   assert.match(swift, /player\.numberOfLoops = 0[\s\S]*?player\.play\(\)/);
   assert.match(swift, /func audioPlayerDidFinishPlaying[\s\S]*?guard self\.startSound === player, let call = self\.pending[\s\S]*?guard flag[\s\S]*?"start sound end"\)[\s\S]*?self\.start\(call\)/);
   assert.match(swift, /private func finish[\s\S]*?startSound = nil[\s\S]*?player\.stop\(\)/);
+});
+
+test('German start commands require an exact tea and use the existing brew duration', () => {
+  const fruitTea = { id: 3, rawName: 'Früchte Tee Mischung', brand: 'Teekanne', brewSeconds: 360 };
+  const teas = [fruitTea, ...catalog];
+  for (const expression of ['Starte', 'Start']) {
+    for (const [selection, water] of [
+      ['Früchte Tee Mischung Teekanne, 500 Milliliter', 500],
+      ['Teekanne Früchte Tee Mischung mit fünfhundert Milliliter', 500],
+      ['Früchte Tee Mischung, 725 ml', 725],
+      ['Früchte Tee Mischung', undefined],
+    ]) {
+      const intent = parseVoiceTeaIntent(expression + ' ' + selection, teas);
+      assert.deepEqual(intent, { type: 'brew', tea: fruitTea, water });
+      assert.equal(routeVoiceTeaIntent(intent, { brew: seconds => { assert.equal(seconds, 360); return true; } }), true);
+    }
+  }
+  assert.deepEqual(parseVoiceTeaIntent('Früchte Tee Mischung Teekanne, 500 Milliliter', teas),
+    { type: 'detail', tea: fruitTea, water: 500 });
+  assert.equal(parseVoiceTeaIntent('Start Früchte Tee Mischung, 500 ml', [fruitTea, { ...fruitTea, id: 4 }]).type, 'search');
+  assert.equal(parseVoiceTeaIntent('Starte Unbekannter Tee, 500 ml', teas).type, 'no-match');
+  assert.equal(parseVoiceTeaIntent('Start Früchte Tee Mischung, 49 ml', teas).type, 'invalid-water');
+  for (const utterance of ['Start', 'Starte', 'Start 500 ml', 'Früchte Tee Mischung mit 500 ml aufbrühen',
+    'Früchte Tee Mischung Start', 'StarteX Früchte Tee Mischung, 500 ml']) {
+    assert.notEqual(parseVoiceTeaIntent(utterance, teas).type, 'brew');
+  }
 });

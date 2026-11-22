@@ -92,11 +92,12 @@ export function parseVoiceTeaIntent(transcript, teas) {
     if (normalizeQuery(query)) return { type: 'search', query };
   }
   if (command === 'suche') return { type: 'unrecognised' };
-  const brew = /^brew\s+/i.test(text) || /\s+aufbr[uü]hen$/i.test(text);
-  const parsed = extractVolume(text.replace(/^brew\s+|\s+aufbr[uü]hen$/gi, ''));
+  const startCommand = text.match(/^(starte|start|brew)(?=\s|$)/iu)?.[0];
+  const brew = Boolean(startCommand);
+  const parsed = extractVolume(startCommand ? text.slice(startCommand.length).trim() : text);
   if (!parsed) return { type: 'invalid-water' };
   const query = normalizeQuery(parsed.query);
-  if (!query || (brew && parsed.water == null)) return { type: 'unrecognised' };
+  if (!query || (startCommand?.toLowerCase() === 'brew' && parsed.water == null)) return { type: 'unrecognised' };
   if (!Array.isArray(teas) || !teas.length) return { type: 'catalog-unavailable' };
   const exact = teas.filter(tea => [tea.rawName, tea.name, `${tea.brand} ${tea.rawName}`, `${tea.rawName} ${tea.brand}`]
     .some(name => normalizeQuery(name) === query));
