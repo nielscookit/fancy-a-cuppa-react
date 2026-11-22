@@ -26,10 +26,13 @@ export function createVoiceTeaSession(bridge, { update, handle, notify, visible 
         if (event.id === id && current() && ['listening', 'processing'].includes(event.phase)) update(event.phase);
       });
       if (!current()) return;
-      const { transcripts } = await bridge.listen({ id });
+      const { transcripts, debug } = await bridge.listen({ id });
       if (!current()) return;
       update('processing');
-      const handled = await handle(transcripts, current);
+      const trace = (intent, outcome) => {
+        if (debug === true) void bridge.trace({ id, intent, outcome }).catch(() => {});
+      };
+      const handled = await handle(transcripts, current, trace);
       if (current()) update(handled ? 'idle' : 'unrecognised');
     } catch (error) {
       if (!current()) return;

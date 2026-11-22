@@ -1,8 +1,14 @@
 import { isValidDetailWater } from './teaDetailModel.js';
 import { normalizeQuery, teaMatches } from './teaModel.js';
 
-const scan = new Set(['tee suchen', 'tee scannen', 'tee identifizieren', 'find tea', 'scan tea', 'identify tea']);
-const add = new Set(['tee anlegen', 'neuen tee hinzufuegen', 'add new tea', 'create tea']);
+const scan = new Set([
+  'tee suchen', 'tee scannen', 'tee identifizieren', 'find tea', 'scan tea', 'identify tea',
+  'scanner oeffnen', 'oeffne den scanner', 'open scanner',
+]);
+const add = new Set([
+  'neuen tee', 'neuen tee hinzufuegen', 'tee hinzufuegen', 'tee anlegen',
+  'add tea', 'add new tea', 'new tea', 'create tea',
+]);
 const small = [
   'zero null', 'one ein eins', 'two zwei', 'three drei', 'four vier', 'five fuenf',
   'six sechs', 'seven sieben', 'eight acht', 'nine neun', 'ten zehn', 'eleven elf',
@@ -74,8 +80,10 @@ function extractVolume(text) {
 export function parseVoiceTeaIntent(transcript, teas) {
   const text = String(transcript ?? '').trim().replace(/[.!?]+$/, '');
   const normalized = normalizeQuery(text);
-  if (scan.has(normalized)) return { type: 'scan' };
-  if (add.has(normalized)) return { type: 'add' };
+  // Keep action recognition anchored to the complete utterance.
+  const command = normalized.split(' ').filter(word => word !== 'bitte' && word !== 'please').join(' ');
+  if (scan.has(command)) return { type: 'scan' };
+  if (add.has(command)) return { type: 'add' };
   const brew = /^brew\s+/i.test(text) || /\s+aufbr[uü]hen$/i.test(text);
   const parsed = extractVolume(text.replace(/^brew\s+|\s+aufbr[uü]hen$/gi, ''));
   if (!parsed) return { type: 'invalid-water' };
@@ -94,7 +102,7 @@ export function resolveVoiceTeaIntent(transcripts, teas) {
   const outcomes = transcripts.map(text => parseVoiceTeaIntent(text, teas));
   const actions = outcomes.filter(({ type }) => ['scan', 'add', 'detail', 'search', 'brew'].includes(type));
   const keys = new Set(actions.map(action => JSON.stringify([action.type, action.tea?.id, action.water, action.query])));
-  if (keys.size > 1) return { type: 'unrecognised' };
+  if (keys.size > 1) return { type: 'unrecognised', reason: 'conflicting-transcripts' };
   if (actions[0]?.type === 'brew' && outcomes.some(outcome => outcome.type === 'invalid-water')) return { type: 'invalid-water' };
   return actions[0] ?? outcomes.find(outcome => outcome.type !== 'unrecognised') ?? { type: 'unrecognised' };
 }
@@ -103,7 +111,6 @@ export function resolveVoiceTeaIntent(transcripts, teas) {
 export function routeVoiceTeaIntent(intent, actions) {
   switch (intent.type) {
     case 'scan':
-    case 'no-match':
       actions.scan();
       return true;
     case 'add':

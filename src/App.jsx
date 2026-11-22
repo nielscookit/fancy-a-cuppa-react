@@ -337,14 +337,17 @@ export default function App() {
     setMode(mode === 'edit' && selected ? 'prep' : 'search');
   };
   const voiceTea = useNativeVoiceTea(nativeIOS && mode === 'closed' && !scannerBusy,
-    async (transcripts, current) => {
+    async (transcripts, current, trace) => {
       let intent = resolveVoiceTeaIntent(transcripts, catalog.status === 'ready' ? teas : null);
       if (intent.type === 'catalog-unavailable' && catalog.status === 'loading') {
         const available = await waitForCameraCatalog(catalogRequest.current ?? Promise.resolve([])).catch(() => []);
         intent = resolveVoiceTeaIntent(transcripts, available);
       }
-      if (!current() || nativeCameraBusy.current) return true;
-      return routeVoiceTeaIntent(intent, {
+      if (!current() || nativeCameraBusy.current || scannerBusy) {
+        trace(intent.type, !current() ? 'stale' : 'camera-busy');
+        return true;
+      }
+      const handled = routeVoiceTeaIntent(intent, {
         scan: () => { void openCamera({ fromQuickAccess: true }); },
         add: openAdd,
         detail: chooseTea,
@@ -352,6 +355,10 @@ export default function App() {
         brew: seconds => quickTimerRef.current?.begin(seconds),
         notice: setQuickNotice,
       });
+      const action = { scan: 'scanner-requested', add: 'editor-opened', detail: 'detail-opened',
+        search: 'search-opened', brew: 'timer-start-requested' };
+      trace(intent.type, handled ? action[intent.type] : intent.reason ?? (intent.type === 'brew' ? 'timer-declined' : intent.type));
+      return handled;
     }, code => setQuickNotice(code === 'PERMISSION'
       ? 'Allow Microphone and Speech Recognition in Settings to use voice input.'
       : 'Speech recognition is currently unavailable.'));

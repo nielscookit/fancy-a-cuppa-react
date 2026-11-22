@@ -110,10 +110,59 @@ test('voice routes to existing views and only the brew action invokes the timer'
     'Brew Assam Morning Tea, 500 ml']) {
     routeVoiceTeaIntent(parseVoiceTeaIntent(text, catalog), actions);
   }
-  assert.deepEqual(calls, [['detail', tea, undefined], ['scan'], ['add'], ['scan'], ['brew', 240],
+  assert.deepEqual(calls, [['detail', tea, undefined], ['scan'], ['add'], ['brew', 240],
     ['notice', 'Timer not ready. Please try again.']]);
   calls.length = 0;
   routeVoiceTeaIntent(parseVoiceTeaIntent('Brew Assam Morning Tea, 500 ml', []), actions);
   routeVoiceTeaIntent(parseVoiceTeaIntent('Brew Assam, 500 ml', catalog), actions);
   assert.deepEqual(calls, [['notice', 'Tea catalogue unavailable.'], ['search', 'assam']]);
+});
+
+test('voice accepts explicit alternatives with optional politeness words', () => {
+  for (const text of ['Neuen Tee', 'Neuen Tee hinzufügen', 'Tee hinzufügen', 'Tee anlegen',
+    'Add tea', 'Add new tea', 'New tea', 'Bitte neuen Tee', 'Tee bitte hinzufügen']) {
+    assert.equal(parseVoiceTeaIntent(text, catalog).type, 'add');
+  }
+  for (const text of ['Scanner öffnen', 'Öffne den Scanner', 'Tee scannen', 'Scan tea',
+    'Open scanner', 'Öffne bitte den Scanner', 'Open scanner please']) {
+    assert.equal(parseVoiceTeaIntent(text, catalog).type, 'scan');
+  }
+});
+
+test('unmatched, absent, conflicting or incomplete speech does not invoke any action', () => {
+  const deny = () => assert.fail('Unclear voice input must not invoke an action');
+  const actions = { scan: deny, add: deny, detail: deny, search: deny, brew: deny, notice: deny };
+  for (const transcripts of [[], [''], ['...'], ['klick'], ['Tee hinzufügen oder'], ['open'],
+    ['bitte'], ['öffne den'], ['unbekannter Tee'], ['Scan tea', 'Add tea'], ['do not open scanner'],
+    ['I want to open scanner'], ['Brew Earl Grey, 500 ml']]) {
+    assert.equal(routeVoiceTeaIntent(resolveVoiceTeaIntent(transcripts, catalog), actions), false);
+  }
+});
+
+test('native diagnostic receives categorical intent and outcome only when enabled', async () => {
+  for (const debug of [false, true]) {
+    const calls = [];
+    const session = createVoiceTeaSession({
+      addListener: async () => ({ remove: async () => {} }),
+      listen: async () => ({ transcripts: ['unknown product'], debug }),
+      trace: async payload => { calls.push(payload); },
+    }, {
+      update: () => {},
+      notify: () => {},
+      visible: () => true,
+      handle: async (transcripts, current, trace) => {
+        assert.ok(current());
+        const intent = resolveVoiceTeaIntent(transcripts, catalog);
+        trace(intent.type, 'no-match');
+        return false;
+      },
+    });
+    await session.toggle();
+    assert.equal(calls.length, debug ? 1 : 0);
+    if (debug) {
+      const { id, ...decision } = calls[0];
+      assert.ok(id);
+      assert.deepEqual(decision, { intent: 'no-match', outcome: 'no-match' });
+    }
+  }
 });

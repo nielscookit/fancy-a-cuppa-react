@@ -7,11 +7,38 @@ import UIKit
 final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "FACVoiceTeaPlugin"
     let jsName = "FACVoiceTea"
-    let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "listen", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "cancel", returnType: CAPPluginReturnPromise)
-    ]
+    var pluginMethods: [CAPPluginMethod] {
+        var methods: [CAPPluginMethod] = [
+            CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "listen", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "cancel", returnType: CAPPluginReturnPromise)
+        ]
+        #if DEBUG
+        methods.append(CAPPluginMethod(name: "trace", returnType: CAPPluginReturnPromise))
+        #endif
+        return methods
+    }
+
+    #if DEBUG
+    @objc func trace(_ call: CAPPluginCall) {
+        let intents: Set<String> = ["scan", "add", "detail", "search", "brew", "no-match",
+            "unrecognised", "catalog-unavailable", "invalid-water"]
+        let outcomes: Set<String> = ["scanner-requested", "editor-opened", "detail-opened", "search-opened",
+            "timer-start-requested", "stale", "camera-busy", "conflicting-transcripts", "timer-declined"]
+        if let intent = call.getString("intent"), intents.contains(intent),
+           let outcome = call.getString("outcome"), outcomes.contains(outcome) || intents.contains(outcome) {
+            log(call, "intent=\(intent) outcome=\(outcome)")
+        }
+        call.resolve()
+    }
+    #endif
+
+    private func log(_ call: CAPPluginCall, _ message: @autoclosure () -> String) {
+        #if DEBUG
+        let id = call.getString("id").flatMap { Int($0) } ?? 0
+        print("[FACVoice] id=\(id) up=\(ProcessInfo.processInfo.systemUptime) \(message())")
+        #endif
+    }
 
     // All session state is accessed on the main queue.
     private struct Recognition {
@@ -51,9 +78,10 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func listen(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            guard self.pending == nil else { call.reject("Recording already active.", "BUSY"); return }
+            guard self.pending == nil else { self.log(call, "listen rejected: busy"); call.reject("Recording already active.", "BUSY"); return }
             guard UIApplication.shared.applicationState == .active else { call.reject("App is inactive.", "CANCELLED"); return }
             self.pending = call
+            self.log(call, "listen requested")
             SFSpeechRecognizer.requestAuthorization { [weak self] speech in
                 DispatchQueue.main.async {
                     guard let self, self.pending === call else { return }
@@ -115,7 +143,7 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
                 let task = recognizer.recognitionTask(with: request) { [weak self] result, error in
                     DispatchQueue.main.async {
                         guard let self, self.pending === call, self.unresolved.contains(locale) else { return }
-                        self.receive(result, failed: error != nil, locale: locale, call: call)
+                        self.receive(result, error: error, locale: locale, call: call)
                     }
                 }
                 return Recognition(recognizer: recognizer, request: request, task: task)
@@ -126,32 +154,44 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             audioInstalled = true
             try audio.start()
+            log(call, "capture begin locales=\(unresolved.sorted().joined(separator: ","))")
             notifyListeners("phase", data: ["id": call.getString("id") ?? "", "phase": "listening"])
-            let limit = DispatchWorkItem { [weak self] in self?.endCapture(call) }
+            let limit = DispatchWorkItem { [weak self] in self?.endCapture(call, reason: "capture-deadline") }
             timeout = limit
             DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: limit)
         } catch {
+            let failure = error as NSError
+            log(call, "audio setup failed domain=\(failure.domain) code=\(failure.code)")
             finish("UNAVAILABLE")
         }
     }
 
-    private func receive(_ result: SFSpeechRecognitionResult?, failed: Bool, locale: String, call: CAPPluginCall) {
+    private func receive(_ result: SFSpeechRecognitionResult?, error: Error?, locale: String, call: CAPPluginCall) {
         let text = result?.bestTranscription.formattedString ?? ""
-        if result?.isFinal == true || failed {
+        if let error {
+            let failure = error as NSError
+            log(call, "locale=\(locale) recognition error domain=\(failure.domain) code=\(failure.code)")
+        }
+        if result?.isFinal == true {
+            log(call, "locale=\(locale) final=\(String(reflecting: text))")
+        }
+        if result?.isFinal == true || error != nil {
             if result?.isFinal == true && !text.isEmpty { transcripts.append(text) }
             unresolved.remove(locale)
             if unresolved.isEmpty { finish() }
         } else if !text.isEmpty && text != lastPartial[locale] && engine != nil {
+            log(call, "locale=\(locale) partial=\(String(reflecting: text))")
             lastPartial[locale] = text
             silence?.cancel()
-            let pause = DispatchWorkItem { [weak self] in self?.endCapture(call) }
+            let pause = DispatchWorkItem { [weak self] in self?.endCapture(call, reason: "partial-idle locale=" + locale) }
             silence = pause
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.7, execute: pause)
         }
     }
 
-    private func endCapture(_ call: CAPPluginCall) {
+    private func endCapture(_ call: CAPPluginCall, reason: String) {
         guard pending === call, engine != nil else { return }
+        log(call, "capture end reason=\(reason)")
         stopInput()
         notifyListeners("phase", data: ["id": call.getString("id") ?? "", "phase": "processing"])
         let limit = DispatchWorkItem { [weak self] in
@@ -175,6 +215,8 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
     private func finish(_ error: String? = nil) {
         guard let call = pending else { return }
         pending = nil
+        if engine != nil { log(call, "capture end reason=\(error ?? "finalised")") }
+        log(call, "session end status=\(error ?? "complete") finalCount=\(transcripts.count) pendingLocales=\(unresolved.sorted().joined(separator: ","))")
         stopInput()
         for item in recordings { item.task.cancel() }
         recordings = []
@@ -190,6 +232,12 @@ final class FACVoiceTeaPlugin: CAPPlugin, CAPBridgedPlugin {
         let final = transcripts
         transcripts = []
         if let error { call.reject("Voice input did not complete.", error) }
-        else { call.resolve(["transcripts": final]) }
+        else {
+            #if DEBUG
+            call.resolve(["transcripts": final, "debug": true])
+            #else
+            call.resolve(["transcripts": final])
+            #endif
+        }
     }
 }

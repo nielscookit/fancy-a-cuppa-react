@@ -19,7 +19,7 @@ const FILL_POSTER = MEDIA_BASE + MEDIA_ASSETS.fill.poster;
 const VOICE_HINTS = {
   listening: ['Listening…', 'Say your tea or a command.', 'voice-listening.svg'],
   processing: ['Finding your tea…', 'Your request is being processed.', 'voice-processing.svg'],
-  unrecognised: ["Couldn't understand", 'Please try again.', 'voice-error.svg'],
+  unrecognised: ["Couldn't understand", 'Please try again or say “Open scanner”.', 'voice-error.svg'],
 };
 
 export default function HomeScreen({ ref, minutes, onStep, onTeaAssistant, onTimerError, voiceTea }) {
