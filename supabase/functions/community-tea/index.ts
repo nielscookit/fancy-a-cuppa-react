@@ -22,6 +22,15 @@ Deno.serve(async (req) => {
     if(origin && !allowedOrigins.has(origin)) return reply({error:"Origin not allowed"},403);
     return new Response(null,{status:204,headers});
   }
+  if (req.method === "GET" && new URL(req.url).searchParams.get("capabilities") === "ios-pilot") {
+    // Deployment and production acceptance are separate. This route never
+    // invokes RPCs or Storage, and stays closed until operators confirm V4.
+    const pilotReady = Deno.env.get("COMMUNITY_TEA_IOS_PILOT_READY") === "true";
+    return new Response(JSON.stringify({ contract: "fancy-a-cuppa/uc02-v4", pilotReady }), {
+      status: pilotReady ? 200 : 503,
+      headers: { ...headers, "Cache-Control": "no-store" },
+    });
+  }
   if(req.method!=="POST") return reply({error:"Method not allowed"},405);
   if(origin && !allowedOrigins.has(origin)) return reply({error:"Origin not allowed"},403);
   const url=Deno.env.get("SUPABASE_URL");

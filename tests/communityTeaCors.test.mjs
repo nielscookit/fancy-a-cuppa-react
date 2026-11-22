@@ -12,7 +12,7 @@ runInNewContext(source,{
     serve(callback){handler=callback;},
     env:{get(){return undefined;}},
   },
-  Response, TextEncoder, crypto:globalThis.crypto,
+  Response, URL, TextEncoder, crypto:globalThis.crypto,
   fetch(){throw new Error('Unexpected backend call');},
 });
 const url='https://example.test/functions/v1/community-tea';
@@ -156,4 +156,26 @@ test('barcode edits use the dedicated version-4 RPC and conflicts return 409', a
   const legacy = await mockSave(() => assert.fail('Old clients may not use barcode edits'),
     { ...payload, write_version: 3 });
   assert.equal(legacy.status, 400);
+});
+
+test('the iOS Pilot readiness route defaults to closed and never calls the backend', async () => {
+  const response = await handler(new Request(url + '?capabilities=ios-pilot'));
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await response.json(), { contract: 'fancy-a-cuppa/uc02-v4', pilotReady: false });
+});
+
+test('the iOS Pilot readiness route reports only the explicitly released contract', async () => {
+  let pilotHandler;
+  runInNewContext(source, {
+    Deno: {
+      serve(callback) { pilotHandler = callback; },
+      env: { get(key) { return key === 'COMMUNITY_TEA_IOS_PILOT_READY' ? 'true' : undefined; } },
+    },
+    Response, URL,
+    fetch() { throw new Error('Readiness must not call RPC or Storage'); },
+  });
+  const response = await pilotHandler(new Request(url + '?capabilities=ios-pilot'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { contract: 'fancy-a-cuppa/uc02-v4', pilotReady: true });
 });

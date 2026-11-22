@@ -20,6 +20,15 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     private var opening = false
     private var cancelOpening = false
 
+    private static var supportsStructuredOCR: Bool {
+        let bundle = Bundle.main
+        if bundle.bundleIdentifier == "com.fancyacuppa.test" { return true }
+        guard bundle.bundleIdentifier == "com.fancyacuppa.app",
+              let index = bundle.url(forResource: "index", withExtension: "html", subdirectory: "public"),
+              let html = try? String(contentsOf: index, encoding: .utf8) else { return false }
+        return html.contains("name=\"fac-ios-pilot\"")
+    }
+
     @objc func open(_ call: CAPPluginCall) {
         Task { @MainActor in
             guard #available(iOS 16.0, *) else {
@@ -44,7 +53,7 @@ final class FACTeaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             let barcodeOnly = call.getString("mode") == "barcode"
             let structuredOCR = !barcodeOnly && call.getBool("structuredOCR") == true
-                && Bundle.main.bundleIdentifier == "com.fancyacuppa.test"
+                && Self.supportsStructuredOCR
             var capturedBarcode: [String: String]?
             let controller = FACTeaCameraViewController(barcodeOnly: barcodeOnly, structuredOCR: structuredOCR, cameraAvailable: granted && DataScannerViewController.isSupported && DataScannerViewController.isAvailable) { [weak self] id, text, format in
                 if barcodeOnly {

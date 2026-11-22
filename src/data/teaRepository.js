@@ -3,6 +3,7 @@ import { supabaseConfig, uc02IosEnabled } from './supabaseConfig.js';
 // Framework-independent V3 adapter, behavior based on app-v2/cloud.js.
 // For later migration: changing backend settings does not require React changes.
 const endpoint = supabaseConfig.url;
+const communityEndpoint = endpoint + (supabaseConfig.communityFunction ?? '/functions/v1/community-tea');
 // Keep builds compatible with the existing endpoint until the coordinated cutover.
 export const communityTeaV4 = uc02IosEnabled;
 const selectFields = (communityTeaV4 ? 'origin,revision,' : '') + 'id,brand,name,category,subcategory,subcategory_other,leaf_style,photo_url,tea_codes(code_type,code_value),tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c,instructions,source_label)';
@@ -208,7 +209,7 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
     }
     if (data.photos !== undefined) payload.photos = data.photos;
   }
-  const response = await fetchImpl(endpoint + '/functions/v1/community-tea', {
+  const response = await fetchImpl(communityEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -218,7 +219,7 @@ export async function saveTea(data, { signal, fetchImpl = fetch } = {}) {
 }
 
 export async function listCommunityTeaPhotos(id, { signal, fetchImpl = fetch } = {}) {
-  const response = await fetchImpl(endpoint + '/functions/v1/community-tea', {
+  const response = await fetchImpl(communityEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ write_version: 4, action: 'photos', id: normalizeCloudId(id) }),

@@ -33,6 +33,9 @@ on:
       - src/App.jsx
       - public/figma/uc02-*
       - tests/nativeLiveActivityPrototype.test.mjs
+      - scripts/build-ios-pilot.mjs
+      - scripts/ios-pilot-config.mjs
+      - tests/iosPilotConfig.test.mjs
       - scripts/build-ios-uc02-local.mjs
       - scripts/uc02-ios-config.mjs
       - vite.native.config.js
@@ -111,6 +114,48 @@ jobs:
         run: |
           APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")" = AppIcon
+      - name: Compile isolated iOS Pilot Release with a readiness fixture
+        run: |
+          set -euo pipefail
+          # Exercise the Release bundle without connecting CI to production.
+          node --input-type=module <<'JS'
+          import { build } from 'vite';
+          globalThis.fetch = async (url, options) => {
+            const target = new URL(url);
+            if (target.origin !== 'https://zfkiiqqyapahxirguxgj.supabase.co' || options?.method !== 'GET') {
+              throw Error('Unexpected iOS Pilot fixture request');
+            }
+            if (target.pathname === '/rest/v1/teas') return Response.json([{ origin: 'curated', revision: 1 }]);
+            if (target.pathname === '/functions/v1/community-tea-v4') {
+              return Response.json({ contract: 'fancy-a-cuppa/uc02-v4', pilotReady: true });
+            }
+            throw Error('Unexpected iOS Pilot fixture route');
+          };
+          await build({ configFile: 'vite.native.config.js', mode: 'ios-pilot' });
+          JS
+          npx cap sync ios
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
+            -derivedDataPath "$RUNNER_TEMP/fancy-ios-derived" \
+            CODE_SIGNING_ALLOWED=NO build
+          APP="$RUNNER_TEMP/fancy-ios-derived/Build/Products/Release-iphonesimulator/App.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")" = com.fancyacuppa.app
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/PlugIns/FACLiveActivityExtension.appex/Info.plist")" = com.fancyacuppa.app.liveactivity
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")" = AppIcon
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")" = "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/PlugIns/FACLiveActivityExtension.appex/Info.plist")"
+          grep -q 'fac-ios-pilot' "$APP/public/index.html"
+          grep -R -F -q '/functions/v1/community-tea-v4' "$APP/public/assets"
+          grep -R -F -q 'https://zfkiiqqyapahxirguxgj.supabase.co' "$APP/public/assets"
+          if /usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity' "$APP/Info.plist" ||
+             grep -q 'fac-uc02-local' "$APP/public/index.html" ||
+             grep -R -E -l 'http://(127\.0\.0\.1|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' "$APP/public/assets"; then
+            echo 'Release build contains local test settings.' >&2
+            exit 1
+          fi
       - name: Compile isolated UC02 Debug app and validate its identity and network settings
         env:
           VITE_COMMUNITY_TEA_V4: 'true'

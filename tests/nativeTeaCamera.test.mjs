@@ -551,8 +551,10 @@ test('P3 drops pending lookups if a photo is deleted before the result arrives',
   assert.equal((await flow).photoPrefill, undefined);
 });
 
-test('native structured OCR requires a Fancy Test bundle and rejects late no-match results after timeout', () => {
-  assert.match(cameraSwift, /let structuredOCR = !barcodeOnly && call\.getBool\("structuredOCR"\) == true\s+&& Bundle\.main\.bundleIdentifier == "com\.fancyacuppa\.test"/);
+test('native structured OCR is limited to Fancy Test and marked Pilot and rejects late no-match results', () => {
+  assert.match(cameraSwift, /let structuredOCR = !barcodeOnly && call\.getBool\("structuredOCR"\) == true\s+&& Self\.supportsStructuredOCR/);
+  assert.match(cameraSwift, /bundle.bundleIdentifier == "com.fancyacuppa.test" \{ return true \}/);
+  assert.match(cameraSwift, /bundle.bundleIdentifier == "com.fancyacuppa.app",[\s\S]*?html.contains\("name=\\"fac-ios-pilot\\""\)/);
   assert.match(cameraSwift, /if structuredOCR \{ event\["observations"\] = observations \}/);
   assert.match(cameraSwift, /let photoID = structuredOCR && state == \.networkError \? nil : acceptedPhotoID/);
 });
