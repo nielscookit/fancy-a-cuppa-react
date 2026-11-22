@@ -28,8 +28,27 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fac-pilot-ci"
           cd "$RUNNER_TEMP/fac-pilot-ci"
           supabase init
-          # Keep this dedicated stack away from an existing UC02 stack.
-          sed -i -E 's/5432([0-9])/5832\1/g' supabase/config.toml
+          python - <<'PYPORT'
+          import os, re, socket
+          from pathlib import Path
+          path=Path('supabase/config.toml')
+          text=path.read_text()
+          sockets=[]
+          ports={}
+          for old in sorted(set(re.findall(r'5432[0-9]',text))):
+              sock=socket.socket()
+              sock.bind(('0.0.0.0',0))
+              sockets.append(sock)
+              ports[old]=str(sock.getsockname()[1])
+          project='fac-pilot-'+os.environ['GITHUB_RUN_ID']
+          text=re.sub(r'project_id = "[^"]+"','project_id = "'+project+'"',text)
+          text=re.sub(r'5432[0-9]',lambda m:ports[m[0]],text)
+          path.write_text(text)
+          with open(os.environ['GITHUB_ENV'],'a') as env:
+              env.write('FAC_LOCAL_DB_CONTAINER=supabase_db_'+project+'\n')
+              env.write('PILOT_LOCAL_API=http://127.0.0.1:'+ports['54321']+'\n')
+          for sock in sockets: sock.close()
+          PYPORT
           cp -R "$GITHUB_WORKSPACE/supabase/functions" supabase/
           mkdir -p supabase/migrations
           cp "$GITHUB_WORKSPACE/tests/fixtures/community-tea-local-schema.sql" supabase/migrations/20261110000000_local_fixture.sql
@@ -38,15 +57,13 @@ jobs:
           cat "$GITHUB_WORKSPACE/supabase/config.toml" >> supabase/config.toml
           supabase start
       - name: Run real isolated pilot integration
-        env:
-          FAC_LOCAL_DB_CONTAINER: supabase_db_fac-pilot-ci
         run: |
           cd "$RUNNER_TEMP/fac-pilot-ci"
           echo 'COMMUNITY_TEA_IOS_PILOT_READY=true' > "$RUNNER_TEMP/pilot.env"
-          echo 'COMMUNITY_TEA_PUBLIC_URL=http://127.0.0.1:58321' >> "$RUNNER_TEMP/pilot.env"
+          echo "COMMUNITY_TEA_PUBLIC_URL=$PILOT_LOCAL_API" >> "$RUNNER_TEMP/pilot.env"
           supabase functions serve --env-file "$RUNNER_TEMP/pilot.env" --no-verify-jwt > "$RUNNER_TEMP/pilot-edge.log" 2>&1 &
           for attempt in $(seq 1 60); do
-            if curl -fsS 'http://127.0.0.1:58321/functions/v1/community-tea-v4?capabilities=ios-pilot' >/dev/null; then break; fi
+            if curl -fsS "$PILOT_LOCAL_API/functions/v1/community-tea-v4?capabilities=ios-pilot" >/dev/null; then break; fi
             sleep 2
           done
           node "$GITHUB_WORKSPACE/scripts/verify-ios-pilot-local.mjs"
