@@ -178,9 +178,9 @@ test('voice search opens the existing search with an empty or explicit query, ne
   }
   assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Suche Assam Morning Tea', []), actions), true);
   assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Bitte suche Grüntee, bitte', []), actions), true);
-  assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Suche', catalog), actions), false);
+  assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Suche', catalog), actions), true);
   assert.equal(routeVoiceTeaIntent(resolveVoiceTeaIntent(['Find tea', 'Scan tea'], catalog), actions), false);
-  assert.deepEqual(calls, ['', '', '', '', '', 'Assam Morning Tea', 'Grüntee']);
+  assert.deepEqual(calls, ['', '', '', '', '', 'Assam Morning Tea', 'Grüntee', '']);
 });
 
 test('native voice plays the bundled cue before capture and cancels it with the session', async () => {
@@ -260,11 +260,39 @@ test('expanded search captures the original name after German and English comman
 });
 
 test('unrecognised commands never route mixed or incomplete actions', () => {
-  for (const utterance of ['Scan', 'Neu', 'Start', 'Öffne den', 'Suche nach', 'Finde Tee von',
+  for (const utterance of ['Neu', 'Neuen', 'Start', 'Öffne den', 'Suche nach', 'Finde Tee von',
     'Öffne die Suche nach', 'Suche nach, bitte', 'Tee scannen oder', 'Tee scannen und Tee erfassen',
     'Suche Assam und öffne den Scanner', 'Suche Assam, add a new tea', 'Open scanner then find tea']) {
     assert.equal(parseVoiceTeaIntent(utterance, catalog).type, 'unrecognised', utterance);
   }
   assert.equal(resolveVoiceTeaIntent(['Teesuche öffnen', 'Öffne den Scanner'], catalog).type, 'unrecognised');
   assert.deepEqual(resolveVoiceTeaIntent(['Suche Assám', 'Search for Assam'], catalog), { type: 'search', query: 'Assám' });
+});
+
+test('consolidated matrix includes the approved short commands and natural language variants', () => {
+  const phrases = {
+    scan: ['Scannen', 'Scanner', 'Scan', 'Starte Scanner', 'Starte den Scanner', 'Scanne einen Tee',
+      'Tee einscannen', 'Ich möchte einen Tee scannen', 'Kannst du bitte den Scanner öffnen?'],
+    search: ['Suchen', 'Suche', 'Suche Tee', 'Such Tee', 'Öffne Teesuche', 'Zeig mir die Suche',
+      'Finde Tee', 'Search'],
+    add: ['Anlegen', 'Hinzufügen', 'Add', 'Neuer Tee', 'Neuen Tee anlegen', 'Füge Tee hinzu',
+      'Lege einen Tee an', 'Lege einen neuen Tee an', 'Tee erstellen',
+      'Ich möchte einen neuen Tee anlegen', 'Kannst du bitte einen neuen Tee hinzufügen?', 'Create new tea'],
+  };
+  for (const [type, variants] of Object.entries(phrases)) {
+    for (const utterance of variants) {
+      assert.deepEqual(parseVoiceTeaIntent(utterance, catalog),
+        type === 'search' ? { type, query: '' } : { type }, utterance);
+    }
+  }
+  for (const [utterance, query] of [
+    ['Such mal Schwarztee', 'Schwarztee'], ['Ich suche einen Assam', 'Assam'],
+    ['Suche Tee von Teekanne', 'Teekanne'], ['Finde Grüntee', 'Grüntee'],
+    ['Suche Earl Grey von Bitte & Co.', 'Earl Grey von Bitte & Co'],
+    ['Kannst du bitte nach Earl Grey von Bitte & Co suchen?', 'Earl Grey von Bitte & Co'],
+    ['Find Lapsang Souchong', 'Lapsang Souchong'],
+  ]) assert.deepEqual(parseVoiceTeaIntent(utterance, catalog), { type: 'search', query }, utterance);
+  for (const utterance of ['Scannen und Suchen', 'Add or Scan', 'Starte den Scanner und Suche Tee']) {
+    assert.equal(parseVoiceTeaIntent(utterance, catalog).type, 'unrecognised', utterance);
+  }
 });

@@ -2,31 +2,39 @@ import { isValidDetailWater } from './teaDetailModel.js';
 import { normalizeQuery, teaMatches } from './teaModel.js';
 
 const scan = new Set([
+  'scannen', 'scanner', 'scan',
   'scanner oeffnen', 'den scanner oeffnen', 'oeffne scanner', 'oeffne den scanner', 'mach den scanner auf', 'scanner starten',
   'tee scannen', 'barcode scannen', 'teepackung scannen', 'tee identifizieren',
   'open scanner', 'open the scanner', 'start scanner', 'start the scanner',
   'scan tea', 'scan the tea', 'scan barcode', 'scan the barcode', 'scan tea packaging', 'identify tea',
 ]);
 const search = new Set([
+  'suchen', 'suche', 'suche tee', 'such tee', 'finde tee', 'search',
   'tee suchen', 'teesuche oeffnen', 'oeffne suche', 'oeffne teesuche', 'oeffne die teesuche', 'oeffne die suche',
   'search tea', 'find tea', 'open search', 'open tea search', 'open the tea search',
 ]);
 const add = new Set([
+  'anlegen', 'hinzufuegen', 'add', 'neuer tee', 'create new tea',
   'neuen tee', 'einen neuen tee anlegen', 'neuen tee hinzufuegen', 'tee hinzufuegen', 'tee anlegen',
   'fuege neuen tee hinzu', 'fuege einen neuen tee hinzu', 'erstelle einen neuen tee', 'tee erfassen',
   'add tea', 'add new tea', 'add a new tea', 'new tea', 'create tea', 'create a new tea',
 ]);
 
-const politeLead = /^(?:(?:kannst du|könntest du|koenntest du|could you|can you)[\s,]+)?(?:(?:bitte|please)[\s,]+)?/iu;
-const searchPrefix = /^(?:suche(?:[\s,]+(?:bitte|please))?(?:[\s,]+nach)?|finde(?:[\s,]+(?:bitte|please))?(?:[\s,]+tee[\s,]+von)?|(?:öffne|oeffne)(?:[\s,]+(?:bitte|please))?[\s,]+(?:(?:die|der)[\s,]+)?(?:suche|teesuche)[\s,]+nach|search[\s,]+for|find[\s,]+tea[\s,]+by)[\s,]+/iu;
+const politeLead = /^(?:(?:kannst du|könntest du|koenntest du|could you|can you|ich moechte|ich möchte|i would like to)[\s,]+)?(?:(?:bitte|please)[\s,]+)?/iu;
+const searchPrefix = /^(?:(?:ich[\s,]+(?:suche|such)|suche|such|finde)|(?:öffne|oeffne)[\s,]+(?:die[\s,]+)?(?:suche|teesuche)[\s,]+nach|search[\s,]+for|find)[\s,]+/iu;
+const searchSuffix = /^nach[\s,]+(.+)[\s,]+suchen$/iu;
+const searchModifiers = /^(?:(?:bitte|please|mal)[\s,]+)*(?:(?:nach|tee[\s,]+von|tea[\s,]+by)[\s,]+)?/iu;
 const unrecognised = { type: 'unrecognised' };
 
 function fixedVoiceCommand(text) {
   const command = normalizeQuery(text.replace(politeLead, ''))
-    .split(' ').filter(word => word !== 'bitte' && word !== 'please').join(' ');
-  if (scan.has(command)) return { type: 'scan' };
-  if (add.has(command)) return { type: 'add' };
-  if (search.has(command)) return { type: 'search', query: '' };
+    .split(' ').filter(word => !['bitte', 'please', 'mal', 'mir'].includes(word)).join(' ');
+  if (scan.has(command)
+    || /^(?:(?:oeffne|starte|start) (?:den )?scanner|mach (?:den )?scanner auf)$/.test(command)
+    || /^(?:scanne (?:einen |den )?(?:tee|barcode|teepackung)|(?:(?:einen|den) )?(?:tee|barcode|teepackung) (?:ein)?scannen)$/.test(command)) return { type: 'scan' };
+  if (add.has(command)
+    || /^(?:(?:(?:einen )?(?:neuen )?tee) (?:anlegen|hinzufuegen|erstellen|erfassen)|fuege (?:einen )?(?:neuen )?tee hinzu|lege (?:einen )?(?:neuen )?tee an|erstelle (?:einen )?(?:neuen )?tee)$/.test(command)) return { type: 'add' };
+  if (search.has(command) || /^(?:(?:oeffne|zeig|zeige) (?:die )?(?:suche|teesuche))$/.test(command)) return { type: 'search', query: '' };
 }
 
 function explicitVoiceCommand(text) {
@@ -35,16 +43,19 @@ function explicitVoiceCommand(text) {
   const spoken = text.replace(politeLead, '');
   const command = normalizeQuery(spoken).replace(/ (?:bitte|please)$/u, '');
   const clauses = spoken.split(/(?:[;.!?]+|,|\s+(?:und|oder|and|or|dann|then)\s+)/iu);
-  const isAction = part => fixedVoiceCommand(part) || searchPrefix.test(part) || /^(?:starte|start|brew)\s+/iu.test(part);
+  const isAction = part => fixedVoiceCommand(part) || searchPrefix.test(part) || searchSuffix.test(part) || /^(?:starte|start|brew)\s+/iu.test(part);
   if (clauses.length > 1 && isAction(clauses[0].trim())
     && clauses.slice(1).some(part => isAction(part.trim()))) return unrecognised;
   const fixed = fixedVoiceCommand(spoken);
   if (fixed) return fixed;
   if (fixedVoiceCommand(spoken.replace(/\s+(?:und|oder|and|or|dann|then)$/iu, ''))) return unrecognised;
-  if (/^(?:scan|neu|new|add|search|find|oeffne(?: den| die)?|suche(?: nach)?|finde(?: tee von)?|search for|find tea by|oeffne (?:die )?(?:suche|teesuche) nach)$/u.test(command)) return unrecognised;
+  if (/^(?:neu|neuen|new|find|oeffne(?: den| die)?|suche (?:nach|tee von)|finde(?: tee von)?|search for|find tea by|oeffne (?:die )?(?:suche|teesuche) nach)$/u.test(command)) return unrecognised;
   const prefix = spoken.match(searchPrefix)?.[0];
-  if (!prefix) return undefined;
-  const query = spoken.slice(prefix.length).replace(/,\s*(?:bitte|please)$/iu, '').trim();
+  const suffixQuery = spoken.match(searchSuffix)?.[1];
+  if (!prefix && !suffixQuery) return undefined;
+  let term = suffixQuery ?? spoken.slice(prefix.length).replace(searchModifiers, '');
+  if (/^ich\s+such/iu.test(spoken)) term = term.replace(/^(?:einen|eine|ein)\s+/iu, '');
+  const query = term.replace(/,\s*(?:bitte|please)$/iu, '').trim();
   return normalizeQuery(query) ? { type: 'search', query } : unrecognised;
 }
 
