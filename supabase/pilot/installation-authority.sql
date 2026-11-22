@@ -26,10 +26,9 @@ alter function tea_community_private.tea_save_receipt(text,jsonb,text) rename to
 create function tea_community_private.tea_save_receipt(client text,p_data jsonb,operation text)
 returns jsonb language plpgsql set search_path = '' as $$
 begin
-  -- Preserve legacy CREATE. Block legacy EDIT and crafted V4 payloads
-  -- before quotas, receipts, catalog or barcode rows can change.
-  if (operation = 'update' or p_data->>'write_version' = '4')
-    and coalesce(current_setting('fac.pilot_writer', true), '') <> client then
+  -- Every catalog mutation requires the authenticated pilot gateway,
+  -- including legacy CREATE without a write_version.
+  if coalesce(current_setting('fac.pilot_writer', true), '') <> client then
     raise sqlstate 'PT403' using message = 'Pilot write authorization required';
   end if;
   return tea_community_private.tea_save_receipt_v4(client,p_data,operation);

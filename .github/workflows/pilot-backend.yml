@@ -1,0 +1,55 @@
+name: Isolated pilot backend
+on:
+  push:
+    branches: [feature/native-ios]
+    paths:
+      - supabase/pilot/**
+      - supabase/functions/community-tea/**
+      - supabase/functions/community-tea-v4/**
+      - scripts/verify-ios-pilot-*.mjs
+      - .github/workflows/pilot-backend.yml
+permissions:
+  contents: read
+jobs:
+  local-supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned existing CLI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pilot-tools" --no-audit --no-fund supabase@3.1.0
+          echo "$RUNNER_TEMP/pilot-tools/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Prepare dedicated local sandbox
+        run: |
+          mkdir -p "$RUNNER_TEMP/fac-pilot-ci"
+          cd "$RUNNER_TEMP/fac-pilot-ci"
+          supabase init
+          cp -R "$GITHUB_WORKSPACE/supabase/functions" supabase/
+          mkdir -p supabase/migrations
+          cp "$GITHUB_WORKSPACE/tests/fixtures/community-tea-local-schema.sql" supabase/migrations/20261110000000_local_fixture.sql
+          cp "$GITHUB_WORKSPACE/supabase/migrations/"*community_tea*.sql supabase/migrations/
+          cp "$GITHUB_WORKSPACE/supabase/pilot/installation-authority.sql" supabase/migrations/20261123000000_local_pilot.sql
+          cat "$GITHUB_WORKSPACE/supabase/config.toml" >> supabase/config.toml
+          supabase start
+      - name: Run real isolated pilot integration
+        env:
+          FAC_LOCAL_DB_CONTAINER: supabase_db_fac-pilot-ci
+        run: |
+          cd "$RUNNER_TEMP/fac-pilot-ci"
+          echo 'COMMUNITY_TEA_IOS_PILOT_READY=true' > "$RUNNER_TEMP/pilot.env"
+          echo 'COMMUNITY_TEA_PUBLIC_URL=http://127.0.0.1:54321' >> "$RUNNER_TEMP/pilot.env"
+          supabase functions serve --env-file "$RUNNER_TEMP/pilot.env" --no-verify-jwt > "$RUNNER_TEMP/pilot-edge.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:54321/functions/v1/community-tea-v4?capabilities=ios-pilot' >/dev/null; then break; fi
+            sleep 2
+          done
+          node "$GITHUB_WORKSPACE/scripts/verify-ios-pilot-local.mjs"
+      - name: Stop isolated sandbox
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/fac-pilot-ci"
+          supabase stop --no-backup

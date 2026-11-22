@@ -81,9 +81,12 @@ await db.exec('set role service_role');
 
 await assert.rejects(save(payload('create'), 'f'.repeat(64)), /Pilot write authorization/);
 await assert.rejects(direct('add',payload('create')), /Pilot write authorization/);
-const legacy = await direct('add',payload('create', { write_version: 3 }));
-assert.ok(legacy.id);
-await assert.rejects(direct('update',payload('update', {write_version: 3, id:legacy.id,expected_revision:1})), /Pilot write authorization/);
+const unchanged = (await db.query('select count(*)::integer count from teas')).rows[0].count;
+for (const version of [undefined, 3, 4]) {
+  await assert.rejects(direct('add',payload('create',{write_version:version})), /Pilot write authorization/);
+  await assert.rejects(direct('update',payload('update',{write_version:version,id:fixture,expected_revision:1})), /Pilot write authorization/);
+}
+assert.equal((await db.query('select count(*)::integer count from teas')).rows[0].count, unchanged);
 await assert.rejects(direct('update',payload('update',{id:fixture,expected_revision:1})), /Pilot write authorization/);
 const curatedPhoto = 'community/00000000-0000-4000-8000-000000000004.jpg';
 const curatedEdit = payload('update_barcode', {id:fixture,expected_revision:1,
@@ -133,5 +136,5 @@ await db.exec('set role service_role');
 assert.equal(await identity(rotated), writer);
 assert.equal(await identity(hash), null);
 assert.equal((await save(create,rotated)).replayed, true);
-console.log('PostgreSQL: public reads, legacy CREATE, legacy EDIT denial, authorization, rotation, revocation, idempotency, curated protection, photos and atomic barcode edits passed.');
+console.log('PostgreSQL: public reads, legacy CREATE/EDIT denial, authorization, rotation, revocation, idempotency, curated protection, photos and atomic barcode edits passed.');
 await db.close();
