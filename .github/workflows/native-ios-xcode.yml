@@ -25,6 +25,8 @@ on:
       - src/features/uc02PhotoPrefill.js
       - tests/uc02PhotoPrefill.test.mjs
       - src/features/nativeQuickAccess.js
+      - src/features/voiceTeaIntent.js
+      - tests/voiceTea.test.mjs
       - src/features/teaModel.js
       - src/components/TeaEditor.jsx
       - src/components/tea-sheet.css

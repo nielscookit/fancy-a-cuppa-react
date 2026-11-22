@@ -8,7 +8,7 @@ const other = { id: 2, brand: 'Other', rawName: 'Assam Morning Tea' };
 const catalog = [tea];
 
 test('voice resolves explicit German and English camera and empty editor commands', () => {
-  for (const text of ['Tee suchen', 'Tee scannen', 'Tee identifizieren', 'Find tea', 'Scan tea', 'Identify tea']) {
+  for (const text of ['Tee scannen', 'Tee identifizieren', 'Scan tea', 'Identify tea']) {
     assert.deepEqual(parseVoiceTeaIntent(text, []), { type: 'scan' });
   }
   for (const text of ['Tee anlegen', 'Neuen Tee hinzufügen', 'Add new tea', 'Create tea']) {
@@ -165,4 +165,20 @@ test('native diagnostic receives categorical intent and outcome only when enable
       assert.deepEqual(decision, { intent: 'no-match', outcome: 'no-match' });
     }
   }
+});
+
+test('voice search opens the existing search with an empty or explicit query, never the scanner', () => {
+  const calls = [];
+  const actions = {
+    search: query => calls.push(query),
+    scan: () => assert.fail('Voice search must not open the scanner'),
+  };
+  for (const text of ['Tee suchen', 'Teesuche öffnen', 'Search tea', 'Find tea', 'Bitte Tee suchen']) {
+    assert.equal(routeVoiceTeaIntent(resolveVoiceTeaIntent([text], []), actions), true);
+  }
+  assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Suche Assam Morning Tea', []), actions), true);
+  assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Bitte suche Grüntee, bitte', []), actions), true);
+  assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent('Suche', catalog), actions), false);
+  assert.equal(routeVoiceTeaIntent(resolveVoiceTeaIntent(['Find tea', 'Scan tea'], catalog), actions), false);
+  assert.deepEqual(calls, ['', '', '', '', '', 'Assam Morning Tea', 'Grüntee']);
 });

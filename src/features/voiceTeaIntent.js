@@ -2,9 +2,10 @@ import { isValidDetailWater } from './teaDetailModel.js';
 import { normalizeQuery, teaMatches } from './teaModel.js';
 
 const scan = new Set([
-  'tee suchen', 'tee scannen', 'tee identifizieren', 'find tea', 'scan tea', 'identify tea',
+  'tee scannen', 'tee identifizieren', 'scan tea', 'identify tea',
   'scanner oeffnen', 'oeffne den scanner', 'open scanner',
 ]);
+const search = new Set(['tee suchen', 'teesuche oeffnen', 'search tea', 'find tea']);
 const add = new Set([
   'neuen tee', 'neuen tee hinzufuegen', 'tee hinzufuegen', 'tee anlegen',
   'add tea', 'add new tea', 'new tea', 'create tea',
@@ -84,6 +85,13 @@ export function parseVoiceTeaIntent(transcript, teas) {
   const command = normalized.split(' ').filter(word => word !== 'bitte' && word !== 'please').join(' ');
   if (scan.has(command)) return { type: 'scan' };
   if (add.has(command)) return { type: 'add' };
+  if (search.has(command)) return { type: 'search', query: '' };
+  const requestedTea = text.match(/^(?:(?:bitte|please)[\s,]+)?suche[\s,]+(.+)$/iu)?.[1];
+  if (requestedTea && command.startsWith('suche ')) {
+    const query = requestedTea.replace(/^(?:bitte|please)[\s,]+|[\s,]+(?:bitte|please)$/giu, '').trim();
+    if (normalizeQuery(query)) return { type: 'search', query };
+  }
+  if (command === 'suche') return { type: 'unrecognised' };
   const brew = /^brew\s+/i.test(text) || /\s+aufbr[uü]hen$/i.test(text);
   const parsed = extractVolume(text.replace(/^brew\s+|\s+aufbr[uü]hen$/gi, ''));
   if (!parsed) return { type: 'invalid-water' };
