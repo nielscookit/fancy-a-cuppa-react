@@ -1,5 +1,5 @@
 import { isValidDetailWater } from './teaDetailModel.js';
-import { normalizeQuery, teaMatches } from './teaModel.js';
+import { CATEGORY_LABELS, normalizeQuery, teaMatches } from './teaModel.js';
 
 const scan = new Set([
   'scannen', 'scanner', 'scan',
@@ -50,6 +50,14 @@ function explicitVoiceCommand(text) {
   if (fixed) return fixed;
   if (fixedVoiceCommand(spoken.replace(/\s+(?:und|oder|and|or|dann|then)$/iu, ''))) return unrecognised;
   if (/^(?:neu|neuen|new|find|oeffne(?: den| die)?|suche (?:nach|tee von)|finde(?: tee von)?|search for|find tea by|oeffne (?:die )?(?:suche|teesuche) nach)$/u.test(command)) return unrecognised;
+  const addPrefix = spoken.match(/^[^,;]+(?=[,;])/u)?.[0];
+  if (addPrefix && fixedVoiceCommand(addPrefix)?.type === 'add') {
+    return makeAddIntent(spoken.slice(addPrefix.length + 1));
+  }
+  const addWords = /\S+/g;
+  const boundaries = [...spoken.matchAll(addWords)].map(word => word.index).slice(1, 9).reverse();
+  const addBoundary = boundaries.find(index => fixedVoiceCommand(spoken.slice(0, index).trimEnd())?.type === 'add');
+  if (addBoundary != null) return makeAddIntent(spoken.slice(addBoundary));
   const prefix = spoken.match(searchPrefix)?.[0];
   const suffixQuery = spoken.match(searchSuffix)?.[1];
   if (!prefix && !suffixQuery) return undefined;
@@ -60,7 +68,7 @@ function explicitVoiceCommand(text) {
 }
 
 const small = [
-  'zero null', 'one ein eins', 'two zwei', 'three drei', 'four vier', 'five fuenf',
+  'zero null', 'one ein eins einen eine', 'two zwei', 'three drei', 'four vier', 'five fuenf',
   'six sechs', 'seven sieben', 'eight acht', 'nine neun', 'ten zehn', 'eleven elf',
   'twelve zwoelf', 'thirteen dreizehn', 'fourteen vierzehn', 'fifteen fuenfzehn',
   'sixteen sechzehn', 'seventeen siebzehn', 'eighteen achtzehn', 'nineteen neunzehn',
@@ -127,6 +135,107 @@ function extractVolume(text) {
   return { query: query.replace(/\s+(?:mit|with|in|for|fuer)$/iu, ''), water };
 }
 
+const categoryNames = new Map([
+  ...Object.entries(CATEGORY_LABELS).map(([key, label]) => [normalizeQuery(label), key]),
+  ['schwarztee', 'black'], ['schwarzer tee', 'black'], ['gruentee', 'green'],
+  ['gruener tee', 'green'], ['fruechtetee', 'fruit'], ['fruechte tee', 'fruit'],
+  ['kraeutertee', 'herbal'], ['weisser tee', 'white'], ['weisstee', 'white'],
+]);
+const fieldLabel = /^(teename|name|hersteller|marke|kategorie|dosierung|menge|wasser(?:menge)?|ziehzeit|temperatur)\b[\s:=]*/iu;
+const dosageUnit = '(?:gramm|grams?|g|teebeutel|beutel|tea bags?|teelöffel|tl|tsp)';
+const waterUnit = '(?:millilit(?:er|re)s?|ml|lit(?:er|re)s?|l)';
+const durationUnit = '(?:minuten?|minutes?|mins?)';
+const heatUnit = '(?:grad(?:\\s+celsius)?|°\\s*c|°|celsius)';
+const unlabeledCategory = /\s+(schwarztee|gr(?:ü|ue)ntee|fr(?:ü|ue)chtetee|kr(?:ä|ae)utertee|wei(?:ß|ss)tee)$/iu;
+const ambiguousText = /\b(?:oder|or)\b|^(?:und|and|dann|then)\b/iu;
+const measureWords = new RegExp('(?:^|\\s)(?:' + [dosageUnit, waterUnit, durationUnit, heatUnit].join('|') + ')(?:\\s|$)', 'iu');
+const numberWord = '(?:' + [...values.keys()].map(word => word.replace(/ae/g, '(?:ae|ä)').replace(/oe/g, '(?:oe|ö)')
+  .replace(/ue/g, '(?:ue|ü)').replace(/ss/g, '(?:ss|ß)')).join('|') + '|hundred|thousand|und|and|[\\p{L}]*(?:hundert|tausend)[\\p{L}]*)';
+// A metric may be adjacent to another metric in an unpunctuated transcript.
+// Keep the number and unit together and never split a decimal comma.
+const metric = new RegExp('(?<![\\p{L}\\d.,+-])(?:[+-]?\\d+(?:[.,]\\d+)?|' + numberWord + '(?:\\s+' + numberWord + ')*)'
+  + '\\s*(?:' + dosageUnit + '|' + waterUnit + '|' + durationUnit + '|' + heatUnit + ')(?![\\p{L}\\d])', 'giu');
+const metricUnit = new RegExp('\\s*(' + dosageUnit + '|' + waterUnit + '|' + durationUnit + '|' + heatUnit + ')$', 'iu');
+
+function amountIn(text) {
+  return /^[+-]?\d+(?:[.,]\d+)?$/.test(text) ? Number(text.replace(',', '.')) : wordNumber(text);
+}
+
+function makeAddIntent(input) {
+  const fields = new Map();
+  const set = (key, value) => {
+    if (!fields.has(key)) fields.set(key, new Map());
+    fields.get(key).set(typeof value === 'string' ? normalizeQuery(value) : JSON.stringify(value), value);
+  };
+  const clauses = input
+    .replace(/\s+(?=(?:teename|hersteller|marke|kategorie|dosierung|wassermenge|ziehzeit|temperatur)\b)/giu, ';')
+    .split(/;|(?<!\d),|,(?!\d)/u).map(part => part.trim()).filter(Boolean);
+  for (const clause of clauses) {
+    const label = clause.match(fieldLabel)?.[1].toLowerCase();
+    const value = clause.replace(fieldLabel, '').trim();
+    if (!value) continue;
+    const measures = [...value.matchAll(metric)];
+    if (label === 'kategorie' || (!label && categoryNames.has(normalizeQuery(value)))) {
+      set('category', categoryNames.get(normalizeQuery(value)) ?? null);
+      continue;
+    }
+    const identity = label === 'hersteller' || label === 'marke' ? 'brand'
+      : label === 'name' || label === 'teename' || !label ? 'rawName' : null;
+    let beforeMeasure = measures.length ? value.slice(0, measures[0].index).trim() : value;
+    const separators = measures.map((match, index) => {
+      const end = match.index + match[0].length;
+      return value.slice(end, measures[index + 1]?.index).trim();
+    });
+    const cleanMeasures = measures.length && separators.every(separator => /^(?:auf|pro|mit|per|for|in|und|and)?$/iu.test(separator))
+      && (!beforeMeasure || (identity && !/\d|\b(?:bis|to|oder|or|minus)\b|[+–—-]$/iu.test(beforeMeasure)));
+    if (cleanMeasures && identity === 'brand') {
+      // Speech may omit the pause between an explicit brand and a category.
+      const category = beforeMeasure.match(unlabeledCategory);
+      if (category) {
+        beforeMeasure = beforeMeasure.slice(0, category.index);
+        set('category', categoryNames.get(normalizeQuery(category[1])));
+      }
+    }
+    if (identity && beforeMeasure && (cleanMeasures || !measures.length)
+      && /\p{L}/u.test(beforeMeasure) && !ambiguousText.test(beforeMeasure)
+      && (label || !/[\d°]/u.test(beforeMeasure) || !measureWords.test(beforeMeasure))) {
+      set(identity, beforeMeasure);
+    }
+    if (!cleanMeasures) continue;
+    for (const match of measures) {
+      const text = match[0];
+      const unitMatch = text.match(metricUnit);
+      const unit = unitMatch[1].toLowerCase();
+      const amount = amountIn(text.slice(0, unitMatch.index).trim());
+      if (!Number.isFinite(amount)) continue;
+      if (new RegExp('^' + dosageUnit + '$', 'iu').test(unit) && (!label || label === 'dosierung' || label === 'menge' || identity)) {
+        const kind = /beutel|bag/u.test(unit) ? 'bag' : /teelöffel|tl|tsp/u.test(unit) ? 'tsp' : 'g';
+        set('dose', amount > 0 && amount <= 100 && (kind !== 'bag' || Number.isInteger(amount))
+          ? { type: kind === 'bag' ? 'bag' : 'loose', unit: kind, qty: amount } : null);
+      } else if (new RegExp('^' + waterUnit + '$', 'iu').test(unit) && (!label || label.startsWith('wasser') || label === 'dosierung' || identity)) {
+        const ml = amount * (/^l/u.test(unit) ? 1000 : 1);
+        set('base', Number.isInteger(ml) && ml >= 50 && ml <= 10000 ? ml : null);
+      } else if (new RegExp('^' + durationUnit + '$', 'iu').test(unit) && (!label || label === 'ziehzeit' || identity)) {
+        set('brewSeconds', Number.isInteger(amount) && amount >= 1 && amount <= 30 ? amount * 60 : null);
+      } else if (new RegExp('^' + heatUnit + '$', 'iu').test(unit) && (!label || label === 'temperatur' || identity)) {
+        set('temperature', Number.isInteger(amount) && amount >= 40 && amount <= 100 ? amount : null);
+      }
+    }
+  }
+  const prefill = {};
+  for (const [key, candidates] of fields) {
+    if (candidates.size !== 1) continue;
+    const [value] = candidates.values();
+    if (value == null) continue;
+    if (key === 'dose') Object.assign(prefill, value);
+    else prefill[key] = value;
+  }
+  return Object.keys(prefill).length ? { type: 'add', prefill } : { type: 'add' };
+}
+
+// Only spelling-equivalent compounds participate in the exact identity guard.
+const exactVoiceName = value => normalizeQuery(value).replace(/\bfruechte tee\b/g, 'fruechtetee');
+
 export function parseVoiceTeaIntent(transcript, teas) {
   const text = String(transcript ?? '').trim().replace(/[.!?]+$/, '');
   const command = explicitVoiceCommand(text);
@@ -138,8 +247,9 @@ export function parseVoiceTeaIntent(transcript, teas) {
   const query = normalizeQuery(parsed.query);
   if (!query || (startCommand?.toLowerCase() === 'brew' && parsed.water == null)) return { type: 'unrecognised' };
   if (!Array.isArray(teas) || !teas.length) return { type: 'catalog-unavailable' };
+  const exactQuery = exactVoiceName(query);
   const exact = teas.filter(tea => [tea.rawName, tea.name, `${tea.brand} ${tea.rawName}`, `${tea.rawName} ${tea.brand}`]
-    .some(name => normalizeQuery(name) === query));
+    .some(name => exactVoiceName(name) === exactQuery));
   const matches = exact.length ? exact : teas.filter(tea => teaMatches(tea, query));
   if (!matches.length) return { type: 'no-match' };
   if (matches.length > 1 || (brew && exact.length !== 1)) return { type: 'search', query };
@@ -149,7 +259,7 @@ export function parseVoiceTeaIntent(transcript, teas) {
 export function resolveVoiceTeaIntent(transcripts, teas) {
   const outcomes = transcripts.map(text => parseVoiceTeaIntent(text, teas));
   const actions = outcomes.filter(({ type }) => ['scan', 'add', 'detail', 'search', 'brew'].includes(type));
-  const keys = new Set(actions.map(action => JSON.stringify([action.type, action.tea?.id, action.water, normalizeQuery(action.query)])));
+  const keys = new Set(actions.map(action => JSON.stringify([action.type, action.tea?.id, action.water, normalizeQuery(action.query), Object.entries(action.prefill ?? {}).sort()])));
   if (keys.size > 1) return { type: 'unrecognised', reason: 'conflicting-transcripts' };
   if (actions[0]?.type === 'brew' && outcomes.some(outcome => outcome.type === 'invalid-water')) return { type: 'invalid-water' };
   return actions[0] ?? outcomes.find(outcome => outcome.type !== 'unrecognised') ?? { type: 'unrecognised' };
@@ -162,7 +272,8 @@ export function routeVoiceTeaIntent(intent, actions) {
       actions.scan();
       return true;
     case 'add':
-      actions.add();
+      if (intent.prefill) actions.add(intent.prefill);
+      else actions.add();
       return true;
     case 'detail':
       actions.detail(intent.tea, intent.water);

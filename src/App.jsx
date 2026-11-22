@@ -70,7 +70,7 @@ export default function App() {
   const [scanError, setScanError] = useState('');
   const [scannedCode, setScannedCode] = useState(null);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
-  const [photoPrefill, setPhotoPrefill] = useState(null);
+  const [editorPrefill, setEditorPrefill] = useState(null);
   const [message, setMessage] = useState('');
   const [quickMinutes, setQuickMinutes] = useState(readQuickMinutes);
   const [quickNotice, setQuickNotice] = useState('');
@@ -160,7 +160,7 @@ export default function App() {
     setClosing(false);
     setDrag({offset:0, active:false});
     setCapturedPhotos([]);
-    setPhotoPrefill(null);
+    setEditorPrefill(null);
     setScannedCode(null);
     setQuickNotice('');
   }
@@ -244,7 +244,7 @@ export default function App() {
         else setQuickNotice('No verified tea found in the photos.');
       } else if (action === 'add') {
         setScannedCode(barcode);
-        setPhotoPrefill(recognizedFields || null);
+        setEditorPrefill(recognizedFields || null);
         setCapturedPhotos(Array.isArray(photos) ? photos : []);
         setMessage('');
         setMode('add');
@@ -303,7 +303,7 @@ export default function App() {
     catch (error) {
       setScannedCode(null);
       setCapturedPhotos([]);
-      setPhotoPrefill(null);
+      setEditorPrefill(null);
       setMode('search');
       setMessage('Tee gespeichert. Der Katalog konnte nicht aktualisiert werden: ' +
         (error?.message || String(error)));
@@ -316,21 +316,21 @@ export default function App() {
         tea.brand.toLocaleLowerCase('de-DE') === payload.brand.toLocaleLowerCase('de-DE'));
     setScannedCode(null);
     setCapturedPhotos([]);
-    setPhotoPrefill(null);
+    setEditorPrefill(null);
     if (match) chooseTea(match);
     else {
       setMode('search');
       setMessage('Tee gespeichert. Er ist möglicherweise noch nicht veröffentlicht.');
     }
   }
-  function openAdd() {
+  function openAdd(prefill = null) {
     setCapturedPhotos([]);
-    setPhotoPrefill(null);
+    setEditorPrefill(prefill);
     setScannedCode(null);
     setMode('add');
   }
   const previousView = () => {
-    setPhotoPrefill(null);
+    setEditorPrefill(null);
     setCapturedPhotos([]);
     setScannedCode(null);
     setMessage('');
@@ -452,6 +452,7 @@ export default function App() {
         slotProps={{ transition:{ easing:SHEET_EASING, onExited:() => {
           if (!closing) return;
           setMode('closed');
+          setEditorPrefill(null);
           setSelectedId(null);
           setClosing(false);
           setDrag({offset:0, active:false});
@@ -522,7 +523,7 @@ export default function App() {
                 </Box>
               </Box>
               <Box className="fac-sheet-footer">
-                <Button variant="contained" fullWidth onClick={openAdd} className="fac-sheet-add">
+                <Button variant="contained" fullWidth onClick={() => openAdd()} className="fac-sheet-add">
                   ADD NEW TEA
                 </Button>
               </Box>
@@ -550,7 +551,7 @@ export default function App() {
               barcode={scannedCode}
               onScanBarcode={nativeIOS ? scanEditorBarcode : undefined}
               photos={mode === 'add' ? capturedPhotos : []}
-              prefill={mode === 'add' ? photoPrefill : null}
+              prefill={mode === 'add' ? editorPrefill : null}
               message={message}
               onCancel={previousView}
               onSaved={formSaved} />

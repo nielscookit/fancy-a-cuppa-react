@@ -2,10 +2,82 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseVoiceTeaIntent, resolveVoiceTeaIntent, routeVoiceTeaIntent } from '../src/features/voiceTeaIntent.js';
 import { createVoiceTeaSession } from '../src/features/voiceTeaSession.js';
+import { initialTeaForm, validateTeaForm } from '../src/features/teaModel.js';
 
 const tea = { id: 1, brand: 'Example', rawName: 'Assam Morning Tea', brewSeconds: 240 };
 const other = { id: 2, brand: 'Other', rawName: 'Assam Morning Tea' };
 const catalog = [tea];
+
+test('voice adds an empty editor or prefills only the spoken identity', () => {
+  for (const command of ['Anlegen', 'Hinzufügen']) {
+    assert.deepEqual(parseVoiceTeaIntent(command, []), { type: 'add' });
+  }
+  assert.deepEqual(parseVoiceTeaIntent('Neuen Tee anlegen, English Breakfast Tea', []), {
+    type: 'add', prefill: { rawName: 'English Breakfast Tea' },
+  });
+  assert.deepEqual(parseVoiceTeaIntent('Anlegen, Marke Twinings, Teename English Breakfast Tea', []), {
+    type: 'add', prefill: { rawName: 'English Breakfast Tea', brand: 'Twinings' },
+  });
+});
+
+test('voice routes spoken quantities into the existing new-tea form without saving or reusing them', () => {
+  let form;
+  const actions = {
+    add: prefill => { form = initialTeaForm(prefill, { defaultMinutes: 1 }); },
+    save: () => assert.fail('Voice add must not save'),
+  };
+  for (const utterance of [
+    'Anlegen, English Breakfast Tea, Hersteller Twinings, Schwarztee, drei Gramm auf 250 Milliliter, drei Minuten, 100 Grad.',
+    'Anlegen English Breakfast Tea Hersteller Twinings Schwarztee drei Gramm auf 250 Milliliter drei Minuten 100 Grad',
+    'Anlegen, Temperatur einhundert Grad Celsius, Teename English Breakfast Tea, Kategorie Schwarztee, Hersteller Twinings, Ziehzeit drei Minuten, Dosierung drei Gramm auf zweihundertfünfzig Milliliter',
+  ]) {
+    assert.equal(routeVoiceTeaIntent(parseVoiceTeaIntent(utterance, []), actions), true);
+    const { name, brand, category, type, qty, unit, base, mins, temperature } = validateTeaForm(form);
+    assert.deepEqual({ name, brand, category, type, qty, unit, base, mins, temperature }, {
+      name: 'English Breakfast Tea', brand: 'Twinings', category: 'black', type: 'loose',
+      qty: 3, unit: 'g', base: 250, mins: 3, temperature: 100,
+    });
+  }
+  routeVoiceTeaIntent(parseVoiceTeaIntent('Anlegen', []), actions);
+  assert.deepEqual(form, initialTeaForm(null, { defaultMinutes: 1 }));
+  assert.throws(() => validateTeaForm(form), /are required/);
+});
+
+test('voice interprets bag and decimal doses without rounding custom water amounts', () => {
+  assert.deepEqual(parseVoiceTeaIntent('Neuen Tee hinzufügen, Earl Grey, Hersteller Twinings, ein Teebeutel auf 275 Milliliter, vier Minuten', []).prefill, {
+    rawName: 'Earl Grey', brand: 'Twinings', type: 'bag', unit: 'bag', qty: 1, base: 275, brewSeconds: 240,
+  });
+  assert.deepEqual(parseVoiceTeaIntent('Anlegen, Assam, 3,5 Gramm auf 0,275 Liter', []).prefill, {
+    rawName: 'Assam', type: 'loose', unit: 'g', qty: 3.5, base: 275,
+  });
+});
+
+test('voice leaves conflicting or invalid fields empty and keeps other unambiguous fields', () => {
+  assert.deepEqual(parseVoiceTeaIntent('Anlegen, Earl Grey, Hersteller Twinings oder Lipton, Marke, Schwarztee, Grüntee, 100 Grad, 80 Grad, 3-4 Minuten, Wassermenge -250 ml', []), {
+    type: 'add', prefill: { rawName: 'Earl Grey' },
+  });
+  assert.deepEqual(parseVoiceTeaIntent('Anlegen, Teename Assam, Hersteller One, Marke Two, drei Gramm, vier Gramm, zwei Minuten', []), {
+    type: 'add', prefill: { rawName: 'Assam', brewSeconds: 120 },
+  });
+  assert.equal(resolveVoiceTeaIntent(['Anlegen, Assam', 'Anlegen, Darjeeling'], []).type, 'unrecognised');
+  assert.equal(parseVoiceTeaIntent('Anlegen, Assam, Tee scannen', []).type, 'unrecognised');
+});
+
+test('voice brews equivalent Früchtetee spellings only when the exact identity is unique', () => {
+  const fruit = { id: 3, brand: 'Teekanne', rawName: 'Früchte Tee Mischung', brewSeconds: 300 };
+  const otherFruit = { ...fruit, id: 4, rawName: 'Früchtetee Mischung' };
+  const variants = [
+    ['Starte Früchtetee Mischung Teekanne 500 ml', fruit],
+    ['Starte Früchte Tee Mischung Teekanne 500 ml', otherFruit],
+  ];
+  for (const [utterance, product] of variants) {
+    const intent = parseVoiceTeaIntent(utterance, [product, tea]);
+    assert.deepEqual(intent, { type: 'brew', tea: product, water: 500 });
+    assert.equal(routeVoiceTeaIntent(intent, { brew: seconds => seconds === 300 }), true);
+    assert.equal(parseVoiceTeaIntent(utterance, [fruit, otherFruit]).type, 'search');
+  }
+  assert.notEqual(parseVoiceTeaIntent('Starte Früchtetee Mischung Bio Teekanne 500 ml', [fruit]).type, 'brew');
+});
 
 test('voice resolves explicit German and English camera and empty editor commands', () => {
   for (const text of ['Tee scannen', 'Tee identifizieren', 'Scan tea', 'Identify tea']) {
