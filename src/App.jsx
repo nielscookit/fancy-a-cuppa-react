@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Box, Button, Drawer, Typography } from '@mui/material';
-import { communityTeaV4, listTeas, lookupTeaByCode } from './data/teaRepository.js';
+import { communityTeaV4, pilotCatalogEditing, listTeas, lookupTeaByCode } from './data/teaRepository.js';
 import {
   normalizeQuery, recentTeaIds,
 } from './features/teaModel.js';
@@ -536,7 +536,7 @@ export default function App() {
               customMl={customMl} onCustomChange={setCustomMl}
               minutes={detailMinutes}
               onMinuteStep={step => setDetailMinutes(previous => stepQuickMinutes(previous,step))}
-              onEdit={!communityTeaV4 || selected.origin === 'community' ? () => setMode('edit') : undefined}
+              onEdit={!communityTeaV4 || pilotCatalogEditing || selected.origin === 'community' ? () => setMode('edit') : undefined}
               onClose={openSearch}
               pinned={pinnedIds.includes(selected.id)}
               onTogglePin={() => togglePin(selected.id)}
@@ -544,7 +544,7 @@ export default function App() {
               fixedBrew={nativeIOS}
             />
           )}
-          {(mode === 'add' || mode === 'edit' && (!communityTeaV4 || selected?.origin === 'community')) && (
+          {(mode === 'add' || mode === 'edit' && (!communityTeaV4 || pilotCatalogEditing || selected?.origin === 'community')) && (
             <TeaEditor key={mode === 'edit' ? selected?.id : 'new'}
               tea={mode === 'edit' ? selected : null}
               nativeIOS={nativeIOS}

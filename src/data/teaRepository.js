@@ -9,6 +9,8 @@ const pilotWriter = registerPlugin('FACIosPilot');
 const communityEndpoint = endpoint + (supabaseConfig.communityFunction ?? '/functions/v1/community-tea');
 // Keep builds compatible with the existing endpoint until the coordinated cutover.
 export const communityTeaV4 = uc02IosEnabled;
+// The editor is available in the native pilot; SAVE is authorized by the server.
+export const pilotCatalogEditing = pilot && Capacitor.getPlatform() === 'ios';
 const selectFields = (communityTeaV4 ? 'origin,revision,' : '') + 'id,brand,name,category,subcategory,subcategory_other,leaf_style,photo_url,tea_codes(code_type,code_value),tea_preparations(dose_teaspoons,dose_grams,dose_bags,dose_measures,dose_water_ml,brew_seconds,water_temp_c,instructions,source_label)';
 const codeSelect = 'tea_id,teas(' + selectFields + ')';
 const unitField = {

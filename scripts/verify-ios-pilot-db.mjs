@@ -84,7 +84,27 @@ await assert.rejects(direct('add',payload('create')), /Pilot write authorization
 const legacy = await direct('add',payload('create', { write_version: 3 }));
 assert.ok(legacy.id);
 await assert.rejects(direct('update',payload('update', {write_version: 3, id:legacy.id,expected_revision:1})), /Pilot write authorization/);
-await assert.rejects(save(payload('update', {id:fixture,expected_revision:1})), /Curated tea is read-only/);
+await assert.rejects(direct('update',payload('update',{id:fixture,expected_revision:1})), /Pilot write authorization/);
+const curatedPhoto = 'community/00000000-0000-4000-8000-000000000004.jpg';
+const curatedEdit = payload('update_barcode', {id:fixture,expected_revision:1,
+  name:'Updated catalog tea',brand:'Updated maker',category:'green',dose_grams:3,dose_quantity:3,
+  dose_water_ml:275,brew_seconds:240,water_temp_c:90,
+  photo_keys:[curatedPhoto],uploaded_photo_keys:[curatedPhoto],
+  previous_code_type:null,previous_code_value:null,code_type:'ean_8',code_value:'96385075'});
+assert.equal((await save(curatedEdit)).revision, 2);
+assert.equal((await save(curatedEdit)).replayed, true);
+assert.deepEqual(await query('select public.community_tea_photo_keys($1) result', [fixture]), [curatedPhoto]);
+assert.deepEqual((await db.query('select name,brand,category,origin,revision from teas where id=$1',[fixture])).rows[0],
+  {name:'Updated catalog tea',brand:'Updated maker',category:'green',origin:'curated',revision:2});
+assert.equal((await db.query('select brew_seconds from tea_preparations where tea_id=$1',[fixture])).rows[0].brew_seconds,240);
+assert.equal((await db.query('select code_value from tea_codes where tea_id=$1',[fixture])).rows[0].code_value,'96385075');
+await assert.rejects(save(payload('update',{id:fixture,expected_revision:1})), /revision conflict/);
+await db.exec('reset role');
+assert.equal((await db.query('select snapshot from tea_community_private.tea_edit_history where tea_id=$1',[fixture])).rows[0].snapshot.tea.name,'Synthetic Black Tea');
+const audit = (await db.query('select installation_id from tea_community_private.pilot_edit_audit where tea_id=$1',[fixture])).rows;
+assert.equal(audit.length,1);
+assert.ok(audit[0].installation_id);
+await db.exec('set role service_role');
 
 const photo = 'community/00000000-0000-4000-8000-000000000002.jpg';
 const create = payload('create', {photo_keys:[photo],uploaded_photo_keys:[photo],code_type:'ean_13',code_value:'0850045678906'});
@@ -106,6 +126,7 @@ await db.query('update tea_community_private.pilot_installations set revoked_at=
 await db.exec('set role service_role');
 assert.equal(await identity(hash), null);
 await assert.rejects(save(create), /Pilot write authorization/);
+await assert.rejects(save(payload('update',{id:fixture,expected_revision:2})), /Pilot write authorization/);
 await db.exec('reset role');
 await db.query('update tea_community_private.pilot_installations set token_hash=$2, revoked_at=null where token_hash=$1', [hash,rotated]);
 await db.exec('set role service_role');

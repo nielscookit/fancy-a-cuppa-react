@@ -36,6 +36,39 @@ begin
 end;
 $$;
 
+-- Patch only the coordinated pilot copy; abort if the original guard drifts.
+do $patch$
+declare
+  source text := pg_get_functiondef('public.update_community_tea(jsonb,text)'::regprocedure);
+  guard text := $guard$if v_before.origin <> 'community' then raise exception 'Curated tea is read-only'; end if;$guard$;
+begin
+  if position(guard in source) = 0 then raise exception 'Curated guard source mismatch'; end if;
+  execute replace(source, guard, $newguard$
+    if v_before.origin <> 'community' and
+      coalesce(current_setting('fac.pilot_writer', true), '') <> p_client_hash
+      then raise exception 'Curated tea is read-only'; end if;
+  $newguard$);
+end;
+$patch$;
+
+create or replace function public.community_tea_photo_keys(p_tea uuid)
+returns jsonb language sql stable set search_path = '' as $$
+  select coalesce(jsonb_agg(f.object_key order by f.position),'[]'::jsonb)
+  from tea_community_private.tea_photos f join public.teas t on t.id=f.tea_id
+  where t.id=p_tea and t.status='published'
+$$;
+
+create table tea_community_private.pilot_edit_audit (
+  tea_id uuid not null references public.teas(id),
+  revision integer not null,
+  installation_id uuid not null references tea_community_private.pilot_installations(id),
+  recorded_at timestamptz not null default now(),
+  primary key (tea_id, revision)
+);
+alter table tea_community_private.pilot_edit_audit enable row level security;
+revoke all on tea_community_private.pilot_edit_audit from public, anon, authenticated, service_role;
+grant insert on tea_community_private.pilot_edit_audit to service_role;
+
 create function public.community_tea_pilot_save(p_data jsonb,p_token_hash text)
 returns jsonb language plpgsql set search_path = '' as $$
 declare
@@ -55,6 +88,12 @@ begin
     when 'update_barcode' then result := public.update_community_tea_barcode(p_data,writer);
     else raise exception 'Invalid action';
   end case;
+  if p_data->>'action' in ('update','update_barcode')
+    and not coalesce((result->>'replayed')::boolean, false) then
+    insert into tea_community_private.pilot_edit_audit(tea_id,revision,installation_id)
+    select (result->>'id')::uuid,(result->>'revision')::integer,id
+      from tea_community_private.pilot_installations where token_hash=p_token_hash;
+  end if;
   perform set_config('fac.pilot_writer', '', true);
   return result;
 end;
