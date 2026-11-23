@@ -6,6 +6,8 @@ on:
       - scripts/verify-pilot-restore.mjs
       - tests/pilotRestore.test.mjs
       - tests/fixtures/pilot-role-settings.sql
+      - tests/fixtures/pilot-search-paths.sql
+      - scripts/verify-pilot-search-paths.mjs
       - .github/workflows/pilot-restore.yml
 permissions:
   contents: read
@@ -34,6 +36,10 @@ jobs:
           create role anon;
           create role authenticated;
           create role service_role bypassrls;
+          create role supabase_admin;
+          create role supabase_auth_admin;
+          create role supabase_realtime_admin;
+          create role supabase_storage_admin;
           create database backup_fixture;
           SQL
           docker exec -i fac-pilot-restore psql -U postgres -d backup_fixture -v ON_ERROR_STOP=1 < tests/fixtures/community-tea-local-schema.sql
@@ -51,21 +57,22 @@ jobs:
           select id,'https://example.invalid/image.jpg','https://example.invalid/product' from public.teas order by id limit 142;
           SQL
           docker exec -i fac-pilot-restore psql -U postgres -v ON_ERROR_STOP=1 < tests/fixtures/pilot-role-settings.sql
+          docker exec -i fac-pilot-restore psql -U postgres -v ON_ERROR_STOP=1 < tests/fixtures/pilot-search-paths.sql
+          node scripts/verify-pilot-search-paths.mjs
           docker exec -i fac-pilot-restore psql -U postgres -v ON_ERROR_STOP=1 <<'SQL'
           alter role postgres set default_transaction_read_only to 'on';
-          alter role postgres set search_path to 'pg_catalog';
           SQL
           mkdir -p "$HOME/fac-pilot-backup"
           chmod 700 "$HOME/fac-pilot-backup"
           docker exec fac-pilot-restore pg_dump -U postgres -d backup_fixture -Fc > "$HOME/fac-pilot-backup/database.dump"
           docker exec fac-pilot-restore pg_dumpall -U postgres --roles-only --no-role-passwords > "$HOME/fac-pilot-backup/roles.sql"
-          # Reproduce the production export's E-prefixed bootstrap setting.
+          # Keep the exact reported production syntax in the roles export.
           python - <<'PY'
           import os, re
           from pathlib import Path
           path=Path(os.environ['HOME'])/'fac-pilot-backup/roles.sql'
           source,count=re.subn(r"^ALTER ROLE postgres SET search_path TO .+;$",
-              lambda _: r"ALTER ROLE postgres SET search_path TO E'\u0070g_catalog';",
+              lambda _: next(line for line in Path('tests/fixtures/pilot-search-paths.sql').read_text().splitlines() if line.startswith('ALTER ROLE postgres ')),
               path.read_text(), flags=re.M)
           assert count == 1
           path.write_text(source)

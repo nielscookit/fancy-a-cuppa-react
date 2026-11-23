@@ -175,3 +175,13 @@ Der Restore-Parser akzeptiert auch E- und e-präfixierte Stringliterale in den e
 Erst nach dem Dekodieren wird der Wert anhand derselben Setting-Allowlist geprüft und als neues SQL rekonstruiert. Die Escape-Schreibweise erteilt keine zusätzlichen Rechte für Settings, Bibliotheken oder Schema-Ausdrücke. Zusätzliche Statements, Konkatenation und Kommentare bleiben verboten. Mehrzeilige SQL-Literalfortsetzungen werden weiterhin nicht unterstützt.
 
 Die Regression verwendet die gemeldete Syntax `ALTER ROLE postgres SET search_path TO E'…';` mit repräsentativen Schemawerten. Der vollständige Produktionsrollenexport wurde nicht bereitgestellt. CI erzeugt den Rollenexport aus echtem PostgreSQL 17.11, überführt den Bootstrap-search_path in ein gleichwertiges E-Literal mit Unicode-Escape und führt damit den vollständigen Restore einschließlich Wiederholung aus.
+
+### Exakter produktiver search_path mit Backslash
+
+Am 23. November 2026 wurden ausschließlich die fünf Rollen-search_path-Werte aus `pg_db_role_setting` lesend geprüft. Die Fixture `tests/fixtures/pilot-search-paths.sql` enthält den gemeldeten postgres-Ausdruck und die vier weiteren Rollenwerte: supabase_admin, supabase_auth_admin, supabase_realtime_admin und supabase_storage_admin. Keine Passwörter oder sonstigen Rollenparameter wurden übernommen.
+
+Der Ausdruck `ALTER ROLE postgres SET search_path TO E'\\$user', 'public', 'extensions';` dekodiert seinen ersten Eintrag zu einem Schemanamen mit einem wörtlichen Backslash vor $user. Der Backslash bleibt erhalten. Die Parser-Erweiterung akzeptiert dafür ausschließlich diesen besonderen Namen einschließlich seiner quoted Rückleseform. Der gewöhnliche $user-Eintrag für die Nutzerschema-Auflösung wird weiterhin getrennt behandelt. Andere Backslash-Schemanamen und ein abweichender standard_conforming_strings-Modus bleiben gesperrt.
+
+`scripts/verify-pilot-search-paths.mjs` läuft ausschließlich in der CI-Testumgebung. Es führt alle fünf Originalausdrücke und ihre Parser-Rekonstruktionen in PostgreSQL 17 aus. Ein Schema namens postgres und ein Schema mit dem wörtlichen Namen Backslash-$user existieren während der Prüfung gleichzeitig. `current_schemas(false)` muss die erwarteten unterschiedlichen Ergebnisse zeigen; die Reihenfolge muss für Original und Rekonstruktion exakt übereinstimmen. Die Testschemas werden jeweils nur innerhalb einer zurückgerollten Transaktion angelegt.
+
+Der vollständige Restore-Workflow enthält anschließend den exakten gemeldeten postgres-Ausdruck im Rollenexport und prüft Restore, Cutover und Wiederholung. Produktionsdatenbank, Mac-Backups und Signing bleiben unberührt. Der echte Mac-Restore ist weiterhin eine gesonderte Abnahme.

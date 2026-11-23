@@ -88,7 +88,9 @@ function settingTokens(source) {
       if (!rest) throw Error('Unvollständige Rolleneinstellung.');
       continue;
     }
-    const match = rest.match(/^(?:'((?:[^'\\]|'')*)'|"([A-Za-z_$][A-Za-z0-9_$]*)"|([A-Za-z0-9_]+))/);
+    // Ordinary strings retain backslashes (standard_conforming_strings=on).
+    // Their decoded values still pass the setting-specific validation below.
+    const match = rest.match(/^(?:'((?:[^']|'')*)'|"((?:\\?\$user)|[A-Za-z_$][A-Za-z0-9_$]*)"|([A-Za-z0-9_]+))/);
     if (!match) throw Error('Ungültiger SQL-Wert einer Rolleneinstellung.');
     tokens.push(match[1] !== undefined ? match[1].replaceAll("''", "'")
       : match[2] !== undefined ? '"' + match[2] + '"' : match[3]);
@@ -109,6 +111,10 @@ export function parseRoleSetting(name, source) {
     const paths = tokens.flatMap(token => token === '' || token === '""' ? [] : token.split(',').map(part => part.trim()));
     const schemas = paths.map(path => {
       if (path === '"$user"') return '$user';
+      if (path === '$user') return '$user';
+      // This exported value names a literal backslash-prefixed schema.
+      // Never turn it into the $user substitution entry.
+      if (path === '\\$user' || path === '"\\$user"') return '\\$user';
       if (/^"[A-Za-z_][A-Za-z0-9_]*"$/.test(path)) return path.slice(1, -1);
       if (/^[a-z_][a-z0-9_]*$/.test(path)) return path;
       throw Error('Ungültiges Schema im search_path.');
@@ -137,7 +143,9 @@ export function parseRoles(source) {
   const nameOf = match => match[1] || match[2];
   for (const line of source.split('\n').map(line=>line.trim())) {
     if (!line || line.startsWith('--') || /^\\(?:un)?restrict [a-zA-Z0-9]+$/.test(line)
-      || /^SET (?:default_transaction_read_only|client_encoding|standard_conforming_strings) = (?:off|'UTF8'|on);$/.test(line)) continue;
+      || /^SET default_transaction_read_only = off;$/.test(line)
+      || /^SET client_encoding = 'UTF8';$/.test(line)
+      || /^SET standard_conforming_strings = on;$/.test(line)) continue;
     let m = line.match(new RegExp('^CREATE ROLE '+identifier+';$'));
     if (m) { names.add(nameOf(m)); continue; }
     m = line.match(new RegExp('^ALTER ROLE '+identifier+' SET ([a-z_]+) (?:TO|=) (.+);$'));

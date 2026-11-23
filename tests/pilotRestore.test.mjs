@@ -142,3 +142,28 @@ test('escape literals cannot inject SQL, bypass setting validation or carry inva
   assert.throws(()=>parseRoles(roleExport+String.raw`ALTER ROLE anon PASSWORD E'secret';`),/PASSWORD/);
   assert.throws(()=>parseRoleSetting('unknown_setting',String.raw`E'on'`));
 });
+
+test('all five production search paths preserve their decoded names and order', () => {
+  const fixture=readFileSync('tests/fixtures/pilot-search-paths.sql','utf8');
+  const roles=['postgres','supabase_admin','supabase_auth_admin','supabase_realtime_admin','supabase_storage_admin'];
+  const parsed=parseRoles(roleExport+roles.map(role=>'CREATE ROLE '+role+';').join('\n')+'\n'+fixture);
+  assert.deepEqual(parsed.settings.map(setting=>[setting.role,setting.value]),[
+    ['postgres',String.raw`"\$user", "public", "extensions"`],
+    ['supabase_admin','"$user", "public", "auth", "extensions"'],
+    ['supabase_auth_admin','"auth"'],
+    ['supabase_realtime_admin','"public", "extensions", "realtime"'],
+    ['supabase_storage_admin','"storage"'],
+  ]);
+  assert.equal(parseRoleSetting('search_path',String.raw`'"\$user", public, extensions'`).value,parsed.settings[0].value);
+  assert.notEqual(parsed.settings[0].value,parseRoleSetting('search_path',String.raw`E'\$user', 'public', 'extensions'`).value);
+});
+test('literal user schema support does not admit general backslashes or unsafe string modes', () => {
+  for(const source of [
+    String.raw`E'\\$other', 'public'`,
+    String.raw`E'\\$user; DROP ROLE anon'`,
+    String.raw`E'\\$user' || 'public'`,
+    String.raw`'\public'`,
+    String.raw`'public\'; DROP ROLE anon; --'`,
+  ]) assert.throws(()=>parseRoleSetting('search_path',source),source);
+  assert.throws(()=>parseRoles(roleExport+'SET standard_conforming_strings = off;'));
+});
