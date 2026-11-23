@@ -175,7 +175,8 @@ body {
 .fac-home__action--primary.MuiButton-root[data-timer-control="reset"] {
   background:#B9FC69; color:#1B272B;
 }
-.fac-home__action--secondary.MuiButton-root.Mui-disabled {
+.fac-home__action--secondary.MuiButton-root.Mui-disabled,
+.fac-home__voice-button.MuiIconButton-root.Mui-disabled {
   background:#F3F2F0; color:#E8E6E3;
 }
 
@@ -202,7 +203,9 @@ body {
   padding: 0;
 }
 
-.fac-home__voice-button.Mui-disabled { opacity: .35; }
+.fac-home__voice-button.Mui-disabled img {
+  content: url('/figma/voice-button-disabled.svg');
+}
 .fac-home__voice-button.Mui-focusVisible {
   outline: 3px solid #782b40;
   outline-offset: 2px;
