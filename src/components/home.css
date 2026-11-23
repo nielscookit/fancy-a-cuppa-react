@@ -168,6 +168,10 @@ body {
 .fac-home__action--primary.MuiButton-root:hover { background:#B9FC69; }
 .fac-home__action--secondary.MuiButton-root,
 .fac-home__action--secondary.MuiButton-root:hover { background:#1B272B; color:#fff; }
+.fac-home__action--secondary.MuiButton-root,
+.fac-home__voice-button.MuiIconButton-root {
+  transition: none;
+}
 .fac-home__assistant-slot { margin:-82px auto 16px; }
 .fac-home__action--primary.MuiButton-root.Mui-disabled {
   background:#B9FC69; color:#1B272B; opacity:.65;
